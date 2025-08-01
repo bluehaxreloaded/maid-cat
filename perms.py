@@ -6,7 +6,7 @@ def command_with_perms(*, min_role: str="Default", **kwargs): # permission manag
     def decorator(func):
         async def perm_check(ctx: commands.Context):
             role = discord.utils.get(ctx.guild.roles, name = min_role) if min_role != "Default" else ctx.guild.default_role
-            if role == None or ctx.author.top_role.position < role.position: # how??
+            if role is None or ctx.author.top_role.position < role.position: # how??
                 raise commands.MissingRole(min_role)
 
             return True

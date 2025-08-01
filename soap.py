@@ -1,4 +1,5 @@
-import discord, time
+import discord 
+import time
 from perms import command_with_perms
 from exceptions import CategoryNotFound
 from log import log_to_soaper_log
@@ -71,7 +72,7 @@ class SoapCog(commands.Cog): # SOAP commands
             return await ctx.send(f"{channel.mention} is not a SOAP channel!")
 
         boom = discord.utils.get(channel.guild.emojis, name=BOOM_NAME)
-        await channel.send(f"Self-destruct sequence initiated!")
+        await channel.send("Self-destruct sequence initiated!")
         await channel.send(f"<a:{boom.name}:{boom.id}>")
         time.sleep(2.75)
         await channel.delete()
