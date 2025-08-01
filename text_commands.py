@@ -74,7 +74,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             "Select `Open in Textviewer`. Send a picture of the serial number contained in the file. It should be a three-letter prefix followed by nine numbers.",
         ]
 
-    @perms.command_with_perms(min_role="Soaper", name="soapwait", aliases=["wait"])
+    @perms.command_with_perms(min_role="Soaper", name="soapwait", aliases=["wait"], help="Claiming a soap channel, for soapers")
     @perms.soap_channels_only()
     @ping_before_mes()
     async def soapwait(self, ctx: commands.Context):
@@ -83,38 +83,38 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             f"{blobsoap} the SOAP process has begun and will take up to 5 minutes. Please wait. {blobsoap}"
         ]
 
-    @perms.command_with_perms(name="removennid", aliases=["nnidremove"])
+    @perms.command_with_perms(name="removennid", aliases=["nnidremove"], help="NNID Removal instructions")
     async def removennid(self, ctx: commands.Context):
         await ctx.send()
 
-    @perms.command_with_perms(name="hacksguide", aliases=["guide"])
+    @perms.command_with_perms(name="hacksguide", aliases=["guide"], help="Modding and 3DS help link")
     async def hacksguide(self, ctx: commands.Context):
         await ctx.send(
             "For modding help and 3DS support please visit 3DS Hacks Guide:\n\n"
             "<https://3ds.hacks.guide/>"
         )
 
-    @perms.command_with_perms(name="regionchange")
+    @perms.command_with_perms(name="regionchange", help="Directions on performing a region change on a 3DS console")
     async def regionchange(self, ctx: commands.Context):
         await ctx.send(
             "Region changing guide:\n\n<https://3ds.hacks.guide/region-changing.html>"
         )
 
-    @perms.command_with_perms(name="nandbackup", aliases=["backupnand"])
+    @perms.command_with_perms(name="nandbackup", aliases=["backupnand"], help="Directions on creating a nand backup")
     async def nandbackup(self, ctx: commands.Context):
         await ctx.send(
             "How to create a nand backup:\n\n"
             "<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>"
         )
 
-    @perms.command_with_perms(name="cleaninty")
+    @perms.command_with_perms(name="cleaninty", help="Sends link to cleaninty article")
     async def cleaninty(self, ctx: commands.Context):
         await ctx.send(
             "See the following for an overview on how SOAP Transfers work:\n\n"
             "https://wiki.hacks.guide/wiki/3DS:Cleaninty"
         )
 
-    @perms.command_with_perms(min_role="Soaper", name="nodonors")
+    @perms.command_with_perms(min_role="Soaper", name="nodonors", help="Lets Soapee know they need to wait for a bit.")
     @perms.soap_channels_only()
     @ping_before_mes()
     async def nodonors(self, ctx: commands.Context):
