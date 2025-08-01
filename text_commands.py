@@ -1,5 +1,5 @@
 import discord
-import perms
+from perms import command_with_perms, soap_channels_only
 from discord.ext import commands
 from functools import wraps
 from constants import SOAP_CHANNEL_SUFFIX
@@ -27,13 +27,13 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     def __init__(self, bot: discord.Bot):
         self.bot = bot
 
-    @perms.command_with_perms(
+    @command_with_perms(
         min_role="Soaper",
         name="soapnormal",
         aliases=["normalsoap", "normal"],
         help="Displays normal SOAP completion message",
     )
-    @perms.soap_channels_only()
+    @soap_channels_only()
     @ping_before_mes()
     async def soapnormal(self, ctx: commands.Context):
         return [
@@ -43,13 +43,13 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             "Please let us know if the eshop functions or not.",
         ]
 
-    @perms.command_with_perms(
+    @command_with_perms(
         min_role="Soaper",
         name="soaplottery",
         aliases=["lotterysoap", "lottery"],
         help='Displays "lottery" SOAP completion message',
     )
-    @perms.soap_channels_only()
+    @soap_channels_only()
     @ping_before_mes()
     async def soaplottery(self, ctx: commands.Context):
         return [
@@ -59,13 +59,13 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             "Please let us know if the eshop functions or not.",
         ]
 
-    @perms.command_with_perms(
+    @command_with_perms(
         min_role="Soaper",
         name="findserial",
         aliases=["serial", "serialmismatch"],
         help="Explains how to find a serial number in GM9",
     )
-    @perms.soap_channels_only()
+    @soap_channels_only()
     @ping_before_mes()
     async def findserial(self, ctx: commands.Context):
         return [
@@ -74,8 +74,13 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             "Select `Open in Textviewer`. Send a picture of the serial number contained in the file. It should be a three-letter prefix followed by nine numbers.",
         ]
 
-    @perms.command_with_perms(min_role="Soaper", name="soapwait", aliases=["wait"], help="Claiming a soap channel, for soapers")
-    @perms.soap_channels_only()
+    @command_with_perms(
+        min_role="Soaper",
+        name="soapwait",
+        aliases=["wait"],
+        help="Claiming a soap channel, for soapers",
+    )
+    @soap_channels_only()
     @ping_before_mes()
     async def soapwait(self, ctx: commands.Context):
         blobsoap = discord.utils.get(ctx.guild.emojis, name="blobsoap")
@@ -83,44 +88,78 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             f"{blobsoap} the SOAP process has begun and will take up to 5 minutes. Please wait. {blobsoap}"
         ]
 
-    @perms.command_with_perms(name="removennid", aliases=["nnidremove"], help="NNID Removal instructions")
+    @command_with_perms(
+        name="removennid", aliases=["nnidremove"], help="NNID Removal instructions"
+    )
     async def removennid(self, ctx: commands.Context):
-        await ctx.send()
+        await ctx.send(
+            "To remove the old Nintendo Network ID (NNID) on your system, first [make a fresh nand backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) (NOTE: Your existing NAND backup is likely in the original region of your console, so you will want one of your changed region anyway).\n\n"
+            "Then use GM9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>)"
+        )
 
-    @perms.command_with_perms(name="hacksguide", aliases=["guide"], help="Modding and 3DS help link")
+    @command_with_perms(
+        name="hacksguide", aliases=["guide"], help="Modding and 3DS help link"
+    )
     async def hacksguide(self, ctx: commands.Context):
         await ctx.send(
             "For modding help and 3DS support please visit 3DS Hacks Guide:\n\n"
             "<https://3ds.hacks.guide/>"
         )
 
-    @perms.command_with_perms(name="regionchange", help="Directions on performing a region change on a 3DS console")
+    @command_with_perms(
+        name="regionchange",
+        help="Directions on performing a region change on a 3DS console",
+    )
     async def regionchange(self, ctx: commands.Context):
         await ctx.send(
             "Region changing guide:\n\n<https://3ds.hacks.guide/region-changing.html>"
         )
 
-    @perms.command_with_perms(name="nandbackup", aliases=["backupnand"], help="Directions on creating a nand backup")
+    @command_with_perms(
+        name="nandbackup",
+        aliases=["backupnand"],
+        help="Directions on creating a nand backup",
+    )
     async def nandbackup(self, ctx: commands.Context):
         await ctx.send(
             "How to create a nand backup:\n\n"
             "<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>"
         )
 
-    @perms.command_with_perms(name="cleaninty", help="Sends link to cleaninty article")
+    @command_with_perms(name="cleaninty", help="Sends link to cleaninty article")
     async def cleaninty(self, ctx: commands.Context):
         await ctx.send(
             "See the following for an overview on how SOAP Transfers work:\n\n"
             "https://wiki.hacks.guide/wiki/3DS:Cleaninty"
         )
 
-    @perms.command_with_perms(min_role="Soaper", name="nodonors", help="Lets Soapee know they need to wait for a bit.")
-    @perms.soap_channels_only()
+    @command_with_perms(
+        min_role="Soaper",
+        name="nodonors",
+        help="Lets Soapee know they need to wait for a bit.",
+    )
+    @soap_channels_only()
     @ping_before_mes()
     async def nodonors(self, ctx: commands.Context):
         return [
             "Whoops, all of our donors are on cooldown, we’ll get back to you as soon as possible."
         ]
+
+    @command_with_perms(name="newsd", help="New SD guide")
+    async def newsd(self, ctx: commands.Context):
+        await ctx.send(
+            "How to restore CFW on a new SD card:\n\n"
+            "<https://3ds.hacks.guide/restoring-updating-cfw.html>"
+        )
+
+    @command_with_perms(
+        name="formatsd", aliases=["format", "sdformat"], help="SD formatting guide"
+    )
+    async def formatsd(self, ctx: commands.Context):
+        await ctx.send(
+            "How to format an SD card correctly for a 3DS:\n\n"
+            "<https://3ds.hacks.guide/formatting-sd-(windows).html>"
+        )
 
 
 def setup(bot):
