@@ -1,0 +1,12 @@
+KEY = "" # i shouldn't have to explain this one
+
+SOAP_CHANNEL_SUFFIX = "-needs-cleaning-🧼" # what each soap channel ends with
+BOOM_NAME = "boomparrot" # emoji shown on boom (deletesoap)
+
+# channel and user IDs
+SOAP_CHANNEL_CATEGORY_ID =  # category to put all the SOAP channels into
+SOAP_LOG_ID =  # channel that logging of SOAP creation/deletion and errors are placed
+MOD_LOG_ID =  # channel that logging of non-SOAP related actions are placed (excluding join/leaves)
+JOIN_LEAVE_LOG_ID =  # channel where join/leaves are logged
+ERROR_LOG_ID =  # channel that any error not dealt with gets logged to
+SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, , ] # where soap channel specific commands can be used
