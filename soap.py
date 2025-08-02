@@ -68,7 +68,7 @@ class SoapCog(commands.Cog): # SOAP commands
 
         if not channel:
             return await ctx.send(f"SOAP channel not found for `{user.name}`")
-        elif not (channel.category.name == "Soaps" and channel.name.endswith(SOAP_CHANNEL_SUFFIX)):
+        elif not (channel.category.id == SOAP_CHANNEL_CATEGORY_ID and channel.name.endswith(SOAP_CHANNEL_SUFFIX)):
             return await ctx.send(f"{channel.mention} is not a SOAP channel!")
 
         boom = discord.utils.get(channel.guild.emojis, name=BOOM_NAME)

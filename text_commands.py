@@ -2,19 +2,22 @@ import discord
 from perms import command_with_perms, soap_channels_only
 from discord.ext import commands
 from functools import wraps
-from constants import SOAP_CHANNEL_SUFFIX
+from constants import SOAP_CHANNEL_SUFFIX, SOAP_USABLE_IDS
 
 
 def ping_before_mes():  # i didn't feel like writing the same line multiple times so i did the harder option of writing an entire decorator to write one single line
     def decorator(func):
         @wraps(func)
         async def send_ping(self, ctx: commands.Context, *args, **kwargs):
+            
             member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
             member_obj = ctx.guild.get_member_named(member_name)
             if member_obj:
                 await ctx.send(
                     f"{member_obj.mention}\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
                 )
+            elif ctx.channel.category_id in SOAP_USABLE_IDS:
+                await ctx.send(f"`SOAPEE MENTION HERE` (this is not a soap channel)\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}")
             else:
                 await ctx.send(f"User `{member_name}` left.")
 
