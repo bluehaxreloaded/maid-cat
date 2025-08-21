@@ -166,7 +166,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     @command_with_perms(
         name="donors", help="How to donate consoles for SOAPs"
     )
-    async def formatsd(self, ctx: commands.Context):
+    async def donors(self, ctx: commands.Context):
         await ctx.send(
 "For a console to be a donor, ideally they should be dead consoles that won't be used anymore (won't turn on, bad screens, bad ram, etc), a console with a bad wifi card, or a console that has had the eshop apps (`tiger`, `mint`) deleted off the nand so it can't connect to the eshop, using a console while it is also being used as a donor causes various issues
 \n\n"
@@ -182,4 +182,5 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
 
 def setup(bot):
     bot.add_cog(TextCommandsCog(bot))
+
 
