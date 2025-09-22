@@ -1,15 +1,38 @@
 import discord
+import re
 from perms import command_with_perms, soap_channels_only
 from discord.ext import commands
 from functools import wraps
 from constants import SOAP_CHANNEL_SUFFIX, SOAP_USABLE_IDS
 
+# Regex pulls the User ID from a mention
+MENTION_RE = re.compile(r"<@!?(\d{15,25})>")
 
 def ping_before_mes():  # i didn't feel like writing the same line multiple times so i did the harder option of writing an entire decorator to write one single line
     def decorator(func):
         @wraps(func)
         async def send_ping(self, ctx: commands.Context, *args, **kwargs):
-            
+            # Get the user from the channel topic.
+            member_obj = None
+            topic = getattr(ctx.channel, "topic", None)
+            if isinstance(ctx.channel, discord.TextChannel) and topic:
+                m = MENTION_RE.search(topic)
+                if m:
+                    uid = int(m.group(1))
+                    member_obj = ctx.guild.get_member(uid)
+                    if member_obj is None:
+                        try:
+                            member_obj = await ctx.guild.fetch_member(uid)
+                        except discord.NotFound:
+                            member_obj = None
+
+                if member_obj:
+                    await ctx.send(
+                        f"{member_obj.mention}\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
+                    )
+                    return
+                
+            # Get the user from the channel name if topic failed.
             member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
             member_obj = ctx.guild.get_member_named(member_name)
             if member_obj:
