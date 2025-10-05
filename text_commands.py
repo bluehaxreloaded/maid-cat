@@ -168,12 +168,14 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     )
     async def donors(self, ctx: commands.Context):
         await ctx.send(
-"For a console to be a donor, ideally they should be dead consoles that won't be used anymore (won't turn on, bad screens, bad ram, etc), a console with a bad wifi card, or a console that has had the eshop apps (`tiger`, `mint`) deleted off the nand so it can't connect to the eshop, using a console while it is also being used as a donor causes various issues
-\n\n"
+            "For a console to be a donor, ideally they should:\n"
+            "- be in a state where they won't be used anymore (won't turn on, bad screens, bad ram, etc),\n" \
+            "- have a bad wifi card, or\n"
+            "- have had the eShop apps (`tiger`, `mint`) deleted off the NAND so it can't connect to the eShop (connecting a console to the eShop while it is also being used as a donor is known cause various issues)"
+            "\n\n"
             "To donate a console for soaps, all we need is either:\n\n"
-            "essential.exefs + serial\n"
-            "secinfo + otp + serial\n"
-            "otp + serial\n\n"
+            "- `essential.exefs` + serial, or\n"
+            "- secinfo + OTP + serial\n\n"
 
             "You can send this info to any Staff or Soaper. Thank you!"  
 
