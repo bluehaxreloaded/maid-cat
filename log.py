@@ -16,18 +16,27 @@ class ErrorLogChannelNotFound(LogChannelNotFound):
         self.original_error = original_error
 
 
-async def log_to(ctx: commands.Context, channel_id: int, title: str | None = None):
+async def log_to(ctx: commands.Context | discord.Interaction, channel_id: int, title: str | None = None):
     log_channel = discord.utils.get(ctx.guild.channels, id=channel_id)
     if log_channel:
         log_embed = discord.Embed(title=title)
+
+        # Handle both Context and Interaction
+        if isinstance(ctx, discord.Interaction):
+            author = ctx.user
+            action = "Button interaction"
+        else:
+            author = ctx.message.author
+            action = ctx.message.content
+
         log_embed.add_field(
-            name="Sent by:",
-            value=f"{ctx.message.author.name} - {ctx.message.author.id}",
+            name="Action made by:",
+            value=f"{author.name} - {author.id}",
             inline=False,
         )
         log_embed.add_field(
-            name="Action: ", value=ctx.message.content, inline=False
-        )  # on_message() automatically strips all content not command related
+            name="Action: ", value=action, inline=False
+        )
         await log_channel.send(embed=log_embed)
     else:
         raise LogChannelNotFound(channel_id)
@@ -59,5 +68,5 @@ def log_to_mod_log(ctx: commands.Context, title: str):
     return log_to(ctx, MOD_LOG_ID, title)
 
 
-def log_to_soaper_log(ctx: commands.Context, title: str):
+def log_to_soaper_log(ctx: commands.Context | discord.Interaction, title: str):
     return log_to(ctx, SOAP_LOG_ID, title)
