@@ -5,9 +5,8 @@ BOOM_NAME = "boomparrot" # emoji shown on boom (deletesoap)
 
 # channel and user IDs
 SOAP_CHANNEL_CATEGORY_ID =  # category to put all the SOAP channels into
-MANUAL_SOAP_CATEGORY_ID =  # category for manual SOAP channels that need human intervention
+MANUAL_SOAP_CATEGORY_ID =  # category for manual SOAP channels that need soapers to come in
 REQUEST_SOAP_CHANNEL_ID =  # channel where the SOAP request embed is posted on startup
-SOAP_HELP_CHANNEL_ID =  # channel where users can ask for SOAP help
 SOAP_LOG_ID =  # channel that logging of SOAP creation/deletion and errors are placed
 MOD_LOG_ID =  # channel that logging of non-SOAP related actions are placed (excluding join/leaves)
 JOIN_LEAVE_LOG_ID =  # channel where join/leaves are logged

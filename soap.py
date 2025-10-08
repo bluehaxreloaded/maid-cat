@@ -10,7 +10,7 @@ class SoapCog(commands.Cog): # SOAP commands
     def __init__(self, bot):
         self.bot = bot
 
-    async def create_soap_channel_for_user(self, guild: discord.Guild, user: discord.Member, requester: discord.Member = None, ctx: commands.Context = None):
+    async def create_soap_channel_for_user(self, guild: discord.Guild, user: discord.Member, requester: discord.Member = None, ctx: commands.Context | discord.Interaction = None):
         """
         Helper function to create a SOAP channel.
         Returns tuple: (success: bool, channel: discord.TextChannel | None, message: str)
@@ -60,12 +60,11 @@ class SoapCog(commands.Cog): # SOAP commands
                 "10. Please wait for further instructions\n"
             )
 
-            # Log if we have a context
             if ctx:
                 try:
-                    await log_to_soaper_log(ctx, f"Created SOAP Channel for {user.name}")
+                    await log_to_soaper_log(ctx, f"[AUTO] Created SOAP Channel")
                 except:
-                    pass  # Logging failed, but channel was created
+                    pass
 
             return True, new_channel, "Channel created successfully"
 
