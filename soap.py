@@ -17,14 +17,18 @@ class SoapCog(commands.Cog): # SOAP commands
             return
         
         channel_name = user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX # channels can't have periods
-        channel = discord.utils.get(ctx.guild.channels, name = channel_name)   
+        channel = discord.utils.get(ctx.guild.channels, name = channel_name)
         
         if channel:
             await ctx.send(f"Soap channel already made for `{user.name}` at {channel.jump_url}")
         else:
             category = discord.utils.get(ctx.guild.categories, id=SOAP_CHANNEL_CATEGORY_ID)
             if category:
-                new = await ctx.guild.create_text_channel(name=channel_name, category=category)
+                    new = await ctx.guild.create_text_channel(
+                        name=channel_name,
+                        category=category,
+                        topic=f"This is the SOAP channel for <@{user.id}>, please follow all provided instructions."
+                    )
             else:
                 raise CategoryNotFound(SOAP_CHANNEL_CATEGORY_ID)
             
