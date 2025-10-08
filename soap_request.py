@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from perms import command_with_perms
-from constants import REQUEST_SOAP_CHANNEL_ID, SOAP_HELP_CHANNEL_ID
+from constants import REQUEST_SOAP_CHANNEL_ID
 
 
 class CFWCheckView(discord.ui.View):
@@ -135,7 +135,8 @@ class RegionChangeView(discord.ui.View):
         success, channel, message = await soap_cog.create_soap_channel_for_user(
             interaction.guild,
             self.user,
-            interaction.user
+            interaction.user,
+            ctx=interaction
         )
 
         if success:
@@ -237,7 +238,7 @@ class SOAPRequestCog(commands.Cog):
                        "• Be ready to get files off your console",
             color=discord.Color.blue()
         )
-        embed.set_footer(text="SOAPs allow for region-changed consoles to access services such as the eShop and Pokemon Bank.")
+        embed.set_footer(text="SOAPs allow for region-changed consoles to access services such as the eShop.")
         view = SOAPRequestView()
         return embed, view
 
