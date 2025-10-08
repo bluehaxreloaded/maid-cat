@@ -107,7 +107,6 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help="Claiming a soap channel, for soapers",
     )
     @soap_channels_only()
-    @ping_before_mes()
     async def soapwait(self, ctx: commands.Context):
         blobsoap = discord.utils.get(ctx.guild.emojis, name="blobsoap")
         return [
@@ -168,7 +167,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     @ping_before_mes()
     async def nodonors(self, ctx: commands.Context):
         return [
-            "Whoops, all of our donors are on cooldown, we’ll get back to you as soon as possible."
+            "All of our donors are on cooldown, you have been added to the queue, we’ll get back to you as soon as possible."
         ]
 
     @command_with_perms(name="newsd", help="New SD guide")
@@ -187,6 +186,26 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             "<https://3ds.hacks.guide/formatting-sd-(windows).html>"
         )
 
+    @command_with_perms(
+        name="donors", help="How to donate consoles for SOAPs"
+    )
+    async def donors(self, ctx: commands.Context):
+        await ctx.send(
+            "For a console to be a donor, ideally they should:\n"
+            "- be in a state where they won't be used anymore (won't turn on, bad screens, bad ram, etc),\n" \
+            "- have a bad wifi card, or\n"
+            "- have had the eShop apps (`tiger`, `mint`) deleted off the NAND so it can't connect to the eShop (connecting a console to the eShop while it is also being used as a donor is known cause various issues)"
+            "\n\n"
+            "To donate a console for soaps, all we need is either:\n\n"
+            "- `essential.exefs` + serial, or\n"
+            "- secinfo + OTP + serial\n\n"
+
+            "You can send this info to any Staff or Soaper. Thank you!"  
+
+        )
+
 
 def setup(bot):
     bot.add_cog(TextCommandsCog(bot))
+
+
