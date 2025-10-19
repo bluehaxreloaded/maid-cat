@@ -2,6 +2,7 @@ KEY = "" # i shouldn't have to explain this one
 
 SOAP_CHANNEL_SUFFIX = "-needs-cleaning-🧼" # what each soap channel ends with
 BOOM_NAME = "boomparrot" # emoji shown on boom (deletesoap)
+SOAP_LOADING_ID =  # SOAP loading sticker ID
 
 # channel and user IDs
 SOAP_CHANNEL_CATEGORY_ID =  # category to put all the SOAP channels into
