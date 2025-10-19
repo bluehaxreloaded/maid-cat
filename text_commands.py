@@ -3,7 +3,7 @@ import re
 from perms import command_with_perms, soap_channels_only
 from discord.ext import commands
 from functools import wraps
-from constants import SOAP_CHANNEL_SUFFIX, SOAP_USABLE_IDS
+from constants import SOAP_CHANNEL_SUFFIX, SOAP_USABLE_IDS, BLOBSOAP_EMOTE_ID, SOAP_LOADING_ID
 
 # Regex pulls the User ID from a mention
 MENTION_RE = re.compile(r"<@!?(\d{15,25})>")
@@ -108,10 +108,12 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     )
     @soap_channels_only()
     async def soapwait(self, ctx: commands.Context):
-        blobsoap = discord.utils.get(ctx.guild.emojis, name="blobsoap")
-        return [
-            f"{blobsoap} the SOAP process has begun and will take up to 5 minutes. Please wait. {blobsoap}"
-        ]
+        await ctx.send(
+            f"{discord.utils.get(ctx.guild.emojis, id=BLOBSOAP_EMOTE_ID)} the SOAP process has begun and will take up to 5 minutes. Please wait. {discord.utils.get(ctx.guild.emojis, id=BLOBSOAP_EMOTE_ID)}"
+        )
+        sticker = discord.utils.get(ctx.guild.stickers, id=SOAP_LOADING_ID)
+        if sticker:
+            await ctx.send(content="", stickers=[sticker])
 
     @command_with_perms(
         name="removennid", aliases=["nnidremove"], help="NNID Removal instructions"
