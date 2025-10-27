@@ -231,7 +231,7 @@ class SOAPRequestCog(commands.Cog):
         """Helper method to create the SOAP request embed and view"""
         embed = discord.Embed(
             title="🧼 SOAP Request",
-            description="SOAP Transfers allow region-changed Nintendo 3DS consoles to access the eShop, Pokemon Bank, and more. This channel is where you can request one!\n\n"
+            description="This is where you can request a SOAP Transfer, which allows region-changed Nintendo 3DS consoles to access the eShop, Pokemon Bank, and more.\n\n"
                        "**Before requesting:**\n"
                        "• Ensure your 3DS is modded and region-changed\n"
                        "• Have your serial number ready\n"
