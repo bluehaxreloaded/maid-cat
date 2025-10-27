@@ -9,10 +9,10 @@ class CFWCheckView(discord.ui.View):
         super().__init__(timeout=60)
 
     @discord.ui.select(
-        placeholder="Is your console modded?",
+        placeholder="Is your console on custom firmware?",
         options=[
-            discord.SelectOption(label="Yes, my console is modded", value="yes", emoji="✅"),
-            discord.SelectOption(label="No, my console is not modded", value="no", emoji="❌"),
+            discord.SelectOption(label="Yes, my 3DS is on custom firmware", value="yes", emoji="✅"),
+            discord.SelectOption(label="No, my 3DS is not on custom firmware", value="no", emoji="❌"),
             discord.SelectOption(label="I'm not sure", value="unsure", emoji="❓")
         ]
     )
@@ -143,9 +143,10 @@ class RegionChangeView(discord.ui.View):
             embed = discord.Embed(
                 title="✅ Ready to Proceed!",
                 description=f"We'll perform your SOAP in {channel.mention}.\n\n",
-                footer=discord.Footer(text="Please go there and follow the instructions to get started."),
                 color=discord.Color.green()
             )
+
+            embed.set_footer(text="Please go there and follow the instructions to get started.")
 
             # button to go to soap channel
             view = discord.ui.View()
@@ -208,12 +209,12 @@ class SOAPRequestView(discord.ui.View):
         # no existing channel, proceed with the form
         embed = discord.Embed(
             title="🔍 Pre-SOAP Check",
-            description="Let's ensure your console is ready to be SOAPed.",
+            description="Let's ensure your 3DS is ready to be SOAPed.",
             color=discord.Color.blue()
         )
         embed.add_field(
             name="Question 1 of 2",
-            value="Is your console on custom firmware (CFW)?",
+            value="Is your console on custom firmware?",
             inline=False
         )
         embed.set_footer(text="Questions? Drop us a line in #soap-help")
@@ -230,7 +231,7 @@ class SOAPRequestCog(commands.Cog):
         """Helper method to create the SOAP request embed and view"""
         embed = discord.Embed(
             title="🧼 SOAP Request",
-            description="SOAP Transfers allow region-changed consoles to access the eShop, Pokemon Bank, and more. This channel is where you can request one!\n\n"
+            description="SOAP Transfers allow region-changed Nintendo 3DS consoles to access the eShop, Pokemon Bank, and more. This channel is where you can request one!\n\n"
                        "**Before requesting:**\n"
                        "• Ensure your 3DS is modded and region-changed\n"
                        "• Have your serial number ready\n"
