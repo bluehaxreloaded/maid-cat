@@ -11,6 +11,7 @@ intent.members = True
 bot = commands.Bot(command_prefix=".", intents=intent)
 bot.help_command = CustomHelp()
 bot.load_extension("soap")
+bot.load_extension("soap_request")
 # bot.load_extension("dynamic_cmds")
 bot.load_extension("text_commands")
 
