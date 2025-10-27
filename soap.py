@@ -10,7 +10,7 @@ class SoapCog(commands.Cog): # SOAP commands
     def __init__(self, bot):
         self.bot = bot
     
-    @command_with_perms(min_role="Soaper", name="createsoap", aliases=["soup", "setupsoap", "soap", "setupsoup", "createsoup"], help="Sets up SOAP channel")
+    @command_with_perms(min_role="Soaper", name="createsoap", aliases=["soup", "setupsoap", "soap", "siap", "setupsoup", "createsoup"], help="Sets up SOAP channel")
     async def createsoap(self, ctx: commands.Context, user: discord.Member | int | str): # Creates soup channel
         if not isinstance(user, discord.Member):
             await ctx.send("User not in server or does not exist!")
@@ -84,4 +84,5 @@ class SoapCog(commands.Cog): # SOAP commands
 
 
 def setup(bot):
+
     return bot.add_cog(SoapCog(bot))
