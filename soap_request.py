@@ -85,7 +85,7 @@ class RegionChangeView(discord.ui.View):
         if region_answer == "no":
             embed = discord.Embed(
                 title="🔒 Unable to Request SOAP",
-                description="Your console must be region-changed to use SOAP.\n\n"
+                description="Your console must be region-changed to receive a SOAP transfer.\n\n"
                            "Please region-change your console first:",
                 color=discord.Color.red()
             )
