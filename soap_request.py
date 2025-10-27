@@ -6,7 +6,7 @@ from constants import REQUEST_SOAP_CHANNEL_ID
 
 class CFWCheckView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=60)
+        super().__init__(timeout=180)
 
     @discord.ui.select(
         placeholder="Is your console on custom firmware?",
@@ -68,7 +68,7 @@ class CFWCheckView(discord.ui.View):
 
 class RegionChangeView(discord.ui.View):
     def __init__(self, user: discord.Member):
-        super().__init__(timeout=60)
+        super().__init__(timeout=180)
         self.user = user
 
     @discord.ui.select(
