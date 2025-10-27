@@ -46,7 +46,7 @@ class SoapCog(commands.Cog): # SOAP commands
 
                 "# Welcome!\n\n\n"
 
-                "Make sure your console is modded and region changed first.\n\n"
+                "This is where we'll perform your SOAP transfer. Please follow the instructions below.\n\n"
 
                 "1. Ensure your SD card is in your console\n"
                 "2. Hold START while powering on your console. This will boot you into GM9\n"
@@ -54,10 +54,10 @@ class SoapCog(commands.Cog): # SOAP commands
                 "4. Select `essential.exefs`\n"
                 "5. Select `copy to 0:/gm9/out` (select `Overwrite file(s)` if prompted)\n"
                 "6. Power off your console\n"
-                "7. Insert your SD card into your PC\n"
+                "7. Insert your SD card into your PC or connect to your console via FTPD\n"
                 "8. Navigate to `/gm9/out` on your SD, where `essential.exefs` should be located\n"
                 "9. Send the `essential.exefs` file to this chat as well as your serial number from your console. The serial number should be a three-letter prefix followed by nine numbers.\n"
-                "10. Please wait for further instructions\n"
+                "10. Please await a <@1345177409154191414> to assist you\n"
             )
 
             if ctx:

@@ -9,10 +9,10 @@ class CFWCheckView(discord.ui.View):
         super().__init__(timeout=60)
 
     @discord.ui.select(
-        placeholder="Is your console hacked?",
+        placeholder="Is your console modded?",
         options=[
-            discord.SelectOption(label="Yes, my console has CFW", value="yes", emoji="✅"),
-            discord.SelectOption(label="No, my console doesn't have CFW", value="no", emoji="❌"),
+            discord.SelectOption(label="Yes, my console is modded", value="yes", emoji="✅"),
+            discord.SelectOption(label="No, my console is not modded", value="no", emoji="❌"),
             discord.SelectOption(label="I'm not sure", value="unsure", emoji="❓")
         ]
     )
@@ -22,8 +22,8 @@ class CFWCheckView(discord.ui.View):
         if cfw_answer == "no":
             embed = discord.Embed(
                 title="🔒 Unable to Request SOAP",
-                description="Your console must be on custom firmware to use SOAP.\n\n"
-                           "Please visit the guide below to mod your console first:",
+                description="Your console must be on custom firmware to receive a SOAP transfer.\n\n"
+                           "Please visit the guide below to mod your console:",
                 color=discord.Color.red()
             )
             embed.add_field(name="3DS Hacks Guide", value="https://3ds.hacks.guide/", inline=False)
@@ -32,19 +32,19 @@ class CFWCheckView(discord.ui.View):
         elif cfw_answer == "unsure":
             embed = discord.Embed(
                 title="❓ How to Check for CFW",
-                description="Follow these steps to check if your 3DS has custom firmware:",
+                description="Follow these steps to check if your 3DS is modded:",
                 color=discord.Color.orange()
             )
             embed.add_field(
                 name="Steps",
                 value="• Hold SELECT while powering on your console\n"
                       "• If the Luma3DS configuration menu appears, you have CFW\n"
-                      "• If it just boots normally, you don't have CFW",
+                      "• If it boots normally, you don't have CFW installed",
                 inline=False
             )
             embed.add_field(
                 name="No CFW?",
-                value="Visit https://3ds.hacks.guide/ to install it",
+                value="Visit https://3ds.hacks.guide/ to mod your console",
                 inline=False
             )
             await interaction.response.edit_message(embed=embed, view=None)
@@ -53,7 +53,7 @@ class CFWCheckView(discord.ui.View):
             # ask the second question about region change
             embed = discord.Embed(
                 title="🔍 Pre-SOAP Check",
-                description="Great!\n\nOne more thing to check:",
+                description="Great, one more thing to check:",
                 color=discord.Color.blue()
             )
             embed.add_field(
@@ -142,9 +142,8 @@ class RegionChangeView(discord.ui.View):
         if success:
             embed = discord.Embed(
                 title="✅ Ready to Proceed!",
-                description=f"Great! We'll perform your SOAP in this dedicated channel.\n\n"
-                           f"**Your channel:** {channel.mention}\n\n"
-                           "Please go there now and follow the instructions to get started.",
+                description=f"We'll perform your SOAP in {channel.mention}.\n\n",
+                footer=discord.Footer(text="Please go there and follow the instructions to get started."),
                 color=discord.Color.green()
             )
 
@@ -209,7 +208,7 @@ class SOAPRequestView(discord.ui.View):
         # no existing channel, proceed with the form
         embed = discord.Embed(
             title="🔍 Pre-SOAP Check",
-            description="Let's make sure your console is ready to be SOAPed.",
+            description="Let's ensure your console is ready to be SOAPed.",
             color=discord.Color.blue()
         )
         embed.add_field(
@@ -231,14 +230,14 @@ class SOAPRequestCog(commands.Cog):
         """Helper method to create the SOAP request embed and view"""
         embed = discord.Embed(
             title="🧼 SOAP Request",
-            description="Click the button below to request a SOAP transfer.\n\n"
+            description="SOAP Transfers allow region-changed consoles to access the eShop, Pokemon Bank, and more. This channel is where you can request one!\n\n"
                        "**Before requesting:**\n"
-                       "• Ensure your 3DS is modded with custom firmware\n"
-                       "• Have your SD card ready\n"
+                       "• Ensure your 3DS is modded and region-changed\n"
+                       "• Have your serial number ready\n"
                        "• Be ready to get files off your console",
             color=discord.Color.blue()
         )
-        embed.set_footer(text="SOAPs allow for region-changed consoles to access services such as the eShop.")
+        embed.set_footer(text="Click the button below to request a SOAP transfer.")
         view = SOAPRequestView()
         return embed, view
 
