@@ -62,7 +62,7 @@ class SoapCog(commands.Cog): # SOAP commands
 
             if ctx:
                 try:
-                    await log_to_soaper_log(ctx, f"[AUTO] Created SOAP Channel")
+                    await log_to_soaper_log(ctx, f"Created SOAP Channel")
                 except:
                     pass
 
