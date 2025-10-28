@@ -41,28 +41,33 @@ class SoapCog(commands.Cog): # SOAP commands
             )
 
             await new_channel.set_permissions(user, read_messages=True)
-            await new_channel.send(
-                f"{user.mention}\n"
 
-                "# Welcome!\n\n\n"
+            soap_automation_cog = self.bot.get_cog("SOAPAutomationCog")
+            if soap_automation_cog:
+                await soap_automation_cog.create_soap_interface(new_channel, user)
+            else:
+                await new_channel.send(
+                    f"{user.mention}\n"
 
-                "This is where we'll perform your SOAP transfer. Please follow the instructions below.\n\n"
+                    "# Welcome!\n\n\n"
 
-                "1. Ensure your SD card is in your console\n"
-                "2. Hold START while powering on your console. This will boot you into GM9\n"
-                "3. Navigate to `SysNAND Virtual`\n"
-                "4. Select `essential.exefs`\n"
-                "5. Select `copy to 0:/gm9/out` (select `Overwrite file(s)` if prompted)\n"
-                "6. Power off your console\n"
-                "7. Insert your SD card into your PC or connect to your console via FTPD\n"
-                "8. Navigate to `/gm9/out` on your SD, where `essential.exefs` should be located\n"
-                "9. Send the `essential.exefs` file to this chat as well as your serial number from your console. The serial number should be a three-letter prefix followed by nine numbers.\n"
-                "10. Please wait for a Soaper to assist you\n"
-            )
+                    "This is where we'll perform your SOAP transfer. Please follow the instructions below.\n\n"
+
+                    "1. Ensure your SD card is in your console\n"
+                    "2. Hold START while powering on your console. This will boot you into GM9\n"
+                    "3. Navigate to `SysNAND Virtual`\n"
+                    "4. Select `essential.exefs`\n"
+                    "5. Select `copy to 0:/gm9/out` (select `Overwrite file(s)` if prompted)\n"
+                    "6. Power off your console\n"
+                    "7. Insert your SD card into your PC or connect to your console via FTPD\n"
+                    "8. Navigate to `/gm9/out` on your SD, where `essential.exefs` should be located\n"
+                    "9. Send the `essential.exefs` file to this chat as well as your serial number from your console. The serial number should be a three-letter prefix followed by nine numbers.\n"
+                    "10. Please wait for a Soaper to assist you\n"
+                )
 
             if ctx:
                 try:
-                    await log_to_soaper_log(ctx, f"Created SOAP Channel")
+                    await log_to_soaper_log(ctx, "Created SOAP Channel")
                 except:
                     pass
 
@@ -134,7 +139,7 @@ class SoapCog(commands.Cog): # SOAP commands
 
         if not channel:
             return await ctx.send(f"SOAP channel not found for `{user.name}`")
-        elif not (channel.category.id == SOAP_CHANNEL_CATEGORY_ID and channel.name.endswith(SOAP_CHANNEL_SUFFIX)):
+        elif not (channel.category.id == SOAP_CHANNEL_CATEGORY_ID and channel.name.endswith(SOAP_CHANNEL_SUFFIX) or channel.category.id == MANUAL_SOAP_CATEGORY_ID):
             return await ctx.send(f"{channel.mention} is not a SOAP channel!")
 
         boom = discord.utils.get(channel.guild.emojis, name=BOOM_NAME)

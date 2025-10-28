@@ -125,7 +125,7 @@ class RegionChangeView(discord.ui.View):
         if not soap_cog:
             embed = discord.Embed(
                 title="❌ Error",
-                description="SOAP module not loaded. Please contact an administrator.",
+                description="SOAP module not loaded. Please contact a Staff Member.",
                 color=discord.Color.red()
             )
             await interaction.followup.edit_message(interaction.message.id, embed=embed, view=None)
@@ -253,7 +253,7 @@ class SOAPRequestCog(commands.Cog):
             try:
                 await channel.purge(limit=None)
             except discord.Forbidden:
-                print(f"No permission to clear messages in request SOAP channel")
+                print("No permission to clear messages in request SOAP channel")
             except Exception as e:
                 print(f"Error clearing request SOAP channel: {e}")
 
