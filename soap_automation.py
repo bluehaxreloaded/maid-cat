@@ -9,8 +9,8 @@ class SOAPAutomationCog(commands.Cog):
         """Create the welcome embed for new SOAP channels"""
         # Welcome embed
         embed = discord.Embed(
-            title="🧼 Welcome to Your SOAP Channel!",
-            description="This is where we'll perform your SOAP transfer. Please follow the instructions below.\n\n",
+            title="🧼 Welcome to your SOAP Channel!",
+            description="This is where we'll perform your SOAP transfer. To get started, please follow the instructions below:\n\n",
             color=discord.Color.blue()
         )
         embed.add_field(

@@ -51,7 +51,7 @@ class SoapCog(commands.Cog): # SOAP commands
 
                     "# Welcome!\n\n\n"
 
-                    "This is where we'll perform your SOAP transfer. Please follow the instructions below.\n\n"
+                    "This is where we'll perform your SOAP transfer. Please follow the instructions below\n\n"
 
                     "1. Ensure your SD card is in your console\n"
                     "2. Hold START while powering on your console. This will boot you into GM9\n"
