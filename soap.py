@@ -15,7 +15,9 @@ class SoapCog(commands.Cog): # SOAP commands
         Helper function to create a SOAP channel.
         Returns tuple: (success: bool, channel: discord.TextChannel | None, message: str)
         """
-        channel_name = user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
+        # strip leading/trailing periods and then replace remaining periods with dashes
+        safe_user_name = user.name.lstrip('.').rstrip('.').lower().replace(".", "-")
+        channel_name = safe_user_name + SOAP_CHANNEL_SUFFIX
         existing_channel = None
 
         # oly check channels in the SOAP categories
