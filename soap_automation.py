@@ -327,7 +327,8 @@ class SOAPAutomationCog(commands.Cog):
             )
             embed.set_footer(text="⚠️ System transfer was required - wait 7 days before transferring from another 3DS.")
             view = EshopVerificationView()
-            await target_channel.send(embed=embed, view=view)
+            user_mention = f"<@{user_id}>"
+            await target_channel.send(content=user_mention, embed=embed, view=view)
             
             # Delete progress message asynchronously after sending success message
             async def delete_progress():
@@ -362,7 +363,8 @@ class SOAPAutomationCog(commands.Cog):
             )
             embed.set_footer(text="No system transfer was needed - you can transfer from another 3DS right away if you want!")
             view = EshopVerificationView()
-            await target_channel.send(embed=embed, view=view)
+            user_mention = f"<@{user_id}>"
+            await target_channel.send(content=user_mention, embed=embed, view=view)
             
             # Update progress to 100% and delete asynchronously after sending lottery message
             async def update_and_delete_progress():
