@@ -1,6 +1,6 @@
 Looking for a SOAP transfer? [Check out Bluehax](https://discord.gg/qNZePF6RxP), we do SOAP transfers in minutes for free.
 ## 🧼 Maidy the Cat - SOAP Management System
-Maidy is a Discord.py bot built to work alongside [Soapy the Cat](https://github.com/bluehaxreloaded) to manage SOAP Transfers for the Nintendo 3DS family of systems.
+Maidy is a Discord.py bot built to work alongside [Soapy the Cat](https://github.com/bluehaxreloaded/soap-cat) to manage SOAP Transfers for the Nintendo 3DS family of systems.
 
 <img width="628" height="375" alt="image" src="https://github.com/user-attachments/assets/e21f8391-94e5-4564-a8cc-4c947bbb543b" />
 
@@ -19,7 +19,7 @@ Maidy is a Discord.py bot built to work alongside [Soapy the Cat](https://github
 5. Run `python3.13 main.py`, this may be `python3` or `python` depending on your installation.
 6. If console outputs `Logged-in as YOURBOTNAME#1234`, the bot is running. Use .help for a list of commands.
 
-> ⚠️ Please keep in mind that some of this bot's features rely on [Soapy the Cat](https://github.com/bluehaxreloaded), please ensure both are running concurrently.
+> ⚠️ Please keep in mind that some of this bot's features rely on [Soapy the Cat](https://github.com/bluehaxreloaded/soap-cat), please ensure both are running concurrently.
 ---
 ### Why a cat?
 Cats are cute.
