@@ -15,7 +15,7 @@ Maidy is a Discord.py bot built to work alongside [Soapy the Cat](https://github
 1. Git clone this repository into a directory
 2. Ensure Python 3.13 or higher is installed
 3. Run `python3.13 -m pip install -r requirements.txt` to install dependencies. Depending on your Python installation, this may be `python3` or `python`.
-4. Create `constants.py` by removing `.example` from `constants.py.example`. Fill out with the appropriate information, such as the Discord Token and required custom emotes. Please ensure the server you intend to run Maidy in has all necessary emotes for expected results.
+4. Create `constants.py` by removing `.example` from `constants.py.example`. Fill out `constants.py` with the server-specific information. Please ensure the Discord you intend to run Maidy in has all necessary channels, categories, and emotes for expected results.
 5. Run `python3.13 main.py`, this may be `python3` or `python` depending on your installation.
 6. If console outputs `Logged-in as YOURBOTNAME#1234`, the bot is running. Use .help for a list of commands.
 
