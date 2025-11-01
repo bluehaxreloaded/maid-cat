@@ -1,10 +1,10 @@
 import discord 
-import time
+import asyncio
 from perms import command_with_perms
 from exceptions import CategoryNotFound
 from log import log_to_soaper_log
 from discord.ext import commands
-from constants import SOAP_CHANNEL_SUFFIX, BOOM_NAME, SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID
+from constants import SOAP_CHANNEL_SUFFIX, BOOM_EMOTE_ID, SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID
 
 class SoapCog(commands.Cog): # SOAP commands
     def __init__(self, bot):
@@ -70,13 +70,22 @@ class SoapCog(commands.Cog): # SOAP commands
             if ctx:
                 try:
                     await log_to_soaper_log(ctx, "Created SOAP Channel")
-                except:
+                except Exception:
                     pass
 
             return True, new_channel, "Channel created successfully"
 
         except Exception as e:
             return False, None, f"Error creating channel: {str(e)}"
+
+    async def deletesoap(self, channel: discord.TextChannel, ctx: commands.Context = None):
+        """Helper method to delete a SOAP channel with boom effect"""
+        await channel.send("Self-destruct sequence initiated!")
+        await channel.send(f"<a:boomparrot:{BOOM_EMOTE_ID}>")
+        await asyncio.sleep(2.75)
+        await channel.delete()
+        if ctx:
+            await log_to_soaper_log(ctx, "Removed SOAP Channel")
 
     # Leaving this for Manual SOAPs.
     @command_with_perms(min_role="Soaper", name="createsoap", aliases=["soup", "setupsoap", "soap", "siap", "setupsoup", "createsoup"], help="Sets up SOAP channel")
@@ -124,7 +133,7 @@ class SoapCog(commands.Cog): # SOAP commands
             await log_to_soaper_log(ctx, "Created SOAP Channel")
     
     @command_with_perms(min_role="Soaper", name="deletesoap", aliases=["water", "desoap", "unsoup", "spoon", "unsoap", "boom", "desoup"],  help="Deletes SOAP channel")
-    async def deletesoap(self, ctx: commands.Context, user: discord.Member | discord.TextChannel | discord.VoiceChannel | int | str = None): # you're never gonna guess what this one does
+    async def deletesoap_command(self, ctx: commands.Context, user: discord.Member | discord.TextChannel | discord.VoiceChannel | int | str = None): # you're never gonna guess what this one does
         match user:
             case discord.Member():
                 channel_name = user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX 
@@ -144,12 +153,7 @@ class SoapCog(commands.Cog): # SOAP commands
         elif not (channel.category.id == SOAP_CHANNEL_CATEGORY_ID and channel.name.endswith(SOAP_CHANNEL_SUFFIX) or channel.category.id == MANUAL_SOAP_CATEGORY_ID):
             return await ctx.send(f"{channel.mention} is not a SOAP channel!")
 
-        boom = discord.utils.get(channel.guild.emojis, name=BOOM_NAME)
-        await channel.send("Self-destruct sequence initiated!")
-        await channel.send(f"<a:{boom.name}:{boom.id}>")
-        time.sleep(2.75)
-        await channel.delete()
-        await log_to_soaper_log(ctx, "Removed SOAP Channel")
+        await self.deletesoap(channel, ctx)
 
 
 def setup(bot):

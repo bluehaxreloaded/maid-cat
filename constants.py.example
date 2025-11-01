@@ -1,17 +1,18 @@
 KEY = "" # i shouldn't have to explain this one
 
 SOAP_CHANNEL_SUFFIX = "-needs-cleaning-🧼" # what each soap channel ends with
-BOOM_NAME = "boomparrot" # emoji shown on boom (deletesoap)
+BOOM_EMOTE_ID = "boomparrot" # emoji shown on boom (deletesoap)
 BLOBSOAP_EMOTE_ID = # SOAP loading emote ID
 SOAP_LOADING_ID =  # SOAP loading sticker ID
+LOADING_EMOTE_ID = # Loading animated emote
 
 # channel and user IDs
 SOAP_CHANNEL_CATEGORY_ID =  # category to put all the SOAP channels into
 MANUAL_SOAP_CATEGORY_ID =  # category for manual SOAP channels that need soapers to come in
 REQUEST_SOAP_CHANNEL_ID =  # channel where the SOAP request embed is posted on startup
+BOTS_ONLY_CHANNEL_ID = # bot where maid-cat and soap-cat can communicate with each other
 SOAP_LOG_ID =  # channel that logging of SOAP creation/deletion and errors are placed
 MOD_LOG_ID =  # channel that logging of non-SOAP related actions are placed (excluding join/leaves)
 JOIN_LEAVE_LOG_ID =  # channel where join/leaves are logged
 ERROR_LOG_ID =  # channel that any error not dealt with gets logged to
 SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, , ] # where soap channel specific commands can be used
-
