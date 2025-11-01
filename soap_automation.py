@@ -239,8 +239,6 @@ class SOAPAutomationCog(commands.Cog):
             return
 
         content = (message.content or "").strip()
-        # check message for soap status
-        # Pattern matches: SOAP_STATUS <USERID> <STATUS> [DETAIL]
         match = re.match(r"^SOAP_STATUS\s+(\d{15,25})\s+([A-Z_]+)(?:\s+([A-Z0-9_]+))?\s*$", content, re.IGNORECASE)
         if not match:
             print(f"No match found for {content}")
@@ -249,6 +247,8 @@ class SOAPAutomationCog(commands.Cog):
         user_id = int(match.group(1))
         status_text = match.group(2).upper()
         status_detail = match.group(3).upper() if match.group(3) else None
+        
+        serial_number = status_detail if status_text in ["SUCCESS", "LOTTERY"] else None
 
         try:
             await message.channel.send(f"RESPONSE_ACK {user_id} {status_text}")
@@ -312,28 +312,12 @@ class SOAPAutomationCog(commands.Cog):
                 await self._update_progress_message(target_channel, progress_percentages[status_detail], footer)
 
         if status_text == "SUCCESS" and target_channel:
-            progress_message = None
-            async for msg in target_channel.history(limit=50):
-                if msg.author == self.bot.user and msg.embeds:
-                    if msg.embeds[0].author and msg.embeds[0].author.name == "🧼 SOAP Transfer - In Progress":
-                        progress_message = msg
-                        break
-            
-            if progress_message:
-                # Update to 100% with SUCCESS footer
-                footer = progress_footers.get("SUCCESS", "SOAP transfer completed successfully!")
-                await self._update_progress_message(target_channel, 100, footer)
-                # Wait a few seconds then delete
-                await asyncio.sleep(3)
-                try:
-                    await progress_message.delete()
-                except Exception:
-                    pass
-            
+            # Send SUCCESS message immediately
+            boot_instruction = f"Boot {serial_number} normally (with the SD inserted into the console)" if serial_number else "Boot normally (with the SD inserted into the console)"
             embed = discord.Embed(
                 title="🎉 SOAP Transfer Complete",
                 description="Please follow the following steps to verify that everything is working correctly:\n\n"
-                            "**1.** Boot normally (with the SD inserted into the console)\n"
+                            f"**1.** {boot_instruction}\n"
                             "**2.** Then go to: **System Settings** → **Other Settings** → **Profile** → **Region Settings**\n"
                             "and ensure the desired country is selected.\n"
                             "**3.** If using Pretendo, switch to Nintendo Network with Nimbus.\n"
@@ -345,11 +329,30 @@ class SOAPAutomationCog(commands.Cog):
             view = EshopVerificationView()
             await target_channel.send(embed=embed, view=view)
             
+            # Delete progress message asynchronously after sending success message
+            async def delete_progress():
+                progress_message = None
+                async for msg in target_channel.history(limit=50):
+                    if msg.author == self.bot.user and msg.embeds:
+                        if msg.embeds[0].author and msg.embeds[0].author.name == "🧼 SOAP Transfer - In Progress":
+                            progress_message = msg
+                            break
+                if progress_message:
+                    try:
+                        await progress_message.delete()
+                    except Exception:
+                        pass
+            
+            # Run deletion in background without blocking
+            asyncio.create_task(delete_progress())
+            
         if status_text == "LOTTERY" and target_channel:
+            # Send LOTTERY message immediately
+            boot_instruction = f"Boot {serial_number} normally (with the SD inserted into the console)" if serial_number else "Boot normally (with the SD inserted into the console)"
             embed = discord.Embed(
                 title="🎉 SOAP Transfer Complete",
                 description="You won the Soap Lottery! Please follow the following steps to verify that everything is working correctly:\n\n"
-                            "**1.** Boot normally (with the SD inserted into the console)\n"
+                            f"**1.** {boot_instruction}\n"
                             "**2.** Then go to: **System Settings** → **Other Settings** → **Profile** → **Region Settings**\n"
                             "and ensure the desired country is selected.\n"
                             "**3.** If using Pretendo, switch to Nintendo Network with Nimbus.\n"
@@ -360,6 +363,28 @@ class SOAPAutomationCog(commands.Cog):
             embed.set_footer(text="No system transfer was needed - you can transfer from another 3DS right away if you want!")
             view = EshopVerificationView()
             await target_channel.send(embed=embed, view=view)
+            
+            # Update progress to 100% and delete asynchronously after sending lottery message
+            async def update_and_delete_progress():
+                progress_message = None
+                async for msg in target_channel.history(limit=50):
+                    if msg.author == self.bot.user and msg.embeds:
+                        if msg.embeds[0].author and msg.embeds[0].author.name == "🧼 SOAP Transfer - In Progress":
+                            progress_message = msg
+                            break
+                if progress_message:
+                    try:
+                        # Update to 100% with LOTTERY footer
+                        footer = progress_footers.get("SUCCESS", "SOAP transfer completed successfully!")
+                        await self._update_progress_message(target_channel, 100, footer)
+                        # Wait a moment then delete
+                        await asyncio.sleep(1)
+                        await progress_message.delete()
+                    except Exception:
+                        pass
+            
+            # Run update and deletion in background without blocking
+            asyncio.create_task(update_and_delete_progress())
             
         if status_text == "ERROR" and target_channel:
             embed = discord.Embed(
