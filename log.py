@@ -16,7 +16,11 @@ class ErrorLogChannelNotFound(LogChannelNotFound):
         self.original_error = original_error
 
 
-async def log_to(ctx: commands.Context | discord.Interaction, channel_id: int, title: str | None = None):
+async def log_to(
+    ctx: commands.Context | discord.Interaction,
+    channel_id: int,
+    title: str | None = None,
+):
     log_channel = discord.utils.get(ctx.guild.channels, id=channel_id)
     if log_channel:
         log_embed = discord.Embed(title=title)
@@ -34,9 +38,7 @@ async def log_to(ctx: commands.Context | discord.Interaction, channel_id: int, t
             value=f"{author.name} - {author.id}",
             inline=False,
         )
-        log_embed.add_field(
-            name="Action: ", value=action, inline=False
-        )
+        log_embed.add_field(name="Action: ", value=action, inline=False)
         await log_channel.send(embed=log_embed)
     else:
         raise LogChannelNotFound(channel_id)

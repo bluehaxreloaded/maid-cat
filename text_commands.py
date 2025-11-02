@@ -3,10 +3,16 @@ import re
 from perms import command_with_perms, soap_channels_only
 from discord.ext import commands
 from functools import wraps
-from constants import SOAP_CHANNEL_SUFFIX, SOAP_USABLE_IDS, BLOBSOAP_EMOTE_ID, SOAP_LOADING_ID
+from constants import (
+    SOAP_CHANNEL_SUFFIX,
+    SOAP_USABLE_IDS,
+    BLOBSOAP_EMOTE_ID,
+    SOAP_LOADING_ID,
+)
 
 # Regex pulls the User ID from a mention
 MENTION_RE = re.compile(r"<@!?(\d{15,25})>")
+
 
 def ping_before_mes():  # i didn't feel like writing the same line multiple times so i did the harder option of writing an entire decorator to write one single line
     def decorator(func):
@@ -31,7 +37,7 @@ def ping_before_mes():  # i didn't feel like writing the same line multiple time
                         f"{member_obj.mention}\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
                     )
                     return
-                
+
             # Get the user from the channel name if topic failed.
             member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
             member_obj = ctx.guild.get_member_named(member_name)
@@ -40,7 +46,9 @@ def ping_before_mes():  # i didn't feel like writing the same line multiple time
                     f"{member_obj.mention}\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
                 )
             elif ctx.channel.category_id in SOAP_USABLE_IDS:
-                await ctx.send(f"`SOAPEE MENTION HERE` (this is not a soap channel)\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}")
+                await ctx.send(
+                    f"`SOAPEE MENTION HERE` (this is not a soap channel)\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
+                )
             else:
                 await ctx.send(f"User `{member_name}` left.")
 
@@ -188,26 +196,20 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             "<https://3ds.hacks.guide/formatting-sd-(windows).html>"
         )
 
-    @command_with_perms(
-        name="donors", help="How to donate consoles for SOAPs"
-    )
+    @command_with_perms(name="donors", help="How to donate consoles for SOAPs")
     async def donors(self, ctx: commands.Context):
         await ctx.send(
             "For a console to be a donor, ideally they should:\n"
-            "- be in a state where they won't be used anymore (won't turn on, bad screens, bad ram, etc),\n" \
+            "- be in a state where they won't be used anymore (won't turn on, bad screens, bad ram, etc),\n"
             "- have a bad wifi card, or\n"
             "- have had the eShop apps (`tiger`, `mint`) deleted off the NAND so it can't connect to the eShop (connecting a console to the eShop while it is also being used as a donor is known cause various issues)"
             "\n\n"
             "To donate a console for soaps, all we need is either:\n\n"
             "- `essential.exefs` + serial, or\n"
             "- secinfo + OTP + serial\n\n"
-
-            "You can send this info to any Staff or Soaper. Thank you!"  
-
+            "You can send this info to any Staff or Soaper. Thank you!"
         )
 
 
 def setup(bot):
     bot.add_cog(TextCommandsCog(bot))
-
-
