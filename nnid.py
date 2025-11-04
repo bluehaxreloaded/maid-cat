@@ -19,7 +19,7 @@ class NNIDCog(commands.Cog):  # NNID commands
         """Create the welcome embed for new NNID channels"""
         # Welcome embed
         embed = discord.Embed(
-            title="🧼 Welcome to your NNID Channel!",
+            title="🔄 Welcome to your NNID Channel!",
             description="This is where we'll perform your NNID transfer. To get started, please follow the instructions below:\n"
             "**📋 Step-by-Step Instructions**\n"
             "1. Ensure your SD card is in your target console (the console you want to transfer to)\n"
