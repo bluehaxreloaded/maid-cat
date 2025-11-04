@@ -260,8 +260,17 @@ class NNIDRequestCog(commands.Cog):
             color=discord.Color.orange(),
         )
         embed.set_footer(text="Click the button below to request an NNID transfer.")
-        view = NNIDRequestView() 
-        return embed, view
+        view = NNIDRequestView()
+        
+        # Try to load the image file
+        file = None
+        try:
+            file = discord.File("assets/NNIDTransfer.webp", filename="image.png")
+            embed.set_image(url="attachment://image.png")
+        except FileNotFoundError:
+            pass
+        
+        return embed, view, file
 
     # This fixes broken embeds if the bot stops.
     @commands.Cog.listener()
@@ -278,15 +287,21 @@ class NNIDRequestCog(commands.Cog):
             except Exception as e:
                 print(f"Error clearing request NNID channel: {e}")
 
-            embed, view = self._create_nnid_request_embed_and_view()
-            await channel.send(embed=embed, view=view)
+            embed, view, file = self._create_nnid_request_embed_and_view()
+            if file:
+                await channel.send(embed=embed, view=view, file=file)
+            else:
+                await channel.send(embed=embed, view=view)
 
     @command_with_perms(
         name="requestnnid", help="Creates an embed with a button for NNID transfer requests"
     )
     async def requestnnid(self, ctx: commands.Context):
-        embed, view = self._create_nnid_request_embed_and_view()
-        await ctx.send(embed=embed, view=view)
+        embed, view, file = self._create_nnid_request_embed_and_view()
+        if file:
+            await ctx.send(embed=embed, view=view, file=file)
+        else:
+            await ctx.send(embed=embed, view=view)
 
 
 def setup(bot):
