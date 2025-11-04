@@ -13,7 +13,7 @@ class FilesCheckView(discord.ui.View):
         placeholder="Do you have the required files?",
         options=[
             discord.SelectOption(
-                label="Yes, I have one of the three file options listed above", value="yes", emoji="✅"
+                label="Yes, I have one of the three files listed above", value="yes", emoji="✅"
             ),
             discord.SelectOption(
                 label="No, I don't have any files", value="no", emoji="❌"
@@ -29,7 +29,7 @@ class FilesCheckView(discord.ui.View):
         if files_answer == "no":
             embed = discord.Embed(
                 title="🔒 Unable to Request NNID Transfer",
-                description="We need to have one of the following sets of files **from your source console** to perform an NNID transfer.\n\n"
+                description="We need to have one of the following files **from your source console** to perform an NNID transfer.\n\n"
                 "- `essential.exefs`\n"
                 "- a NAND backup\n"
                 "- `OTP.bin`\n\n"
@@ -41,7 +41,7 @@ class FilesCheckView(discord.ui.View):
         elif files_answer == "unsure":
             embed = discord.Embed(
                 title="❓ What Files Do I Need?",
-                description="To perform an NNID transfer, you need files **from your source console** (the console you originally had the NNID on). You were asked to back up your NAND when you originally modded your console, look at all of your backups to see if you can find one of these files.",
+                description="To perform an NNID transfer, you need one of the folllowing files **from your source console** (the console you originally had the NNID on). You were asked to back up your NAND when you originally modded your console, look at all of your backups to see if you can find one of these files.",
                 color=discord.Color.orange(),
             )
             embed.add_field(
@@ -233,7 +233,7 @@ class NNIDRequestView(discord.ui.View):
         )
         embed.add_field(
             name="Question 1 of 2",
-            value="Do you have the required files (see above) from your *source console*?",
+            value="Do you have one of the required files (see above) from your *source console*?",
             inline=False,
         )
         embed.set_footer(text="Questions? Drop us a line in #soap-help")
