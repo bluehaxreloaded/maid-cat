@@ -5,7 +5,9 @@ from discord.ext import commands
 from functools import wraps
 from constants import (
     SOAP_CHANNEL_SUFFIX,
+    NNID_CHANNEL_SUFFIX,
     SOAP_USABLE_IDS,
+    NNID_CHANNEL_CATEGORY_ID,
     BLOBSOAP_EMOTE_ID,
     SOAP_LOADING_ID,
 )
@@ -39,15 +41,19 @@ def ping_before_mes():  # i didn't feel like writing the same line multiple time
                     return
 
             # Get the user from the channel name if topic failed.
+            # Try SOAP suffix first, then NNID suffix
             member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
+            if member_name == ctx.channel.name:  # SOAP suffix didn't match, try NNID
+                member_name = ctx.channel.name.removesuffix(NNID_CHANNEL_SUFFIX)
+            
             member_obj = ctx.guild.get_member_named(member_name)
             if member_obj:
                 await ctx.send(
                     f"{member_obj.mention}\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
                 )
-            elif ctx.channel.category_id in SOAP_USABLE_IDS:
+            elif ctx.channel.category and (ctx.channel.category.id in SOAP_USABLE_IDS or ctx.channel.category.id == NNID_CHANNEL_CATEGORY_ID):
                 await ctx.send(
-                    f"`SOAPEE MENTION HERE` (this is not a soap channel)\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
+                    f"`SOAPEE MENTION HERE` (this is not a soap/nnid channel)\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
                 )
             else:
                 await ctx.send(f"User `{member_name}` left.")

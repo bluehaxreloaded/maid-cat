@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from constants import SOAP_USABLE_IDS
+from constants import SOAP_USABLE_IDS, NNID_CHANNEL_CATEGORY_ID
 
 
 def command_with_perms(
@@ -31,7 +31,7 @@ class WrongChannel(commands.CheckFailure):
         super().__init__(f"Cannot use command `{command}` in {channel}!")
 
 
-def soap_channels_only():  # lock command to SOAP and dev channels only
+def soap_channels_only():  # lock command to SOAP, NNID and dev channels only
     def decorator(func):
         async def soap_chan(ctx: commands.Context):
             if ctx.channel.category.id in SOAP_USABLE_IDS:
