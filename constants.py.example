@@ -18,4 +18,4 @@ SOAP_LOG_ID =  # channel that logging of SOAP creation/deletion and errors are p
 MOD_LOG_ID =  # channel that logging of non-SOAP related actions are placed (excluding join/leaves)
 JOIN_LEAVE_LOG_ID =  # channel where join/leaves are logged
 ERROR_LOG_ID =  # channel that any error not dealt with gets logged to
-SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, , ] # where soap channel specific commands can be used
+SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, ] # where soap channel specific commands can be used

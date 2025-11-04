@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from constants import SOAP_USABLE_IDS, NNID_CHANNEL_CATEGORY_ID
+from constants import SOAP_USABLE_IDS
 
 
 def command_with_perms(
