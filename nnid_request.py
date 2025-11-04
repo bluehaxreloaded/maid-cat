@@ -31,7 +31,7 @@ class FilesCheckView(discord.ui.View):
                 description="We need to have one of the following sets of files **from your source console** to perform an NNID transfer.\n\n"
                 "- `essential.exefs`\n"
                 "- a NAND backup\n"
-                "- `SecureInfo_A` or `SecureInfo_B` AND the OTP file\n\n"
+                "- `OTP.bin`\n\n"
                 "Please locate one of these files from your previous console before requesting.",
                 color=discord.Color.red(),
             )
@@ -47,7 +47,7 @@ class FilesCheckView(discord.ui.View):
                 name="You must have one of the following files from your source console:",
                 value="- `essential.exefs`\n"
                 "- a NAND backup\n"
-                "- `SecureInfo_A` or `SecureInfo_B` AND the OTP file",
+                "- `OTP.bin`",
                 inline=False,
             )
             await interaction.response.edit_message(embed=embed, view=None)
@@ -254,7 +254,7 @@ class NNIDRequestCog(commands.Cog):
             "- Ensure you have one of the following files from your *source console* (where the NNID currently is):\n"
             "  - `essential.exefs`\n"
             "  - NAND backup\n"
-            "  - `SecureInfo_A` or `SecureInfo_B` with an OTP file\n"
+            "  - `OTP.bin`\n"
             "- Be ready to get files off your *target console* (where you want to transfer to)\n"
             "- Have both the serial numbers of your source and target consoles ready",
             color=discord.Color.orange(),
