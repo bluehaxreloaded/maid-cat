@@ -1,6 +1,7 @@
 KEY = "" # i shouldn't have to explain this one
 
 SOAP_CHANNEL_SUFFIX = "-needs-cleaning-🧼" # what each soap channel ends with
+NNID_CHANNEL_SUFFIX = "-needs-nnid" # what each nnid channel ends with
 BOOM_EMOTE_ID = "boomparrot" # emoji shown on boom (deletesoap)
 BLOBSOAP_EMOTE_ID = # SOAP loading emote ID
 SOAP_LOADING_ID =  # SOAP loading sticker ID

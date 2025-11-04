@@ -102,7 +102,9 @@ class NNIDCog(commands.Cog):  # NNID commands
             return False, None, f"Error creating channel: {str(e)}"
 
     async def deletennid(
-        self, channel: discord.TextChannel, ctx: commands.Context | discord.Interaction = None
+        self,
+        channel: discord.TextChannel,
+        ctx: commands.Context | discord.Interaction = None,
     ):
         """Helper method to delete a NNID channel with boom effect"""
         await channel.send("Self-destruct sequence initiated!")
@@ -121,9 +123,7 @@ class NNIDCog(commands.Cog):  # NNID commands
         aliases=["nnid", "setupnnid", "createnn"],
         help="Sets up NNID channel",
     )
-    async def creatennid(
-        self, ctx: commands.Context, user: discord.Member | int | str
-    ):
+    async def creatennid(self, ctx: commands.Context, user: discord.Member | int | str):
         if not isinstance(user, discord.Member):
             await ctx.send("User not in server or does not exist!")
             return
@@ -154,7 +154,6 @@ class NNIDCog(commands.Cog):  # NNID commands
             await self.create_nnid_interface(new, user)
             await ctx.send(new.jump_url)
             await log_to_soaper_log(ctx, "Created NNID Channel")
-
 
 
 def setup(bot):

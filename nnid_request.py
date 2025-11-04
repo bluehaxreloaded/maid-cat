@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from perms import command_with_perms
-from constants import NNID_REQUEST_CHANNEL_ID, NNID_CHANNEL_SUFFIX, NNID_CHANNEL_CATEGORY_ID
+from constants import REQUEST_NNID_CHANNEL_ID, NNID_CHANNEL_SUFFIX, NNID_CHANNEL_CATEGORY_ID
 
 
 class FilesCheckView(discord.ui.View):
@@ -269,7 +269,7 @@ class NNIDRequestCog(commands.Cog):
         """Clear the request NNID channel and post the embed on startup"""
         self.bot.add_view(NNIDRequestView())
 
-        channel = self.bot.get_channel(NNID_REQUEST_CHANNEL_ID)
+        channel = self.bot.get_channel(REQUEST_NNID_CHANNEL_ID)
         if channel:
             try:
                 await channel.purge(limit=None)
