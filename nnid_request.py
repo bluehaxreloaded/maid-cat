@@ -1,3 +1,4 @@
+from pathlib import Path
 import discord
 from discord.ext import commands
 from perms import command_with_perms
@@ -265,10 +266,11 @@ class NNIDRequestCog(commands.Cog):
         # Try to load the image file
         file = None
         try:
-            file = discord.File("assets/NNIDTransfer.webp", filename="image.png")
-            embed.set_image(url="attachment://image.png")
+            path = Path(__file__).parent / "assets" / "NNIDTransfer.webp"
+            file = discord.File(fp=path, filename="NNIDTransfer.webp")
+            embed.set_image(url="attachment://NNIDTransfer.webp")
         except FileNotFoundError as e:
-            print(f"Error: Could not find assets/SOAPTransfer.webp - {e}")
+            print(f"Error: Could not find assets/NNIDTransfer.webp - {e}")
             pass
         
         return embed, view, file

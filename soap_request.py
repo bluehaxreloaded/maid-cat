@@ -1,3 +1,4 @@
+from pathlib import Path
 import discord
 from discord.ext import commands
 from perms import command_with_perms
@@ -276,8 +277,9 @@ class SOAPRequestCog(commands.Cog):
         # Try to load the image file
         file = None
         try:
-            file = discord.File("assets/SOAPTransfer.webp", filename="image.png")
-            embed.set_image(url="attachment://image.png")
+            path = Path(__file__).parent / "assets" / "SOAPTransfer.webp"
+            file = discord.File(fp=path, filename="SOAPTransfer.webp")
+            embed.set_image(url="attachment://SOAPTransfer.webp")
         except FileNotFoundError as e:
             print(f"Error: Could not find assets/SOAPTransfer.webp - {e}")
             pass
