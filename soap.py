@@ -9,6 +9,8 @@ from constants import (
     BOOM_EMOTE_ID,
     SOAP_CHANNEL_CATEGORY_ID,
     MANUAL_SOAP_CATEGORY_ID,
+    NNID_CHANNEL_SUFFIX,
+    NNID_CHANNEL_CATEGORY_ID,
 )
 
 
@@ -165,9 +167,9 @@ class SoapCog(commands.Cog):  # SOAP commands
 
     @command_with_perms(
         min_role="Soaper",
-        name="deletesoap",
-        aliases=["water", "desoap", "unsoup", "spoon", "unsoap", "boom", "desoup"],
-        help="Deletes SOAP channel",
+        name="deletechannel",
+        aliases=["deletesoap", "water", "desoap", "unsoup", "spoon", "unsoap", "boom", "desoup", "delnnid"],
+        help="Deletes SOAP or NNID channel",
     )
     async def deletesoap_command(
         self,
@@ -180,8 +182,12 @@ class SoapCog(commands.Cog):  # SOAP commands
     ):  # you're never gonna guess what this one does
         match user:
             case discord.Member():
-                channel_name = user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
-                channel = discord.utils.get(ctx.guild.channels, name=channel_name)
+                # Try SOAP channel first
+                soap_channel_name = user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
+                nnid_channel_name = user.name.lower().replace(".", "-") + NNID_CHANNEL_SUFFIX
+                channel = discord.utils.get(ctx.guild.channels, name=soap_channel_name)
+                if not channel:
+                    channel = discord.utils.get(ctx.guild.channels, name=nnid_channel_name)
             case discord.TextChannel():
                 channel = user
             case discord.VoiceChannel():
@@ -193,15 +199,35 @@ class SoapCog(commands.Cog):  # SOAP commands
                 return
 
         if not channel:
-            return await ctx.send(f"SOAP channel not found for `{user.name}`")
-        elif not (
-            channel.category.id == SOAP_CHANNEL_CATEGORY_ID
-            and channel.name.endswith(SOAP_CHANNEL_SUFFIX)
-            or channel.category.id == MANUAL_SOAP_CATEGORY_ID
-        ):
-            return await ctx.send(f"{channel.mention} is not a SOAP channel!")
-
-        await self.deletesoap(channel, ctx)
+            return await ctx.send(f"Channel not found for `{user.name}`")
+        
+        # Check if it's a SOAP channel
+        is_soap = (
+            channel.category
+            and (
+                (channel.category.id == SOAP_CHANNEL_CATEGORY_ID and channel.name.endswith(SOAP_CHANNEL_SUFFIX))
+                or channel.category.id == MANUAL_SOAP_CATEGORY_ID
+            )
+        )
+        
+        # Check if it's a NNID channel
+        is_nnid = (
+            channel.category
+            and channel.category.id == NNID_CHANNEL_CATEGORY_ID
+            and channel.name.endswith(NNID_CHANNEL_SUFFIX)
+        )
+        
+        if not (is_soap or is_nnid):
+            return await ctx.send(f"{channel.mention} is not a SOAP or NNID channel!")
+        
+        if is_soap:
+            await self.deletesoap(channel, ctx)
+        elif is_nnid:
+            nnid_cog = self.bot.get_cog("NNIDCog")
+            if nnid_cog:
+                await nnid_cog.deletennid(channel, ctx)
+            else:
+                await ctx.send("Error: NNIDCog not found.")
 
 
 def setup(bot):

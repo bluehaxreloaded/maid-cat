@@ -9,7 +9,9 @@ LOADING_EMOTE_ID = # Loading animated emote
 # channel and user IDs
 SOAP_CHANNEL_CATEGORY_ID =  # category to put all the SOAP channels into
 MANUAL_SOAP_CATEGORY_ID =  # category for manual SOAP channels that need soapers to come in
+NNID_CHANNEL_CATEGORY_ID =  # category to put all the NNID channels into
 REQUEST_SOAP_CHANNEL_ID =  # channel where the SOAP request embed is posted on startup
+REQUEST_NNID_CHANNEL_ID = # channel where the NNID request embed is posted on startup
 BOTS_ONLY_CHANNEL_ID = # bot where maid-cat and soap-cat can communicate with each other
 SOAP_LOG_ID =  # channel that logging of SOAP creation/deletion and errors are placed
 MOD_LOG_ID =  # channel that logging of non-SOAP related actions are placed (excluding join/leaves)
