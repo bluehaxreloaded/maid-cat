@@ -278,7 +278,8 @@ class SOAPRequestCog(commands.Cog):
         try:
             file = discord.File("assets/SOAPTransfer.webp", filename="image.png")
             embed.set_image(url="attachment://image.png")
-        except FileNotFoundError:
+        except FileNotFoundError as e:
+            print(f"Error: Could not find assets/SOAPTransfer.webp - {e}")
             pass
         
         return embed, view, file
