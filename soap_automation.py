@@ -50,7 +50,7 @@ class CompletionFollowUpView(discord.ui.View):
         soap_cog = interaction.client.get_cog("SoapCog")
         if soap_cog:
             try:
-                await soap_cog.deletesoap(channel)
+                await soap_cog.deletesoap(channel, interaction)
             except Exception:
                 pass
         else:

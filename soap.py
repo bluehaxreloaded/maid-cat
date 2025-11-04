@@ -95,7 +95,7 @@ class SoapCog(commands.Cog):  # SOAP commands
             return False, None, f"Error creating channel: {str(e)}"
 
     async def deletesoap(
-        self, channel: discord.TextChannel, ctx: commands.Context = None
+        self, channel: discord.TextChannel, ctx: commands.Context | discord.Interaction = None
     ):
         """Helper method to delete a SOAP channel with boom effect"""
         await channel.send("Self-destruct sequence initiated!")
@@ -103,7 +103,10 @@ class SoapCog(commands.Cog):  # SOAP commands
         await asyncio.sleep(2.75)
         await channel.delete()
         if ctx:
-            await log_to_soaper_log(ctx, "Removed SOAP Channel")
+            try:
+                await log_to_soaper_log(ctx, "Removed SOAP Channel")
+            except Exception:
+                pass
 
     # Leaving this for Manual SOAPs.
     @command_with_perms(
