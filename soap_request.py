@@ -45,9 +45,9 @@ class CFWCheckView(discord.ui.View):
             )
             embed.add_field(
                 name="Steps",
-                value="• Hold SELECT while powering on your console\n"
-                "• If the Luma3DS configuration menu appears, you have CFW\n"
-                "• If it boots normally, you don't have CFW installed",
+                value="- Hold SELECT while powering on your console\n"
+                "- If the Luma3DS configuration menu appears, you have CFW\n"
+                "- If it boots normally, you don't have CFW installed",
                 inline=False,
             )
             embed.add_field(
@@ -118,9 +118,9 @@ class RegionChangeView(discord.ui.View):
             )
             embed.add_field(
                 name="Steps",
-                value="• Go to System Settings\n"
-                "• Check if your region settings match a different region than original\n"
-                "• If your console was originally from one region (e.g., JPN) but now shows another (e.g., USA), it's region-changed",
+                value="- Go to System Settings\n"
+                "- Check if your region settings match a different region than original\n"
+                "- If your console was originally from one region (e.g., JPN) but now shows another (e.g., USA), it's region-changed",
                 inline=False,
             )
             embed.add_field(
@@ -265,9 +265,9 @@ class SOAPRequestCog(commands.Cog):
             title="🧼 SOAP Request",
             description="This is where you can request a SOAP Transfer, which allows region-changed Nintendo 3DS consoles to access the eShop, Pokemon Bank, and more.\n\n"
             "**Before requesting:**\n"
-            "• Ensure your 3DS is modded and region-changed\n"
-            "• Have your serial number ready\n"
-            "• Be ready to get files off your console",
+            "- Ensure your 3DS is modded and region-changed\n"
+            "- Have your serial number ready\n"
+            "- Be ready to get files off your console",
             color=discord.Color.blue(),
         )
         embed.set_footer(text="Click the button below to request a SOAP transfer.")

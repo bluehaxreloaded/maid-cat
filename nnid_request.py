@@ -260,7 +260,7 @@ class NNIDRequestCog(commands.Cog):
             color=discord.Color.orange(),
         )
         embed.set_footer(text="Click the button below to request an NNID transfer.")
-        view = NNIDRequestView()
+        view = NNIDRequestView() 
         return embed, view
 
     # This fixes broken embeds if the bot stops.
