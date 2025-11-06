@@ -10,7 +10,7 @@ class FilesCheckView(discord.ui.View):
         super().__init__(timeout=180)
 
     @discord.ui.select(
-        placeholder="Do you have the required files?",
+        placeholder="Do you have one of the required files?",
         options=[
             discord.SelectOption(
                 label="Yes, I have one of the three files listed above", value="yes", emoji="✅"
@@ -33,9 +33,10 @@ class FilesCheckView(discord.ui.View):
                 "- `essential.exefs`\n"
                 "- a NAND backup\n"
                 "- `OTP.bin`\n\n"
-                "Please locate one of these files from your previous console before requesting.",
+                "Please locate one of these files from your previous console before requesting. We apologize for the inconvenience.",
                 color=discord.Color.red(),
             )
+            embed.set_footer(text="You are asked to backup your NAND when you mod your console, try looking at your backups.")
             await interaction.response.edit_message(embed=embed, view=None)
 
         elif files_answer == "unsure":
