@@ -29,7 +29,7 @@ class FilesCheckView(discord.ui.View):
         if files_answer == "no":
             embed = discord.Embed(
                 title="🔒 Unable to Request NNID Transfer",
-                description="We need to have one of the following files **from your source console** to perform an NNID transfer.\n\n"
+                description="We need to have one of the following files **from your source console** to perform a transfer.\n\n"
                 "- `essential.exefs`\n"
                 "- a NAND backup\n"
                 "- `OTP.bin`\n\n"
@@ -42,7 +42,7 @@ class FilesCheckView(discord.ui.View):
         elif files_answer == "unsure":
             embed = discord.Embed(
                 title="❓ What Files Do I Need?",
-                description="To perform an NNID transfer, you need one of the folllowing files **from your source console** (the console you originally had the NNID on). You were asked to back up your NAND when you originally modded your console, look at all of your backups to see if you can find one of these files.",
+                description="To perform a transfer, you need one of the folllowing files **from your source console** (the console you originally had the NNID on). You were asked to back up your NAND when you originally modded your console, look at all of your backups to see if you can find one of these files.",
                 color=discord.Color.orange(),
             )
             embed.add_field(
@@ -96,7 +96,7 @@ class CFWCheckView(discord.ui.View):
         if cfw_answer == "no":
             embed = discord.Embed(
                 title="🔒 Unable to Request NNID Transfer",
-                description="Your target console must be on custom firmware to receive an NNID transfer.\n\n"
+                description="Your target console must be on custom firmware to receive a NNID transfer.\n\n"
                 "Please visit the guide below to mod your console:",
                 color=discord.Color.red(),
             )
@@ -174,7 +174,7 @@ class CFWCheckView(discord.ui.View):
         elif channel:  # channel already exists
             embed = discord.Embed(
                 title="⚠️ Channel Already Exists",
-                description=f"An NNID channel already exists for {interaction.user.mention}\n\n"
+                description=f"A NNID channel already exists for {interaction.user.mention}\n\n"
                 f"Channel: {channel.mention}",
                 color=discord.Color.orange(),
             )
@@ -203,7 +203,7 @@ class NNIDRequestView(discord.ui.View):
     async def request_nnid_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
-        # check if user already has an NNID channel
+        # check if user already has a NNID channel
         channel_name = (
             interaction.user.name.lower().replace(".", "-") + NNID_CHANNEL_SUFFIX
         )
@@ -219,7 +219,7 @@ class NNIDRequestView(discord.ui.View):
         if existing_channel:
             embed = discord.Embed(
                 title="⚠️ Channel Already Exists",
-                description=f"You already have an NNID channel!\n\n"
+                description=f"You already have a NNID channel!\n\n"
                 f"Please go to: {existing_channel.mention}",
                 color=discord.Color.orange(),
             )
@@ -251,7 +251,7 @@ class NNIDRequestCog(commands.Cog):
         """Helper method to create the NNID request embed and view"""
         embed = discord.Embed(
             title="🔄 NNID Transfer Request",
-            description="This is where you can request an NNID Transfer, which allows you to transfer your Nintendo Network ID from one console to another without a system transfer.\n\n"
+            description="This is where you can request a Transfer, which allows you to transfer your Nintendo Network ID from one console to another without a system transfer.\n\n"
             "**Before requesting:**\n"
             "- Ensure you have one of the following files from your *source console* (where the NNID currently is):\n"
             "  - `essential.exefs`\n"
@@ -261,7 +261,7 @@ class NNIDRequestCog(commands.Cog):
             "- Have both the serial numbers of your source and target consoles ready",
             color=discord.Color.orange(),
         )
-        embed.set_footer(text="Click the button below to request an NNID transfer.")
+        embed.set_footer(text="Click the button below to request a NNID transfer.")
         view = NNIDRequestView()
         
         # Try to load the image file
