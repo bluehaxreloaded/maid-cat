@@ -1,3 +1,4 @@
+from pathlib import Path
 import discord
 import re
 from perms import command_with_perms, soap_channels_only
@@ -185,7 +186,36 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         return [
             "All of our donors are on cooldown, you have been added to the queue, we’ll get back to you as soon as possible."
         ]
-
+    
+    @command_with_perms(
+        min_role="Soaper",
+        name="nocomputer",
+        help="Sends essentialsubmit instructions",
+    )
+    @soap_channels_only()
+    @ping_before_mes()
+    async def nocomputer(self, ctx: commands.Context):
+        file = None
+        try:
+            path = Path(__file__).parent / "assets" / "essential-3dsx.webp"
+            file = discord.File(fp=path, filename="essential-3dsx.webp")
+            await ctx.send(file=file)
+            await ctx.send(
+                "## Submitting essential.exefs without a computer\n"
+                "1. Open FBI and navigate to `Remote Install` → `Scan QR Code`\n"
+                "2. Scan the QR code provided with the camera and press A to install.\n"
+                "3. After it is installed, close FBI.\n"
+                "4. Open the Homebrew Launcher.\n"
+                "5. Select essentialsubmit from the list of applications.\n"
+                "6. Press Y and type in your Discord username, then press OK.\n"
+                "7. Select the large :soap: icon.\n"
+                "8. Let us know when it has been submitted.\n"
+                "\nIf you have any questions or issues, let us know.\n"
+                "\nAfter we confirm that it submitted properly, you can safely delete `essentialsubmit.3dsx` from the `3ds` folder on your SD card (this is not required)."
+            )
+        except FileNotFoundError as e:
+            print(f"Error: Could not find assets/essential-3dsx.webp - {e}")
+            pass
     @command_with_perms(name="newsd", help="New SD guide")
     async def newsd(self, ctx: commands.Context):
         await ctx.send(
