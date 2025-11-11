@@ -193,7 +193,6 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help="Sends essentialsubmit instructions",
     )
     @soap_channels_only()
-    @ping_before_mes()
     async def nocomputer(self, ctx: commands.Context):
         file = None
         try:
@@ -215,7 +214,9 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             )
         except FileNotFoundError as e:
             print(f"Error: Could not find assets/essential-3dsx.webp - {e}")
+            await ctx.send("Could not get essentialsubmit QR code.")
             pass
+    
     @command_with_perms(name="newsd", help="New SD guide")
     async def newsd(self, ctx: commands.Context):
         await ctx.send(
