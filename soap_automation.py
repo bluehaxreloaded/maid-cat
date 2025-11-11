@@ -150,14 +150,14 @@ class EshopVerificationView(discord.ui.View):
         channel_id = interaction.channel_id
         view = CompletionFollowUpView(channel_id)
 
-        # Send ephemeral as followup
+        # Send followup
         if interaction.response.is_done():
             await interaction.followup.send(
-                embed=completion_embed, view=view, ephemeral=True
+                embed=completion_embed, view=view
             )
         else:
             await interaction.response.send_message(
-                embed=completion_embed, view=view, ephemeral=True
+                embed=completion_embed, view=view
             )
 
     @discord.ui.button(
