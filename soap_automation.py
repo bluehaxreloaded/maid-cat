@@ -7,6 +7,7 @@ from constants import (
     SOAP_CHANNEL_CATEGORY_ID,
     MANUAL_SOAP_CATEGORY_ID,
     LOADING_EMOTE_ID,
+    SOAPER_ROLE_ID,
 )
 
 
@@ -18,8 +19,8 @@ class CompletionFollowUpView(discord.ui.View):
         self.channel_id = channel_id
 
     @discord.ui.button(
-        label="No, thank you!",
-        style=discord.ButtonStyle.secondary,
+        label="I'm good, thanks!",
+        style=discord.ButtonStyle.primary,
         emoji="👋",
         custom_id="completion_no_thanks",
     )
@@ -57,9 +58,9 @@ class CompletionFollowUpView(discord.ui.View):
             await interaction.followup.send("Error: SoapCog not found.", ephemeral=True)
 
     @discord.ui.button(
-        label="Yes, I have more questions",
-        style=discord.ButtonStyle.primary,
-        emoji="❓",
+        label="I have more questions",
+        style=discord.ButtonStyle.danger,
+        emoji="❔",
         custom_id="completion_more_questions",
     )
     async def more_questions_button(
@@ -99,7 +100,8 @@ class CompletionFollowUpView(discord.ui.View):
                         break
 
         if channel:
-            # Send assistance requested embed
+            # Send assistance requested embed and ping Soaper role
+            soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
             embed = discord.Embed(
                 title="🆘 Assistance Requested",
                 description=f"{interaction.user.mention} has requested additional help. Please wait for a Soaper to assist you.",
@@ -108,7 +110,7 @@ class CompletionFollowUpView(discord.ui.View):
             embed.set_footer(
                 text="Describe in detail what's happening and please include error codes if possible."
             )
-            await channel.send(embed=embed)
+            await channel.send(content=soaper_ping, embed=embed)
 
 
 class EshopVerificationView(discord.ui.View):
@@ -137,14 +139,8 @@ class EshopVerificationView(discord.ui.View):
             await interaction.response.defer()
 
         completion_embed = discord.Embed(
-            title="🙌 You're all set!",
-            description="You should now be able to access:\n"
-            "- *Pokemon Bank*\n"
-            "- *Nintendo Network IDs*\n"
-            "- *The Nintendo eShop*\n"
-            "- *Game Updates*\n"
-            "- *System Transfers*\n"
-            "Do you have any further questions?",
+            title="❓Do you have any further questions?",
+            description="Services such as Pokemon Bank, Nintendo Network IDs, and the Nintendo eShop should now be working, please click one of the buttons below. ",
             color=discord.Color.blurple(),
         )
         channel_id = interaction.channel_id
@@ -180,6 +176,7 @@ class EshopVerificationView(discord.ui.View):
             await interaction.response.defer()
 
         # Send assistance requested embed
+        soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
         embed = discord.Embed(
             title="🆘 Assistance Requested",
             description=f"{interaction.user.mention} has requested additional help. Please wait for a Soaper to assist you.",
@@ -190,9 +187,9 @@ class EshopVerificationView(discord.ui.View):
         )
 
         if interaction.response.is_done():
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(content=soaper_ping, embed=embed)
         else:
-            await interaction.response.send_message(embed=embed)
+            await interaction.response.send_message(content=soaper_ping, embed=embed)
 
 
 class SOAPAutomationCog(commands.Cog):

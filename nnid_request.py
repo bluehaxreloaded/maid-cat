@@ -33,10 +33,10 @@ class FilesCheckView(discord.ui.View):
                 "- `essential.exefs`\n"
                 "- a NAND backup\n"
                 "- `OTP.bin`\n\n"
-                "Please locate one of these files from your previous console before requesting. We apologize for the inconvenience.",
+                "Please locate one of these files from your previous console before requesting.",
                 color=discord.Color.red(),
             )
-            embed.set_footer(text="You are asked to backup your NAND when you mod your console, try looking at your backups.")
+            embed.set_footer(text="If you modded your console, try locating the NAND backup you originally made.")
             await interaction.response.edit_message(embed=embed, view=None)
 
         elif files_answer == "unsure":
