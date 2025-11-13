@@ -139,8 +139,8 @@ class EshopVerificationView(discord.ui.View):
             await interaction.response.defer()
 
         completion_embed = discord.Embed(
-            title="❓Do you have any further questions?",
-            description="Services such as Pokemon Bank, Nintendo Network IDs, and the Nintendo eShop should now be working, please click one of the buttons below. ",
+            title="❔ Do you have any further questions?",
+            description="Services such as Pokemon Bank, Nintendo Network IDs, System Transfers, and the Nintendo eShop should now be working, please click one of the buttons below. ",
             color=discord.Color.blurple(),
         )
         channel_id = interaction.channel_id
