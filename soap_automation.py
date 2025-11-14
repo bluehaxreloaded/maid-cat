@@ -187,9 +187,9 @@ class EshopVerificationView(discord.ui.View):
         )
 
         if interaction.response.is_done():
-            await interaction.followup.send(content=soaper_ping, embed=embed)
+            await interaction.followup.send(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
         else:
-            await interaction.response.send_message(content=soaper_ping, embed=embed)
+            await interaction.response.send_message(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
 
 
 class SOAPAutomationCog(commands.Cog):
