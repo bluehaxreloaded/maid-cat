@@ -40,7 +40,7 @@ class CompletionFollowUpView(discord.ui.View):
         if self.channel_id:
             channel = interaction.guild.get_channel(self.channel_id)
         if not channel:
-            # Fallback to interaction channel (for ephemeral messages, this should be the SOAP channel)
+            # Fallback to interaction channel
             channel = interaction.channel
 
         if not channel:
