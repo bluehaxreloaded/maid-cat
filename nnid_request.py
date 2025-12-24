@@ -55,6 +55,88 @@ class FilesCheckView(discord.ui.View):
             await interaction.response.edit_message(embed=embed, view=None)
 
         else:  # yes or nand
+            # ask about source console being broken/inaccessible
+            embed = discord.Embed(
+                title="🔍 Pre-NNID Transfer Check",
+                description="Great, one more thing to check:",
+                color=discord.Color.orange(),
+            )
+            embed.add_field(
+                name="Question 2 of 3",
+                value="Is your **source console** (the console where your NNID currently is) broken or inaccessible?",
+                inline=False,
+            )
+            embed.set_footer(text="Questions? Drop us a line in #soap-help")
+            view = BrokenConsoleCheckView(interaction.user)
+            await interaction.response.edit_message(embed=embed, view=view)
+
+
+class BrokenConsoleCheckView(discord.ui.View):
+    def __init__(self, user: discord.Member):
+        super().__init__(timeout=180)
+        self.user = user
+
+    @discord.ui.select(
+        placeholder="Is your source console broken or inaccessible?",
+        options=[
+            discord.SelectOption(
+                label="Yes, my source console is broken/inaccessible", value="yes", emoji="✅"
+            ),
+            discord.SelectOption(
+                label="No, my source console still works", value="no", emoji="❌"
+            ),
+            discord.SelectOption(label="I'm not sure", value="unsure", emoji="❓"),
+        ],
+    )
+    async def broken_console_select(
+        self, select: discord.ui.Select, interaction: discord.Interaction
+    ):
+        broken_answer = select.values[0]
+
+        if broken_answer == "no":
+            embed = discord.Embed(
+                title="🔒 Unable to Request NNID Transfer",
+                description="For safety reasons, we only perform NNID transfers for consoles that are broken or inaccessible.\n\n"
+                "If your source console still works, you can perform a **system transfer** directly on your console to transfer your NNID. This is the official method and doesn't require our assistance.\n\n"
+                "**To perform a system transfer:**\n"
+                "1. Go to System Settings -> Other Settings on both consoles\n"
+                "2. Select 'System Transfer'\n"
+                "3. Follow the on-screen instructions\n\n"
+                "",
+                color=discord.Color.red(),
+            )
+            embed.set_footer(text="If anything happens to your console, you can request a transfer here.")
+            await interaction.response.edit_message(embed=embed, view=None)
+
+        elif broken_answer == "unsure":
+            embed = discord.Embed(
+                title="❓ What Does Broken or Inaccessible Mean?",
+                description="Your source console is considered broken or inaccessible if:",
+                color=discord.Color.orange(),
+            )
+            embed.add_field(
+                name="Broken Console",
+                value="• Won't power on\n"
+                "• Has a broken screen\n"
+                "• Has hardware damage preventing normal use\n"
+                "• Has a brick (software issue preventing boot)",
+                inline=False,
+            )
+            embed.add_field(
+                name="Inaccessible Console",
+                value="• Lost or stolen\n"
+                "• Sold or given away\n"
+                "• No longer in your possession",
+                inline=False,
+            )
+            embed.add_field(
+                name="Still Works?",
+                value="If your console still works normally, you should perform a **system transfer** instead. This is the official method and doesn't require our assistance.",
+                inline=False,
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+
+        else:  # yes
             # ask about target console CFW
             embed = discord.Embed(
                 title="🔍 Pre-NNID Transfer Check",
@@ -62,12 +144,12 @@ class FilesCheckView(discord.ui.View):
                 color=discord.Color.orange(),
             )
             embed.add_field(
-                name="Question 2 of 2",
+                name="Question 3 of 3",
                 value="Is your **target console** (the console you want to transfer to) on custom firmware?",
                 inline=False,
             )
             embed.set_footer(text="Questions? Drop us a line in #soap-help")
-            view = CFWCheckView(interaction.user)
+            view = CFWCheckView(self.user)
             await interaction.response.edit_message(embed=embed, view=view)
 
 
@@ -233,7 +315,7 @@ class NNIDRequestView(discord.ui.View):
             color=discord.Color.orange(),
         )
         embed.add_field(
-            name="Question 1 of 2",
+            name="Question 1 of 3",
             value="Do you have one of the required files (see above) from your *source console*?",
             inline=False,
         )
@@ -251,7 +333,7 @@ class NNIDRequestCog(commands.Cog):
         """Helper method to create the NNID request embed and view"""
         embed = discord.Embed(
             title="🔄 NNID Transfer Request",
-            description="This is where you can request a NNIDTransfer, which allows you to transfer your Nintendo Network ID from an broken or lost console to another console.\n\n"
+            description="This is where you can request a NNID Transfer, which allows you to transfer your Nintendo Network ID from an broken or lost console to another console.\n\n"
             "**Before requesting:**\n"
             "- Ensure you have one of the following files from your *source console* (where the NNID currently is):\n"
             "  - `essential.exefs`\n"

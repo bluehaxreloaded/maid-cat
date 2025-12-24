@@ -1,3 +1,5 @@
+from datetime import datetime, timezone, timedelta
+
 KEY = "" # i shouldn't have to explain this one
 
 SOAP_CHANNEL_SUFFIX = "-needs-cleaning-🧼" # what each soap channel ends with
@@ -19,4 +21,20 @@ SOAPER_ROLE_ID = # role ID for Soapers who assist with SOAP requests
 MOD_LOG_ID =  # channel that logging of non-SOAP related actions are placed (excluding join/leaves)
 JOIN_LEAVE_LOG_ID =  # channel where join/leaves are logged
 ERROR_LOG_ID =  # channel that any error not dealt with gets logged to
+SOAP_TRACKER_ID =  # voice channel that displays SOAP count
+NNID_TRACKER_ID =  # voice channel that displays NNID count
 SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, ] # where soap channel specific commands can be used
+
+# late night hours configuration (24-hour format, PST timezone)
+LATE_NIGHT_START_HOUR = 24  # 12 PM PST
+LATE_NIGHT_END_HOUR = 6  # 6 AM PST
+
+# function to check if current time is within late night hours
+def is_late_night_hours() -> bool:
+    """Check if current time is within late night hours"""
+    pst = timezone(timedelta(hours=-8))  # PST is UTC-8
+    current_hour = datetime.now(pst).hour
+    if LATE_NIGHT_START_HOUR > LATE_NIGHT_END_HOUR:
+        return current_hour >= LATE_NIGHT_START_HOUR or current_hour < LATE_NIGHT_END_HOUR
+    else:
+        return LATE_NIGHT_START_HOUR <= current_hour < LATE_NIGHT_END_HOUR

@@ -8,6 +8,7 @@ from constants import (
     NNID_CHANNEL_SUFFIX,
     BOOM_EMOTE_ID,
     NNID_CHANNEL_CATEGORY_ID,
+    is_late_night_hours,
 )
 
 
@@ -41,6 +42,16 @@ class NNIDCog(commands.Cog):  # NNID commands
         )
         # Send with mention
         await channel.send(content=user.mention, embed=embed)
+        
+        # Send late night delay warning if applicable
+        if is_late_night_hours():
+            late_night_embed = discord.Embed(
+                title="🌕 After Hours Notice",
+                description="It's currently late at night in North America, so most of our Soapers are offline. Response times may be slower than usual. Please follow the instructions above and we'll assist you as soon as possible.\n\n",
+                color=discord.Color(0xD50032),
+            )
+            late_night_embed.set_footer(text="We will assist you as soon as possible. Thank you for your patience!"),
+            await channel.send(embed=late_night_embed)
 
     async def create_nnid_channel_for_user(
         self,

@@ -11,6 +11,7 @@ from constants import (
     MANUAL_SOAP_CATEGORY_ID,
     NNID_CHANNEL_SUFFIX,
     NNID_CHANNEL_CATEGORY_ID,
+    is_late_night_hours,
 )
 
 
@@ -26,7 +27,7 @@ class SoapCog(commands.Cog):  # SOAP commands
         ctx: commands.Context | discord.Interaction = None,
     ):
         """
-        Helper function to create a SOAP channel.
+        Helper function to create a manual SOAP channel.
         Returns tuple: (success: bool, channel: discord.TextChannel | None, message: str)
         """
         # strip leading/trailing periods and then replace remaining periods with dashes

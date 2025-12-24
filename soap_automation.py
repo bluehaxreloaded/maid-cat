@@ -8,54 +8,64 @@ from constants import (
     MANUAL_SOAP_CATEGORY_ID,
     LOADING_EMOTE_ID,
     SOAPER_ROLE_ID,
+    is_late_night_hours,
 )
 
 
 class CompletionFollowUpView(discord.ui.View):
     """View for the follow-up questions after eShop verification"""
 
-    def __init__(self, channel_id=None):
+    def __init__(self, channel_id=None, show_close_button=True):
         super().__init__(timeout=None)
         self.channel_id = channel_id
+        self.show_close_button = show_close_button
+        
+        # Only add the close button if show_close_button is True
+        if show_close_button:
+            self.add_item(self._create_close_button())
 
-    @discord.ui.button(
-        label="I'm good, thanks!",
-        style=discord.ButtonStyle.primary,
-        emoji="👋",
-        custom_id="completion_no_thanks",
-    )
-    async def no_thanks_button(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ):
-        """Trigger boom command to delete the channel"""
-        # Disable all buttons in this view
-        for item in self.children:
-            item.disabled = True
+    def _create_close_button(self):
+        """Create the close channel button"""
+        button = discord.ui.Button(
+            label="I'm good, thanks!",
+            style=discord.ButtonStyle.primary,
+            emoji="👋",
+            custom_id="completion_no_thanks",
+        )
+        
+        async def no_thanks_button(interaction: discord.Interaction):
+            """Trigger boom command to delete the channel"""
+            # Disable all buttons in this view
+            for item in self.children:
+                item.disabled = True
 
-        # Disable buttons before responding
-        await interaction.response.edit_message(view=self)
+            # Disable buttons before responding
+            await interaction.response.edit_message(view=self)
 
-        # Get channel from stored ID or from interaction
-        channel = None
-        if self.channel_id:
-            channel = interaction.guild.get_channel(self.channel_id)
-        if not channel:
-            # Fallback to interaction channel
-            channel = interaction.channel
+            # Get channel from stored ID or from interaction
+            channel = None
+            if self.channel_id:
+                channel = interaction.guild.get_channel(self.channel_id)
+            if not channel:
+                # Fallback to interaction channel
+                channel = interaction.channel
 
-        if not channel:
-            await interaction.followup.send("Channel not found.", ephemeral=True)
-            return
+            if not channel:
+                await interaction.followup.send("Channel not found.", ephemeral=True)
+                return
 
-        # Use the deletesoap helper from SoapCog
-        soap_cog = interaction.client.get_cog("SoapCog")
-        if soap_cog:
-            try:
-                await soap_cog.deletesoap(channel, interaction)
-            except Exception:
-                pass
-        else:
-            await interaction.followup.send("Error: SoapCog not found.", ephemeral=True)
+            # Use the deletesoap helper from SoapCog
+            soap_cog = interaction.client.get_cog("SoapCog")
+            if soap_cog:
+                try:
+                    await soap_cog.deletesoap(channel, interaction)
+                except Exception:
+                    pass
+            else:
+                await interaction.followup.send("Error: SoapCog not found.", ephemeral=True)
+        
+        button.callback = no_thanks_button
+        return button
 
     @discord.ui.button(
         label="I have more questions",
@@ -138,23 +148,46 @@ class EshopVerificationView(discord.ui.View):
         except Exception:
             await interaction.response.defer()
 
-        completion_embed = discord.Embed(
-            title="❔ Do you have any further questions?",
-            description="Services such as Pokemon Bank, Nintendo Network IDs, System Transfers, and the Nintendo eShop should now be working, please click one of the buttons below. ",
-            color=discord.Color.blurple(),
-        )
         channel_id = interaction.channel_id
-        view = CompletionFollowUpView(channel_id)
+        channel = interaction.channel
+        
+        # Check if channel is in manual SOAP category
+        is_manual_soap = channel and channel.category and channel.category.id == MANUAL_SOAP_CATEGORY_ID
+        
+        if is_manual_soap:
+            completion_embed = discord.Embed(
+                title="✅ You're all set!",
+                description="Services such as Pokemon Bank, Nintendo Network IDs, System Transfers, and the Nintendo eShop should now be working. You'll also be able to create a new Nintendo Network ID for your new region.\n\nSince this channel was created manually, **please let a Soaper know to close this channel** if you don't have any further questions.",
+                color=discord.Color.blurple(),
+            )
+            view = None  # Don't show any buttons for manual SOAP channels
+        else:
+            completion_embed = discord.Embed(
+                title="❔ Do you have any further questions?",
+                description="Services such as Pokemon Bank, Nintendo Network IDs, System Transfers, and the Nintendo eShop should now be working. You'll also be able to create a new Nintendo Network ID for your new region. Please click one of the buttons below.",
+                color=discord.Color.blurple(),
+            )
+            view = CompletionFollowUpView(channel_id, show_close_button=True)
 
         # Send followup
         if interaction.response.is_done():
-            await interaction.followup.send(
-                embed=completion_embed, view=view
-            )
+            if view is not None:
+                await interaction.followup.send(
+                    embed=completion_embed, view=view
+                )
+            else:
+                await interaction.followup.send(
+                    embed=completion_embed
+                )
         else:
-            await interaction.response.send_message(
-                embed=completion_embed, view=view
-            )
+            if view is not None:
+                await interaction.response.send_message(
+                    embed=completion_embed, view=view
+                )
+            else:
+                await interaction.response.send_message(
+                    embed=completion_embed
+                )
 
     @discord.ui.button(
         label="No, I need help",
@@ -261,6 +294,16 @@ class SOAPAutomationCog(commands.Cog):
         )
         # Send with mention
         await channel.send(content=user.mention, embed=embed)
+        
+        # Send late night delay warning if applicable
+        if is_late_night_hours():
+            late_night_embed = discord.Embed(
+                title="🌕 After Hours Notice",
+                description="It's currently late at night in North America, so most of our Soapers are offline. Response times may be slower than usual. Please follow the instructions above and we'll assist you as soon as possible.\n\n",
+                color=discord.Color(0xD50032),
+            )
+            late_night_embed.set_footer(text="Someone will assist you as soon as possible. Thank you for your patience!"),
+            await channel.send(embed=late_night_embed)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -360,6 +403,11 @@ class SOAPAutomationCog(commands.Cog):
                 )
 
         if status_text == "SUCCESS" and target_channel:
+            # Increment SOAP count when SUCCESS is received
+            tracker_cog = self.bot.get_cog("TrackerCog")
+            if tracker_cog:
+                tracker_cog.increment_soap_count()
+            
             # Send SUCCESS message immediately
             boot_instruction = (
                 f"Boot the console with the serial {serial_number} normally (with the SD inserted into the console)"
@@ -375,10 +423,11 @@ class SOAPAutomationCog(commands.Cog):
                 "**3.** If using Pretendo, switch to Nintendo Network with Nimbus.\n"
                 "**4.** Then try opening the eShop.\n"
                 "**5.** Does the eShop launch successfully?",
+                
                 color=discord.Color.green(),
             )
             embed.set_footer(
-                text="⚠️ System transfer was required - wait 7 days before transferring from another 3DS."
+                text="⚠️ If you want to system transfer from another 3DS, you must wait 7 days.\nOtherwise, you're free to use your console as normal."
             )
             view = EshopVerificationView()
             user_mention = f"<@{user_id}>"
@@ -459,14 +508,37 @@ class SOAPAutomationCog(commands.Cog):
             asyncio.create_task(update_and_delete_progress())
 
         if status_text == "ERROR" and target_channel:
-            embed = discord.Embed(
-                title="🛑 Something went wrong...",
-                description="Soapers, please check the error log for more information.",
-                color=discord.Color.red(),
-            )
-            if status_detail:
-                embed.set_footer(text=f"Error code: {status_detail}")
-            await target_channel.send(embed=embed)
+            # Check if it's a serial mismatch error
+            is_serial_error = status_detail and "SERIAL_MISMATCH" in status_detail.upper()
+            
+            if is_serial_error:
+                # Send findserial instructions
+                embed = discord.Embed(
+                    title="⚠️ Serial Number Mismatch",
+                    description=(
+                        "The serial number you provided does not match your console's serial number.\n\n"
+                        "To find the correct serial number:\n"
+                        "- Hold START while powering on your console. This will boot you into GodMode9.\n"
+                        "- Go to `SYSNAND TWLNAND` -> `sys` -> `log` -> `inspect.log`\n"
+                        "- Select `Open in Textviewer`.\n\n"
+                        "The correct serial number (three-letter prefix followed by nine numbers) should be in the file. "
+                        "You may also send us a picture if you're unsure."
+                    ),
+                    color=discord.Color.yellow(),
+                )
+                user_mention = f"<@{user_id}>"
+                embed.set_footer(text="Once you've found the serial number and send it here, we will resume your SOAP Transfer.")
+                await target_channel.send(content=user_mention, embed=embed)
+            else:
+                # Error - requires Soaper intervention
+                embed = discord.Embed(
+                    title="🛑 Something went wrong...",
+                    description="Soapers, please check the error log for more information.",
+                    color=discord.Color.red(),
+                )
+                if status_detail:
+                    embed.set_footer(text=f"Error code: {status_detail}")
+                await target_channel.send(embed=embed)
 
 
 def setup(bot):

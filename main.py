@@ -17,6 +17,7 @@ bot.load_extension("soap_automation")
 bot.load_extension("text_commands")
 bot.load_extension("nnid")
 bot.load_extension("nnid_request")
+bot.load_extension("tracker")
 
 
 @bot.event  # variadic command count. unnecessary? maybe. cool? absolutely
