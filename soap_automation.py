@@ -187,9 +187,9 @@ class EshopVerificationView(discord.ui.View):
         )
 
         if interaction.response.is_done():
-            await interaction.followup.send(content=soaper_ping, embed=embed)
+            await interaction.followup.send(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
         else:
-            await interaction.response.send_message(content=soaper_ping, embed=embed)
+            await interaction.response.send_message(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
 
 
 class SOAPAutomationCog(commands.Cog):
@@ -362,9 +362,9 @@ class SOAPAutomationCog(commands.Cog):
         if status_text == "SUCCESS" and target_channel:
             # Send SUCCESS message immediately
             boot_instruction = (
-                f"Boot {serial_number} normally (with the SD inserted into the console)"
-                if serial_number
-                else "Boot normally (with the SD inserted into the console)"
+                f"Boot the console with the serial {serial_number} normally (with the SD inserted into the console)"
+                if serial_number != "SKIP"
+                else "Boot the console normally (with the SD inserted into the console)"
             )
             embed = discord.Embed(
                 title="🎉 SOAP Transfer Complete",
@@ -408,9 +408,9 @@ class SOAPAutomationCog(commands.Cog):
         if status_text == "LOTTERY" and target_channel:
             # Send LOTTERY message immediately
             boot_instruction = (
-                f"Boot {serial_number} normally (with the SD inserted into the console)"
-                if serial_number
-                else "Boot normally (with the SD inserted into the console)"
+                f"Boot the console with the serial {serial_number} normally (with the SD inserted into the console)"
+                if serial_number != "SKIP"
+                else "Boot the console normally (with the SD inserted into the console)"
             )
             embed = discord.Embed(
                 title="🎉 SOAP Transfer Complete",
