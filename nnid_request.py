@@ -82,10 +82,10 @@ class BrokenConsoleCheckView(discord.ui.View):
         placeholder="Do either of the following apply to you?",
         options=[
             discord.SelectOption(
-                label="Yes, my source console is broken/inaccessible", value="broken", emoji="✅"
+                label="My source console is broken/inaccessible", value="broken", emoji="✅"
             ),
             discord.SelectOption(
-                label="Yes, my source is New 3DS/2DS transferring to Old 3DS/2DS", value="new_to_old", emoji="✅"
+                label="I'm transferring from a New 3DS/2DS to an Old 3DS/2DS", value="new_to_old", emoji="✅"
             ),
             discord.SelectOption(
                 label="No, neither applies to me", value="no", emoji="❌"
