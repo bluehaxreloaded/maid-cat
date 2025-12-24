@@ -82,10 +82,10 @@ class BrokenConsoleCheckView(discord.ui.View):
         placeholder="Do either of the following apply to you?",
         options=[
             discord.SelectOption(
-                label="Yes, my source console is broken/inaccessible", value="yes", emoji="✅"
+                label="Yes, my source console is broken/inaccessible", value="broken", emoji="✅"
             ),
             discord.SelectOption(
-                label="Yes, my source is New 3DS/2DS transferring to Old 3DS/2DS", value="yes", emoji="✅"
+                label="Yes, my source is New 3DS/2DS transferring to Old 3DS/2DS", value="new_to_old", emoji="✅"
             ),
             discord.SelectOption(
                 label="No, neither applies to me", value="no", emoji="❌"
@@ -98,7 +98,24 @@ class BrokenConsoleCheckView(discord.ui.View):
     ):
         broken_answer = select.values[0]
 
-        if broken_answer == "no":
+        if broken_answer in ["broken", "new_to_old"]:
+            # Both "yes" options proceed to CFW check
+            # ask about target console CFW
+            embed = discord.Embed(
+                title="🔍 Pre-NNID Transfer Check",
+                description="Great, one more thing to check:",
+                color=discord.Color.orange(),
+            )
+            embed.add_field(
+                name="Question 3 of 3",
+                value="Is your **target console** (the console you want to transfer to) on custom firmware?",
+                inline=False,
+            )
+            embed.set_footer(text="Questions? Drop us a line in #soap-help")
+            view = CFWCheckView(self.user)
+            await interaction.response.edit_message(embed=embed, view=view)
+
+        elif broken_answer == "no":
             embed = discord.Embed(
                 title="🔒 Unable to Request NNID Transfer",
                 description="For safety reasons, we only perform NNID transfers if:\n"
@@ -143,22 +160,6 @@ class BrokenConsoleCheckView(discord.ui.View):
                 inline=False,
             )
             await interaction.response.edit_message(embed=embed, view=None)
-
-        else:  # yes
-            # ask about target console CFW
-            embed = discord.Embed(
-                title="🔍 Pre-NNID Transfer Check",
-                description="Great, one more thing to check:",
-                color=discord.Color.orange(),
-            )
-            embed.add_field(
-                name="Question 3 of 3",
-                value="Is your **target console** (the console you want to transfer to) on custom firmware?",
-                inline=False,
-            )
-            embed.set_footer(text="Questions? Drop us a line in #soap-help")
-            view = CFWCheckView(self.user)
-            await interaction.response.edit_message(embed=embed, view=view)
 
 
 class CFWCheckView(discord.ui.View):
