@@ -11,7 +11,7 @@ from constants import (
     NNID_TRACKER_ID,
 )
 
-TRACKER_COUNTS_FILE = Path("tracker_counts.json")
+TRACKER_COUNTS_FILE = Path(__file__).parent / "tracker_counts.json"
 
 class TrackerCog(commands.Cog):
     """Cog to track and update SOAP and NNID channel counts in voice channel names"""
@@ -19,8 +19,12 @@ class TrackerCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         # Initialize file if it doesn't exist
-        if not TRACKER_COUNTS_FILE.exists():
-            self._save_counts_to_file(0, 0)
+        try:
+            if not TRACKER_COUNTS_FILE.exists():
+                self._save_counts_to_file(0, 0)
+        except (IOError, PermissionError) as e:
+            print(f"Warning: Could not initialize tracker_counts.json: {e}")
+            print(f"File path: {TRACKER_COUNTS_FILE.absolute()}")
 
     def _read_counts(self):
         """Read counts from JSON file"""
@@ -49,10 +53,13 @@ class TrackerCog(commands.Cog):
     def _save_counts_to_file(self, soap_count: int, nnid_count: int):
         """Save counts to file"""
         try:
+            TRACKER_COUNTS_FILE.parent.mkdir(parents=True, exist_ok=True)
             with open(TRACKER_COUNTS_FILE, "w") as f:
                 json.dump({"soap_count": soap_count, "nnid_count": nnid_count}, f)
-        except IOError as e:
+        except (IOError, PermissionError) as e:
             print(f"Error saving tracker counts: {e}")
+            print(f"File path: {TRACKER_COUNTS_FILE.absolute()}")
+            print("Please ensure the bot has write permissions to this directory.")
 
     async def update_trackers(self, guild: discord.Guild):
         """Update both tracker voice channel names with current counts"""
