@@ -341,7 +341,7 @@ class NNIDRequestCog(commands.Cog):
         """Helper method to create the NNID request embed and view"""
         embed = discord.Embed(
             title="🔄 NNID Transfer Request",
-            description="This is where you can request a NNID Transfer, which allows you to transfer your Nintendo Network ID from one console to another console. We support transfers between source consoles that are broken or lost and transfers from New 3DS/2DS to Old 3DS/2DS consoles.\n\n"
+            description="This is where you can request a NNID Transfer, which allows you to transfer your Nintendo Network ID from one console to another console.\n\n"
             "**Before requesting:**\n"
             "- Ensure you have one of the following files from your *source console* (where the NNID currently is):\n"
             "  - `essential.exefs`\n"
