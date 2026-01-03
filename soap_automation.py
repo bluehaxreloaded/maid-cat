@@ -516,8 +516,8 @@ class SOAPAutomationCog(commands.Cog):
                 embed = discord.Embed(
                     title="⚠️ Serial Number Mismatch",
                     description=(
-                        "The serial number you provided does not match your console's serial number.\n\n"
-                        "To find the correct serial number:\n"
+                        "The serial number you provided does not match the serial number in your `essentials.exefs` file. Please ensure you have entered the serial number correctly. If you're still having trouble, follow these instructions to find your console's serial number."
+                        "To find your console's serial number:\n"
                         "- Hold START while powering on your console. This will boot you into GodMode9.\n"
                         "- Go to `SYSNAND TWLNAND` -> `sys` -> `log` -> `inspect.log`\n"
                         "- Select `Open in Textviewer`.\n\n"

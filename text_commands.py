@@ -106,14 +106,51 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         aliases=["serial", "serialmismatch"],
         help="Explains how to find a serial number in GM9",
     )
-    @soap_channels_only()
-    @ping_before_mes()
     async def findserial(self, ctx: commands.Context):
-        return [
-            "To find the serial number, hold START while powering on your console. This will boot you into GodMode9.\n\n",
-            "Go to `SYSNAND TWLNAND` -> `sys` -> `log` -> `inspect.log`\n\n",
-            "Select `Open in Textviewer`. Send a picture of the serial number contained in the file. It should be a three-letter prefix followed by nine numbers.",
-        ]
+        # Get the user from the channel topic or name for mention
+        member_obj = None
+        topic = getattr(ctx.channel, "topic", None)
+        if isinstance(ctx.channel, discord.TextChannel) and topic:
+            m = MENTION_RE.search(topic)
+            if m:
+                uid = int(m.group(1))
+                member_obj = ctx.guild.get_member(uid)
+                if member_obj is None:
+                    try:
+                        member_obj = await ctx.guild.fetch_member(uid)
+                    except discord.NotFound:
+                        member_obj = None
+
+        # Get the user from the channel name if topic failed
+        if not member_obj:
+            member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
+            if member_name == ctx.channel.name:  # SOAP suffix didn't match, try NNID
+                member_name = ctx.channel.name.removesuffix(NNID_CHANNEL_SUFFIX)
+            member_obj = ctx.guild.get_member_named(member_name)
+
+        # Create embed matching the Serial Number Mismatch embed format
+        embed = discord.Embed(
+            title="⚠️ Serial Number Mismatch",
+            description=(
+                "The serial number you provided does not match the serial number in your `essentials.exefs` file. Please ensure you have entered the serial number correctly. If you're still having trouble, follow these instructions to find your console's serial number."
+                "To find your console's serial number:\n"
+                "- Hold START while powering on your console. This will boot you into GodMode9.\n"
+                "- Go to `SYSNAND TWLNAND` -> `sys` -> `log` -> `inspect.log`\n"
+                "- Select `Open in Textviewer`.\n\n"
+                "The correct serial number (three-letter prefix followed by nine numbers) should be in the file. "
+                "You may also send us a picture if you're unsure."
+            ),
+            color=discord.Color.yellow(),
+        )
+        embed.set_footer(text="Once you've found the serial number and send it here, we will resume your SOAP Transfer.")
+        
+        # Send with user mention if found
+        if member_obj:
+            await ctx.send(content=member_obj.mention, embed=embed)
+        elif ctx.channel.category and (ctx.channel.category.id in SOAP_USABLE_IDS or ctx.channel.category.id == NNID_CHANNEL_CATEGORY_ID):
+            await ctx.send(content="`SOAPEE MENTION HERE` (this is not a soap/nnid channel)", embed=embed)
+        else:
+            await ctx.send(embed=embed)
 
     @command_with_perms(
         min_role="Soaper",
