@@ -54,7 +54,7 @@ def ping_before_mes():  # i didn't feel like writing the same line multiple time
                 )
             elif ctx.channel.category and (ctx.channel.category.id in SOAP_USABLE_IDS or ctx.channel.category.id == NNID_CHANNEL_CATEGORY_ID):
                 await ctx.send(
-                    f"`SOAPEE MENTION HERE` (this is not a soap/nnid channel)\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
+                    f"`HELPEE MENTION HERE` (This is not a working channel)\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
                 )
             else:
                 await ctx.send(f"User `{member_name}` left.")
@@ -148,7 +148,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         if member_obj:
             await ctx.send(content=member_obj.mention, embed=embed)
         elif ctx.channel.category and (ctx.channel.category.id in SOAP_USABLE_IDS or ctx.channel.category.id == NNID_CHANNEL_CATEGORY_ID):
-            await ctx.send(content="`SOAPEE MENTION HERE` (this is not a soap/nnid channel)", embed=embed)
+            await ctx.send(content="`HELPEE MENTION HERE` (This is not a working channel)", embed=embed)
         else:
             await ctx.send(embed=embed)
 
@@ -215,7 +215,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     @command_with_perms(
         min_role="Soaper",
         name="nodonors",
-        help="Lets Soapee know they need to wait for a bit.",
+        help="Lets Helpee know they need to wait for a bit.",
     )
     @soap_channels_only()
     @ping_before_mes()
