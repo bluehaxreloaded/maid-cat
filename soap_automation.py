@@ -302,7 +302,7 @@ class SOAPAutomationCog(commands.Cog):
                 description="It's currently late at night in North America, so most of our Soapers are offline. Response times may be slower than usual. Please follow the instructions above and we'll assist you as soon as possible.\n\n",
                 color=discord.Color(0xD50032),
             )
-            late_night_embed.set_footer(text="Someone will assist you as soon as possible. Thank you for your patience!"),
+            late_night_embed.set_footer(text="Thank you for your patience!"),
             await channel.send(embed=late_night_embed)
 
     @commands.Cog.listener()
