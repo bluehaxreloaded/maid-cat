@@ -171,28 +171,45 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         name="removennid", aliases=["nnidremove"], help="NNID Removal instructions"
     )
     async def removennid(self, ctx: commands.Context):
-        await ctx.send(
-            "To remove the old Nintendo Network ID (NNID) on your system, first [make a fresh nand backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) (NOTE: Your existing NAND backup is likely in the original region of your console, so you will want one of your changed region anyway).\n\n"
-            "Then use GM9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>)"
+        embed = discord.Embed(
+            title="🔧 Removing Previous Nintendo Network ID",
+            description=(
+                "You'll need to remove the old Nintendo Network ID from your system. \n\nTo do so, follow these steps:\n"
+                "**1.** [Make a new NAND backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) and save it somewhere safe.\n"
+                "**2.** Use GodMode9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>) "
+                "without having to format your console."
+            ),
+            color=discord.Color.orange(),
         )
+        embed.set_footer(text="If you need help with any of these steps, feel free to ask!")
+        await ctx.send(embed=embed)
 
     @command_with_perms(
         name="hacksguide", aliases=["guide"], help="Modding and 3DS help link"
     )
     async def hacksguide(self, ctx: commands.Context):
-        await ctx.send(
-            "For modding help and 3DS support please visit 3DS Hacks Guide:\n\n"
-            "<https://3ds.hacks.guide/>"
+        embed = discord.Embed(
+            title="📚 3DS Hacks Guide",
+            description="For modding help and 3DS support, please visit the 3DS Hacks Guide:\n\n"
+            "[**3ds.hacks.guide**](<https://3ds.hacks.guide/>)",
+            color=discord.Color.blue(),
         )
+        embed.set_footer(text="This guide contains comprehensive instructions for modding your 3DS console.")
+        await ctx.send(embed=embed)
 
     @command_with_perms(
         name="regionchange",
         help="Directions on performing a region change on a 3DS console",
     )
     async def regionchange(self, ctx: commands.Context):
-        await ctx.send(
-            "Region changing guide:\n\n<https://3ds.hacks.guide/region-changing.html>"
+        embed = discord.Embed(
+            title="🌍 Region Changing Guide",
+            description="Learn how to perform a region change on your 3DS console:\n\n"
+            "[**Region Changing Guide**](<https://3ds.hacks.guide/region-changing.html>)",
+            color=discord.Color.blue(),
         )
+        embed.set_footer(text="Follow the guide carefully to change your console's region.")
+        await ctx.send(embed=embed)
 
     @command_with_perms(
         name="nandbackup",
@@ -200,17 +217,25 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help="Directions on creating a nand backup",
     )
     async def nandbackup(self, ctx: commands.Context):
-        await ctx.send(
-            "How to create a nand backup:\n\n"
-            "<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>"
+        embed = discord.Embed(
+            title="💾 Creating a NAND Backup",
+            description="Learn how to create a NAND backup using GodMode9:\n\n"
+            "[**NAND Backup Guide**](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>)",
+            color=discord.Color.blue(),
         )
+        embed.set_footer(text="Always create a NAND backup before making significant changes to your console.")
+        await ctx.send(embed=embed)
 
     @command_with_perms(name="cleaninty", help="Sends link to cleaninty article")
     async def cleaninty(self, ctx: commands.Context):
-        await ctx.send(
-            "See the following for an overview on how SOAP Transfers work:\n\n"
-            "https://wiki.hacks.guide/wiki/3DS:Cleaninty"
+        embed = discord.Embed(
+            title="🧼 SOAP Transfers Overview",
+            description="Learn about how SOAP Transfers work:\n\n"
+            "[**Cleaninty Article**](<https://wiki.hacks.guide/wiki/3DS:Cleaninty>)",
+            color=discord.Color.blue(),
         )
+        embed.set_footer(text="This article provides an overview of the SOAP transfer process.")
+        await ctx.send(embed=embed)
 
     @command_with_perms(
         min_role="Soaper",
@@ -218,11 +243,43 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help="Lets Helpee know they need to wait for a bit.",
     )
     @soap_channels_only()
-    @ping_before_mes()
     async def nodonors(self, ctx: commands.Context):
-        return [
-            "All of our donors are on cooldown, you have been added to the queue, we’ll get back to you as soon as possible."
-        ]
+        # Get the user from the channel topic or name for mention
+        member_obj = None
+        topic = getattr(ctx.channel, "topic", None)
+        if isinstance(ctx.channel, discord.TextChannel) and topic:
+            m = MENTION_RE.search(topic)
+            if m:
+                uid = int(m.group(1))
+                member_obj = ctx.guild.get_member(uid)
+                if member_obj is None:
+                    try:
+                        member_obj = await ctx.guild.fetch_member(uid)
+                    except discord.NotFound:
+                        member_obj = None
+
+        # Get the user from the channel name if topic failed
+        if not member_obj:
+            member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
+            if member_name == ctx.channel.name:  # SOAP suffix didn't match, try NNID
+                member_name = ctx.channel.name.removesuffix(NNID_CHANNEL_SUFFIX)
+            member_obj = ctx.guild.get_member_named(member_name)
+
+        # Create embed
+        embed = discord.Embed(
+            title="⏳ Donors on Cooldown",
+            description="All of our donors are currently on cooldown. You have been added to the queue, and we'll get back to you as soon as possible.",
+            color=discord.Color.orange(),
+        )
+        embed.set_footer(text="Thank you for your patience!")
+        
+        # Send with user mention if found
+        if member_obj:
+            await ctx.send(content=member_obj.mention, embed=embed)
+        elif ctx.channel.category and (ctx.channel.category.id in SOAP_USABLE_IDS or ctx.channel.category.id == NNID_CHANNEL_CATEGORY_ID):
+            await ctx.send(content="`HELPEE MENTION HERE` (This is not a working channel)", embed=embed)
+        else:
+            await ctx.send(embed=embed)
     
     @command_with_perms(
         min_role="Soaper",
@@ -265,24 +322,34 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         name="formatsd", aliases=["format", "sdformat"], help="SD formatting guide"
     )
     async def formatsd(self, ctx: commands.Context):
-        await ctx.send(
-            "How to format an SD card correctly for a 3DS:\n\n"
-            "<https://3ds.hacks.guide/formatting-sd-(windows).html>"
+        embed = discord.Embed(
+            title="💾 Formatting SD Card for 3DS",
+            description="Learn how to format an SD card correctly for your 3DS console:\n\n"
+            "[**SD Card Formatting Guide**](<https://3ds.hacks.guide/formatting-sd-(windows).html>)",
+            color=discord.Color.blue(),
         )
+        embed.set_footer(text="Proper formatting ensures your SD card works correctly with your 3DS.")
+        await ctx.send(embed=embed)
 
     @command_with_perms(name="donors", help="How to donate consoles for SOAPs")
     async def donors(self, ctx: commands.Context):
-        await ctx.send(
-            "For a console to be a donor, ideally they should:\n"
-            "- be in a state where they won't be used anymore (won't turn on, bad screens, bad ram, etc),\n"
-            "- have a bad wifi card, or\n"
-            "- have had the eShop apps (`tiger`, `mint`) deleted off the NAND so it can't connect to the eShop (connecting a console to the eShop while it is also being used as a donor is known cause various issues)"
-            "\n\n"
-            "To donate a console for soaps, all we need is either:\n\n"
-            "- `essential.exefs` + serial, or\n"
-            "- secinfo + OTP + serial\n\n"
-            "You can send this info to any Staff or Soaper. Thank you!"
+        embed = discord.Embed(
+            title="🎁 Donating Consoles for SOAPs",
+            description=(
+                "**Ideal donor consoles should:**\n"
+                "• Be in a state where they won't be used anymore (won't turn on, bad screens, bad RAM, etc.), or\n"
+                "• Have a bad WiFi card, or\n"
+                "• Have had the eShop apps (`tiger`, `mint`) deleted off the NAND so it can't connect to the eShop\n\n"
+                "⚠️ **Note:** Connecting a console to the eShop while it is also being used as a donor is known to cause various issues.\n\n"
+                "**To donate a console for SOAPs, we need either:**\n"
+                "• `essential.exefs` + serial, or\n"
+                "• secinfo + OTP + serial\n\n"
+                "You can send this information to any Staff or Soaper. Thank you for your contribution! 🙏"
+            ),
+            color=discord.Color.green(),
         )
+        embed.set_footer(text="Donor consoles help make SOAP transfers possible for others.")
+        await ctx.send(embed=embed)
 
 
 def setup(bot):
