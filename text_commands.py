@@ -139,7 +139,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
                 "- Select `Open in Textviewer`.\n\n"
                 "The correct serial number (three-letter prefix followed by nine numbers) should be in the file. "
             ),
-            color=discord.Color.yellow(),
+            color=discord.Color.blue(),
         )
         embed.set_footer(text="You may also send us a picture if you're unsure.")
         
