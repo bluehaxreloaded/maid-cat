@@ -130,19 +130,18 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
 
         # Create embed matching the Serial Number Mismatch embed format
         embed = discord.Embed(
-            title="⚠️ Serial Number Mismatch",
+            title="📂 Finding Your Serial Number",
             description=(
-                "The serial number you provided does not match the serial number in your `essentials.exefs` file. Please ensure you have entered the serial number correctly. If you're still having trouble, follow these instructions to find your console's serial number.\n\n"
+                "Follow these instructions to find your console's serial number.\n\n"
                 "**To find your console's serial number:**\n"
                 "- Hold START while powering on your console. This will boot you into GodMode9.\n"
                 "- Go to `SYSNAND TWLNAND` -> `sys` -> `log` -> `inspect.log`\n"
                 "- Select `Open in Textviewer`.\n\n"
                 "The correct serial number (three-letter prefix followed by nine numbers) should be in the file. "
-                "You may also send us a picture if you're unsure."
             ),
             color=discord.Color.yellow(),
         )
-        embed.set_footer(text="Once you've found the serial number and send it here, we will resume your SOAP Transfer.")
+        embed.set_footer(text="You may also send us a picture if you're unsure.")
         
         # Send with user mention if found
         if member_obj:
