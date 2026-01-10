@@ -349,6 +349,21 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         )
         embed.set_footer(text="Donor consoles help make SOAP transfers possible for others.")
         await ctx.send(embed=embed)
+    
+    @command_with_perms(name="nnidwarning", help="Warning message for NNIDTransfers")
+    async def nnidwarning(self, ctx: commands.Context):
+        embed = discord.Embed(
+            title="⚠️ NNID Transfer Warning",
+            description=(
+                "Nintendo of America no longer assists with unlinking NNIDs. Due to this, we provide NNID Transfers for consoles that cannot perform a system transfer normally.\n\n"
+                "Performing NNID transfers via the process used by us in this server is experimental.\n\n"
+                "While there have no been no proven cases of any NNIDs being lost during this process, using our services for transferring NNIDs should nevertheless be considered a **last resort** and you should perform a system transfer if able.\n\n"
+                "__By continuing, you acknowledge that there may be a chance that you will lose access to your NNID and/or other eShop services.__\n\n"
+                "Please tell us if you would like to continue."
+            ),
+            color=discord.Color.yellow(),
+        )
+        await ctx.send(embed=embed)
 
 
 def setup(bot):
