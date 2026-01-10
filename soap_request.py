@@ -289,28 +289,19 @@ class SOAPRequestCog(commands.Cog):
     # This fixes broken embeds if the bot stops.
     @commands.Cog.listener()
     async def on_ready(self):
-        """Clear the request SOAP channel and post the embed on startup"""
         self.bot.add_view(SOAPRequestView())
-
-        channel = self.bot.get_channel(REQUEST_SOAP_CHANNEL_ID)
-        if channel:
-            try:
-                await channel.purge(limit=None)
-            except discord.Forbidden:
-                print("No permission to clear messages in request SOAP channel")
-            except Exception as e:
-                print(f"Error clearing request SOAP channel: {e}")
-
-            embed, view, file = self._create_soap_request_embed_and_view()
-            if file:
-                await channel.send(embed=embed, view=view, file=file)
-            else:
-                await channel.send(embed=embed, view=view)
 
     @command_with_perms(
         name="requestsoap", help="Creates an embed with a button for SOAP requests"
     )
     async def requestsoap(self, ctx: commands.Context):
+        if ctx.channel.id == REQUEST_SOAP_CHANNEL_ID:
+            try:
+                await ctx.channel.purge(limit=None)
+            except discord.Forbidden:
+                print("No permission to clear messages in request SOAP channel")
+            except Exception as e:
+                print(f"Error clearing request SOAP channel: {e}")
         embed, view, file = self._create_soap_request_embed_and_view()
         if file:
             await ctx.send(embed=embed, view=view, file=file)

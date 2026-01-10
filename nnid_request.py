@@ -370,28 +370,19 @@ class NNIDRequestCog(commands.Cog):
     # This fixes broken embeds if the bot stops.
     @commands.Cog.listener()
     async def on_ready(self):
-        """Clear the request NNID channel and post the embed on startup"""
         self.bot.add_view(NNIDRequestView())
-
-        channel = self.bot.get_channel(REQUEST_NNID_CHANNEL_ID)
-        if channel:
-            try:
-                await channel.purge(limit=None)
-            except discord.Forbidden:
-                print("No permission to clear messages in request NNID channel")
-            except Exception as e:
-                print(f"Error clearing request NNID channel: {e}")
-
-            embed, view, file = self._create_nnid_request_embed_and_view()
-            if file:
-                await channel.send(embed=embed, view=view, file=file)
-            else:
-                await channel.send(embed=embed, view=view)
 
     @command_with_perms(
         name="requestnnid", help="Creates an embed with a button for NNID transfer requests"
     )
     async def requestnnid(self, ctx: commands.Context):
+        if ctx.channel.id == REQUEST_NNID_CHANNEL_ID:
+            try:
+                await ctx.channel.purge(limit=None)
+            except discord.Forbidden:
+                print("No permission to clear messages in request NNID channel")
+            except Exception as e:
+                print(f"Error clearing request NNID channel: {e}")
         embed, view, file = self._create_nnid_request_embed_and_view()
         if file:
             await ctx.send(embed=embed, view=view, file=file)

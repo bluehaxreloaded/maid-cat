@@ -3,7 +3,7 @@ import traceback
 from log import ErrorLogChannelNotFound, error_log
 from discord.ext import commands
 from help import CustomHelp
-from constants import KEY
+from constants import KEY, SOAP_LOG_ID
 
 intent = discord.Intents().default()
 intent.message_content = True
@@ -100,6 +100,18 @@ async def on_command_error(ctx: commands.Context, error: commands.CommandError):
 @bot.event
 async def on_ready():
     print(f"Logged-in as {bot.user}")
+    log_channel = bot.get_channel(SOAP_LOG_ID)
+    if log_channel:
+        embed = discord.Embed(
+            title="Ready!",
+            description=f"{bot.user.name} has just restarted.",
+            color=discord.Color.blue(),
+        )
+        embed.set_footer(text="Button interactions created before the restart might be broken now.")
+        await log_channel.send(embed=embed)
+    else:
+        raise ErrorLogChannelNotFound(SOAP_LOG_ID)
+        
     # dynamic_setup = bot.get_cog("DynamicCommandsCog").setup_commands()
     # print(f"Loaded dynamic commands: {dynamic_setup}")
 
