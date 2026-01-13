@@ -70,11 +70,8 @@ async def on_command_error(ctx: commands.Context, error: commands.CommandError):
             await ctx.send_help(ctx.command)
         elif isinstance(error, commands.CommandNotFound):
             cmd_mes = ctx.message.content[1:].split()
-            cmd_tried = cmd_mes[0]
-            if cmd_tried == "help":
-                cmd_tried = cmd_mes[1]
-
-            await ctx.send(f"Unknown command `{cmd_tried}`")
+            if cmd_mes[0] == "help":
+                await ctx.send(f"Unknown command `{cmd_mes[1]}`")
         elif isinstance(error, commands.MissingRole):
             role_name = error.missing_role
             await ctx.send(f"You must be {role_name} or higher to use this command!")
