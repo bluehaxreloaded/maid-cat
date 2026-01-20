@@ -453,7 +453,7 @@ class SOAPAutomationCog(commands.Cog):
                 color=discord.Color.green(),
             )
             embed.set_footer(
-                text="⚠️ If you want to system transfer from another 3DS, you must wait 7 days.\nOtherwise, you're free to use your console as normal."
+                text="⚠️ If you want to system transfer to/from another 3DS, you must wait 7 days.\nOtherwise, you're free to use your console as normal."
             )
             view = EshopVerificationView()
             user_mention = f"<@{user_id}>"
@@ -481,7 +481,7 @@ class SOAPAutomationCog(commands.Cog):
                 color=discord.Color.yellow(),
             )
             embed.set_footer(
-                text="No system transfer was needed - you can transfer from another 3DS right away if you want!"
+                text="No system transfer was needed - you can transfer to/from another 3DS right away if you want!"
             )
             view = EshopVerificationView()
             user_mention = f"<@{user_id}>"

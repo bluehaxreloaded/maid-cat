@@ -33,12 +33,13 @@ class NNIDCog(commands.Cog):  # NNID commands
             "5. Insert your SD card into your PC or connect to your console via FTPD\n"
             "6. Navigate to `/gm9/out/`, where `essential.exefs` should be located\n"
             "7. Rename the `essential.exefs` file to `TARGET_essential.exefs` and upload it to this channel\n"
-            "8. Provide your target console's serial number below\n"
-            "9. Locate your previous console's `essential.exefs`\n"
+            "8. Provide your source console's serial number below if possible\n"
+            "9. Provide your target console's serial number below\n"
+            "10. Locate your previous console's `essential.exefs`\n"
             "    - If you only have a NAND backup or a `SecureInfo_A` or `SecureInfo_B` file with an OTP file, let us know and we will provide further instructions.\n"
             "    - If you cannot find an essential.exefs, NAND backup, or SecureInfo file with an OTP file, we unfortunately cannot perform the NNID transfer. Please try your best to find one of these files, let us know if you need help.\n"
-            "10. Rename the file to `SOURCE_essential.exefs` and upload it to this channel\n"
-            "11. Please wait for someone to assist you",
+            "11. Rename the file to `SOURCE_essential.exefs` and upload it to this channel\n"
+            "12. Please wait for someone to assist you",
             color=discord.Color.orange(),
         )
         # Send with mention
