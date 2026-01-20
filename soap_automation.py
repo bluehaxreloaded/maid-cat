@@ -19,53 +19,54 @@ class CompletionFollowUpView(discord.ui.View):
         super().__init__(timeout=None)
         self.channel_id = channel_id
         self.show_close_button = show_close_button
-        
-        # Only add the close button if show_close_button is True
-        if show_close_button:
-            self.add_item(self._create_close_button())
 
-    def _create_close_button(self):
-        """Create the close channel button"""
-        button = discord.ui.Button(
-            label="I'm good, thanks!",
-            style=discord.ButtonStyle.primary,
-            emoji="👋",
-            custom_id="completion_no_thanks",
-        )
-        
-        async def no_thanks_button(interaction: discord.Interaction):
-            """Trigger boom command to delete the channel"""
-            # Disable all buttons in this view
-            for item in self.children:
-                item.disabled = True
+        # Remove I'm good if manual SOAP
+        if not show_close_button:
+            for item in list(self.children):
+                if (
+                    isinstance(item, discord.ui.Button)
+                    and item.custom_id == "completion_no_thanks"
+                ):
+                    self.remove_item(item)
 
-            # Disable buttons before responding
-            await interaction.response.edit_message(view=self)
+    @discord.ui.button(
+        label="I'm good, thanks!",
+        style=discord.ButtonStyle.primary,
+        emoji="👋",
+        custom_id="completion_no_thanks",
+    )
+    async def no_thanks_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        """Trigger boom command to delete the channel"""
+        # Disable all buttons in this view
+        for item in self.children:
+            item.disabled = True
 
-            # Get channel from stored ID or from interaction
-            channel = None
-            if self.channel_id:
-                channel = interaction.guild.get_channel(self.channel_id)
-            if not channel:
-                # Fallback to interaction channel
-                channel = interaction.channel
+        # Disable buttons before responding
+        await interaction.response.edit_message(view=self)
 
-            if not channel:
-                await interaction.followup.send("Channel not found.", ephemeral=True)
-                return
+        # Get channel from stored ID or from interaction
+        channel = None
+        if self.channel_id:
+            channel = interaction.guild.get_channel(self.channel_id)
+        if not channel:
+            # Fallback to interaction channel
+            channel = interaction.channel
 
-            # Use the deletesoap helper from SoapCog
-            soap_cog = interaction.client.get_cog("SoapCog")
-            if soap_cog:
-                try:
-                    await soap_cog.deletesoap(channel, interaction)
-                except Exception:
-                    pass
-            else:
-                await interaction.followup.send("Error: SoapCog not found.", ephemeral=True)
-        
-        button.callback = no_thanks_button
-        return button
+        if not channel:
+            await interaction.followup.send("Channel not found.", ephemeral=True)
+            return
+
+        # Use the deletesoap helper from SoapCog
+        soap_cog = interaction.client.get_cog("SoapCog")
+        if soap_cog:
+            try:
+                await soap_cog.deletesoap(channel, interaction)
+            except Exception:
+                pass
+        else:
+            await interaction.followup.send("Error: SoapCog not found.", ephemeral=True)
 
     @discord.ui.button(
         label="I have more questions",
