@@ -7,8 +7,8 @@ class HelpView(discord.ui.View):
     """Paginated help view using buttons."""
 
     def __init__(self, pages: list[discord.Embed]):
-        # 2 minute timeout; buttons will stop working after that but message stays.
-        super().__init__(timeout=120)
+        # Keep help buttons active for 2 hours
+        super().__init__(timeout=7200)
         self.pages = pages
         self.index = 0
         # Disable buttons up-front if only one page
@@ -94,7 +94,7 @@ class HelpCog(commands.Cog):
             if not embed.fields:
                 embed.description = "No commands available."
             embed.set_footer(
-                text="Use `.help <command>` for extended info on a specific command."
+                text="Use `/help <command>` for extended info on a specific command."
             )
             pages.append(embed)
 
