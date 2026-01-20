@@ -183,12 +183,21 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     )
     @soap_channels_only()
     async def soapwait(self, ctx):
-        await ctx.respond(
+        from discord.ext import commands as _commands_mod
+
+        if not isinstance(ctx, _commands_mod.Context) and hasattr(ctx, "respond"):
+            try:
+                await ctx.respond("✅ Sent to channel!", ephemeral=True)
+            # Better safe than sorry
+            except TypeError:
+                await ctx.respond("✅ Sent to channel!")
+
+        await ctx.channel.send(
             f"{discord.utils.get(ctx.guild.emojis, id=BLOBSOAP_EMOTE_ID)} the SOAP process has begun and will take up to 5 minutes. Please wait. {discord.utils.get(ctx.guild.emojis, id=BLOBSOAP_EMOTE_ID)}"
         )
         sticker = discord.utils.get(ctx.guild.stickers, id=SOAP_LOADING_ID)
         if sticker:
-            await ctx.respond(content="", stickers=[sticker])
+            await ctx.channel.send(content="", stickers=[sticker])
 
     @command_with_perms(
         name="removennid", aliases=["nnidremove"], help="NNID Removal instructions"

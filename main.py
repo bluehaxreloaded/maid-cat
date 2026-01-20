@@ -9,6 +9,7 @@ intent.message_content = True
 intent.members = True
 bot = bridge.Bot(command_prefix=".", intents=intent)
 bot.load_extension("help")
+bot.load_extension("moderation")
 bot.load_extension("soap")
 bot.load_extension("soap_request")
 bot.load_extension("soap_automation")
