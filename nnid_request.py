@@ -375,7 +375,7 @@ class NNIDRequestCog(commands.Cog):
     @command_with_perms(
         name="requestnnid", help="Creates an embed with a button for NNID transfer requests"
     )
-    async def requestnnid(self, ctx: commands.Context):
+    async def requestnnid(self, ctx):
         if ctx.channel.id == REQUEST_NNID_CHANNEL_ID:
             try:
                 await ctx.channel.purge(limit=None)
@@ -385,9 +385,9 @@ class NNIDRequestCog(commands.Cog):
                 print(f"Error clearing request NNID channel: {e}")
         embed, view, file = self._create_nnid_request_embed_and_view()
         if file:
-            await ctx.send(embed=embed, view=view, file=file)
+            await ctx.respond(embed=embed, view=view, file=file)
         else:
-            await ctx.send(embed=embed, view=view)
+            await ctx.respond(embed=embed, view=view)
 
 
 def setup(bot):

@@ -1,15 +1,14 @@
 import discord
 import traceback
 from log import ErrorLogChannelNotFound, error_log
-from discord.ext import commands
-from help import CustomHelp
+from discord.ext import commands, bridge
 from constants import KEY, SOAP_LOG_ID
 
 intent = discord.Intents().default()
 intent.message_content = True
 intent.members = True
-bot = commands.Bot(command_prefix=".", intents=intent)
-bot.help_command = CustomHelp()
+bot = bridge.Bot(command_prefix=".", intents=intent)
+bot.load_extension("help")
 bot.load_extension("soap")
 bot.load_extension("soap_request")
 bot.load_extension("soap_automation")
@@ -95,6 +94,23 @@ async def on_command_error(ctx: commands.Context, error: commands.CommandError):
 
 
 @bot.event
+async def on_application_command_error(ctx, error: commands.CommandError):
+    """Handle errors for slash/bridge commands (application commands)."""
+    try:
+        if isinstance(error, commands.CheckFailure):
+            # Includes WrongChannel and MissingRole coming from checks/decorators
+            await ctx.respond(str(error), ephemeral=True)
+        else:
+            await ctx.respond(
+                "Error! Please don't do whatever you did again and notify someone who knows what they're doing.",
+                ephemeral=True,
+            )
+            # Log to console for debugging; prefix error_log handles prefix commands.
+            print(f"Application command error: {error}")
+    except Exception as unknown:
+        print(f"Error while handling application command error: {unknown}")
+
+@bot.event
 async def on_ready():
     print(f"Logged-in as {bot.user}")
     log_channel = bot.get_channel(SOAP_LOG_ID)
@@ -111,6 +127,5 @@ async def on_ready():
         
     # dynamic_setup = bot.get_cog("DynamicCommandsCog").setup_commands()
     # print(f"Loaded dynamic commands: {dynamic_setup}")
-
 
 bot.run(KEY)

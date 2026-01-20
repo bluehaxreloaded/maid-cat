@@ -20,7 +20,7 @@ MENTION_RE = re.compile(r"<@!?(\d{15,25})>")
 def ping_before_mes():  # i didn't feel like writing the same line multiple times so i did the harder option of writing an entire decorator to write one single line
     def decorator(func):
         @wraps(func)
-        async def send_ping(self, ctx: commands.Context, *args, **kwargs):
+        async def send_ping(self, ctx, *args, **kwargs):
             # Get the user from the channel topic.
             member_obj = None
             topic = getattr(ctx.channel, "topic", None)
@@ -36,7 +36,7 @@ def ping_before_mes():  # i didn't feel like writing the same line multiple time
                             member_obj = None
 
                 if member_obj:
-                    await ctx.send(
+                    await ctx.respond(
                         f"{member_obj.mention}\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
                     )
                     return
@@ -49,15 +49,15 @@ def ping_before_mes():  # i didn't feel like writing the same line multiple time
             
             member_obj = ctx.guild.get_member_named(member_name)
             if member_obj:
-                await ctx.send(
+                await ctx.respond(
                     f"{member_obj.mention}\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
                 )
             elif ctx.channel.category and (ctx.channel.category.id in SOAP_USABLE_IDS or ctx.channel.category.id == NNID_CHANNEL_CATEGORY_ID):
-                await ctx.send(
+                await ctx.respond(
                     f"`HELPEE MENTION HERE` (This is not a working channel)\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
                 )
             else:
-                await ctx.send(f"User `{member_name}` left.")
+                await ctx.respond(f"User `{member_name}` left.")
 
         return send_ping
 
@@ -74,7 +74,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         aliases=["normalsoap", "normal"],
         help="Displays normal SOAP completion message",
     )
-    async def soapnormal(self, ctx: commands.Context):
+    async def soapnormal(self, ctx):
         embed = discord.Embed(
             title="🎉 SOAP Transfer Complete",
             description=(
@@ -95,7 +95,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             )
         )
 
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
 
     @command_with_perms(
         min_role="Soaper",
@@ -104,7 +104,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help='Displays "lottery" SOAP completion message',
     )
     @soap_channels_only()
-    async def soaplottery(self, ctx: commands.Context):
+    async def soaplottery(self, ctx):
         embed = discord.Embed(
             title="🎉 SOAP Transfer Complete",
             description=(
@@ -122,7 +122,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             text="No system transfer was needed - you can transfer from another 3DS right away if you want!"
         )
 
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
 
     @command_with_perms(
         min_role="Soaper",
@@ -130,7 +130,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         aliases=["serial", "serialmismatch"],
         help="Explains how to find a serial number in GM9",
     )
-    async def findserial(self, ctx: commands.Context):
+    async def findserial(self, ctx):
         # Get the user from the channel topic or name for mention
         member_obj = None
         topic = getattr(ctx.channel, "topic", None)
@@ -169,11 +169,11 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         
         # Send with user mention if found
         if member_obj:
-            await ctx.send(content=member_obj.mention, embed=embed)
+            await ctx.respond(content=member_obj.mention, embed=embed)
         elif ctx.channel.category and (ctx.channel.category.id in SOAP_USABLE_IDS or ctx.channel.category.id == NNID_CHANNEL_CATEGORY_ID):
-            await ctx.send(content="`HELPEE MENTION HERE` (This is not a working channel)", embed=embed)
+            await ctx.respond(content="`HELPEE MENTION HERE` (This is not a working channel)", embed=embed)
         else:
-            await ctx.send(embed=embed)
+            await ctx.respond(embed=embed)
 
     @command_with_perms(
         min_role="Soaper",
@@ -182,18 +182,18 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help="Claiming a soap channel, for soapers",
     )
     @soap_channels_only()
-    async def soapwait(self, ctx: commands.Context):
-        await ctx.send(
+    async def soapwait(self, ctx):
+        await ctx.respond(
             f"{discord.utils.get(ctx.guild.emojis, id=BLOBSOAP_EMOTE_ID)} the SOAP process has begun and will take up to 5 minutes. Please wait. {discord.utils.get(ctx.guild.emojis, id=BLOBSOAP_EMOTE_ID)}"
         )
         sticker = discord.utils.get(ctx.guild.stickers, id=SOAP_LOADING_ID)
         if sticker:
-            await ctx.send(content="", stickers=[sticker])
+            await ctx.respond(content="", stickers=[sticker])
 
     @command_with_perms(
         name="removennid", aliases=["nnidremove"], help="NNID Removal instructions"
     )
-    async def removennid(self, ctx: commands.Context):
+    async def removennid(self, ctx):
         embed = discord.Embed(
             title="🔧 Removing Previous Nintendo Network ID",
             description=(
@@ -205,12 +205,12 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             color=discord.Color.orange(),
         )
         embed.set_footer(text="If you need help with any of these steps, feel free to ask!")
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
 
     @command_with_perms(
         name="hacksguide", aliases=["guide"], help="Modding and 3DS help link"
     )
-    async def hacksguide(self, ctx: commands.Context):
+    async def hacksguide(self, ctx):
         embed = discord.Embed(
             title="📚 3DS Hacks Guide",
             description="For modding help and 3DS support, please visit the 3DS Hacks Guide:\n\n"
@@ -218,13 +218,13 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             color=discord.Color.blue(),
         )
         embed.set_footer(text="This guide contains comprehensive instructions for modding your 3DS console.")
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
 
     @command_with_perms(
         name="regionchange",
         help="Directions on performing a region change on a 3DS console",
     )
-    async def regionchange(self, ctx: commands.Context):
+    async def regionchange(self, ctx):
         embed = discord.Embed(
             title="🌍 Region Changing Guide",
             description="Learn how to perform a region change on your 3DS console:\n\n"
@@ -232,14 +232,14 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             color=discord.Color.blue(),
         )
         embed.set_footer(text="Follow the guide carefully to change your console's region.")
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
 
     @command_with_perms(
         name="nandbackup",
         aliases=["backupnand"],
         help="Directions on creating a nand backup",
     )
-    async def nandbackup(self, ctx: commands.Context):
+    async def nandbackup(self, ctx):
         embed = discord.Embed(
             title="💾 Creating a NAND Backup",
             description="Learn how to create a NAND backup using GodMode9:\n\n"
@@ -247,10 +247,10 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             color=discord.Color.blue(),
         )
         embed.set_footer(text="Always create a NAND backup before making significant changes to your console.")
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
 
     @command_with_perms(name="cleaninty", help="Sends link to cleaninty article")
-    async def cleaninty(self, ctx: commands.Context):
+    async def cleaninty(self, ctx):
         embed = discord.Embed(
             title="🧼 SOAP Transfers Overview",
             description="Learn about how SOAP Transfers work:\n\n"
@@ -258,7 +258,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             color=discord.Color.blue(),
         )
         embed.set_footer(text="This article provides an overview of the SOAP transfer process.")
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
 
     @command_with_perms(
         min_role="Soaper",
@@ -266,7 +266,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help="Lets Helpee know they need to wait for a bit.",
     )
     @soap_channels_only()
-    async def nodonors(self, ctx: commands.Context):
+    async def nodonors(self, ctx):
         # Get the user from the channel topic or name for mention
         member_obj = None
         topic = getattr(ctx.channel, "topic", None)
@@ -298,11 +298,11 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         
         # Send with user mention if found
         if member_obj:
-            await ctx.send(content=member_obj.mention, embed=embed)
+            await ctx.respond(content=member_obj.mention, embed=embed)
         elif ctx.channel.category and (ctx.channel.category.id in SOAP_USABLE_IDS or ctx.channel.category.id == NNID_CHANNEL_CATEGORY_ID):
-            await ctx.send(content="`HELPEE MENTION HERE` (This is not a working channel)", embed=embed)
+            await ctx.respond(content="`HELPEE MENTION HERE` (This is not a working channel)", embed=embed)
         else:
-            await ctx.send(embed=embed)
+            await ctx.respond(embed=embed)
     
     @command_with_perms(
         min_role="Soaper",
@@ -310,13 +310,13 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help="Sends essentialsubmit instructions",
     )
     @soap_channels_only()
-    async def nocomputer(self, ctx: commands.Context):
+    async def nocomputer(self, ctx):
         file = None
         try:
             path = Path(__file__).parent / "assets" / "essential-3dsx.webp"
             file = discord.File(fp=path, filename="essential-3dsx.webp")
-            await ctx.send(file=file)
-            await ctx.send(
+            await ctx.respond(file=file)
+            await ctx.respond(
                 "## Submitting essential.exefs without a computer\n"
                 "1. Open FBI and navigate to `Remote Install` → `Scan QR Code`\n"
                 "2. Scan the QR code provided with the camera and press A to install.\n"
@@ -331,12 +331,12 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             )
         except FileNotFoundError as e:
             print(f"Error: Could not find assets/essential-3dsx.webp - {e}")
-            await ctx.send("Could not get essentialsubmit QR code.")
+            await ctx.respond("Could not get essentialsubmit QR code.")
             pass
     
     @command_with_perms(name="newsd", help="New SD guide")
-    async def newsd(self, ctx: commands.Context):
-        await ctx.send(
+    async def newsd(self, ctx):
+        await ctx.respond(
             "How to restore CFW on a new SD card:\n\n"
             "<https://3ds.hacks.guide/restoring-updating-cfw.html>"
         )
@@ -344,7 +344,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     @command_with_perms(
         name="formatsd", aliases=["format", "sdformat"], help="SD formatting guide"
     )
-    async def formatsd(self, ctx: commands.Context):
+    async def formatsd(self, ctx):
         embed = discord.Embed(
             title="💾 Formatting SD Card for 3DS",
             description="Learn how to format an SD card correctly for your 3DS console:\n\n"
@@ -352,10 +352,10 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             color=discord.Color.blue(),
         )
         embed.set_footer(text="Proper formatting ensures your SD card works correctly with your 3DS.")
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
 
     @command_with_perms(name="donors", help="How to donate consoles for SOAPs")
-    async def donors(self, ctx: commands.Context):
+    async def donors(self, ctx):
         embed = discord.Embed(
             title="🎁 Donating Consoles for SOAPs",
             description=(
@@ -372,10 +372,10 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             color=discord.Color.green(),
         )
         embed.set_footer(text="Donor consoles help make SOAP transfers possible for others.")
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
     
     @command_with_perms(name="nnidwarning", help="Warning message for NNIDTransfers")
-    async def nnidwarning(self, ctx: commands.Context):
+    async def nnidwarning(self, ctx):
         embed = discord.Embed(
             title="⚠️ NNID Transfer Warning",
             description=(
@@ -387,7 +387,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             ),
             color=discord.Color.yellow(),
         )
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
 
 
 def setup(bot):

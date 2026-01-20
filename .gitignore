@@ -2,6 +2,8 @@ constants.py
 .venv
 venv
 .vscode
+.cursor
+.idea
 __pycache__
 .DS_Store
 tracker_counts.json

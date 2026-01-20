@@ -4,6 +4,7 @@ from perms import command_with_perms
 from exceptions import CategoryNotFound
 from log import log_to_soaper_log
 from discord.ext import commands
+from discord.ext.bridge import BridgeOption
 from constants import (
     SOAP_CHANNEL_SUFFIX,
     BOOM_EMOTE_ID,
@@ -11,7 +12,6 @@ from constants import (
     MANUAL_SOAP_CATEGORY_ID,
     NNID_CHANNEL_SUFFIX,
     NNID_CHANNEL_CATEGORY_ID,
-    is_late_night_hours,
 )
 
 
@@ -119,11 +119,10 @@ class SoapCog(commands.Cog):  # SOAP commands
         help="Sets up SOAP channel",
     )
     async def createsoap(
-        self, ctx: commands.Context, user: discord.Member | int | str
+        self,
+        ctx,
+        user: BridgeOption(discord.Member, "User to create a SOAP channel for"),
     ):  # Creates soup channel
-        if not isinstance(user, discord.Member):
-            await ctx.send("User not in server or does not exist!")
-            return
 
         channel_name = (
             user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
@@ -131,7 +130,7 @@ class SoapCog(commands.Cog):  # SOAP commands
         channel = discord.utils.get(ctx.guild.channels, name=channel_name)
 
         if channel:
-            await ctx.send(
+            await ctx.respond(
                 f"Soap channel already made for `{user.name}` at {channel.jump_url}"
             )
         else:
@@ -148,59 +147,78 @@ class SoapCog(commands.Cog):  # SOAP commands
                 raise CategoryNotFound(MANUAL_SOAP_CATEGORY_ID)
 
             await new.set_permissions(user, read_messages=True)
-            await new.send(
-                f"{user.mention}\n"
-                "# Welcome!\n\n\n"
-                "Make sure your console is modded and region changed first.\n\n"
-                "1. Ensure your SD card is in your console\n"
-                "2. Hold START while powering on your console. This will boot you into GM9\n"
-                "3. Navigate to `SysNAND Virtual`\n"
-                "4. Select `essential.exefs`\n"
-                "5. Select `copy to 0:/gm9/out` (select `Overwrite file(s)` if prompted)\n"
-                "6. Power off your console\n"
-                "7. Insert your SD card into your PC\n"
-                "8. Navigate to `/gm9/out` on your SD, where `essential.exefs` should be located\n"
-                "9. Send the `essential.exefs` file to this chat as well as your serial number from your console. The serial number should be a three-letter prefix followed by nine numbers.\n"
-                "10. Please wait for further instructions\n"
-            )
-            await ctx.send(new.jump_url)
+
+            # Use the SOAPAutomationCog's interface so manual SOAPs get the same welcome embed
+            soap_automation_cog = self.bot.get_cog("SOAPAutomationCog")
+            if soap_automation_cog:
+                await soap_automation_cog.create_soap_interface(new, user)
+            else:
+                # Fallback to the old text instructions if the automation cog isn't loaded
+                await new.send(
+                    f"{user.mention}\n"
+                    "# Welcome!\n\n\n"
+                    "Make sure your console is modded and region changed first.\n\n"
+                    "1. Ensure your SD card is in your console\n"
+                    "2. Hold START while powering on your console. This will boot you into GM9\n"
+                    "3. Navigate to `SysNAND Virtual`\n"
+                    "4. Select `essential.exefs`\n"
+                    "5. Select `copy to 0:/gm9/out` (select `Overwrite file(s)` if prompted)\n"
+                    "6. Power off your console\n"
+                    "7. Insert your SD card into your PC\n"
+                    "8. Navigate to `/gm9/out` on your SD, where `essential.exefs` should be located\n"
+                    "9. Send the `essential.exefs` file to this chat as well as your serial number from your console. The serial number should be a three-letter prefix followed by nine numbers.\n"
+                    "10. Please wait for further instructions\n"
+                )
+            await ctx.respond(new.jump_url)
             await log_to_soaper_log(ctx, "Created SOAP Channel")
 
     @command_with_perms(
         min_role="Soaper",
         name="deletechannel",
-        aliases=["deletesoap", "water", "desoap", "unsoup", "spoon", "unsoap", "boom", "desoup", "delnnid"],
+        aliases=["deletesoap", "desoap", "unsoup", "spoon", "unsoap", "desoup", "delnnid"],
         help="Deletes SOAP or NNID channel",
     )
     async def deletesoap_command(
         self,
-        ctx: commands.Context,
-        user: discord.Member
-        | discord.TextChannel
-        | discord.VoiceChannel
-        | int
-        | str = None,
+        ctx,
+        user: BridgeOption(
+            discord.Member,
+            "User whose SOAP/NNID channel should be deleted",
+            required=False,
+        ) = None,
+        channel: BridgeOption(
+            discord.TextChannel,
+            "Specific SOAP/NNID channel to delete (defaults to current channel)",
+            required=False,
+        ) = None,
     ):  # you're never gonna guess what this one does
-        match user:
-            case discord.Member():
-                # Try SOAP channel first
-                soap_channel_name = user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
-                nnid_channel_name = user.name.lower().replace(".", "-") + NNID_CHANNEL_SUFFIX
-                channel = discord.utils.get(ctx.guild.channels, name=soap_channel_name)
-                if not channel:
-                    channel = discord.utils.get(ctx.guild.channels, name=nnid_channel_name)
-            case discord.TextChannel():
-                channel = user
-            case discord.VoiceChannel():
-                channel = user
-            case None:
-                channel = ctx.channel
-            case _:
-                await ctx.send("User not in server or does not exist!")
-                return
+        await self._perform_deletechannel(ctx, user=user, channel=channel)
+
+    async def _perform_deletechannel(
+        self,
+        ctx,
+        user: discord.Member | None = None,
+        channel: discord.TextChannel | None = None,
+    ):
+        """Shared implementation for deletechannel/boom/water."""
+        # Determine target channel: explicit channel option, or derived from user, or current channel.
+        target_channel = channel
+
+        if target_channel is None and user is not None:
+            # Try SOAP channel first based on user name
+            soap_channel_name = user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
+            nnid_channel_name = user.name.lower().replace(".", "-") + NNID_CHANNEL_SUFFIX
+            target_channel = discord.utils.get(ctx.guild.channels, name=soap_channel_name)
+            if not target_channel:
+                target_channel = discord.utils.get(ctx.guild.channels, name=nnid_channel_name)
+
+        if target_channel is None:
+            target_channel = ctx.channel
+
+        channel = target_channel
 
         if not channel:
-            return await ctx.send(f"Channel not found for `{user.name}`")
+            return await ctx.respond("Channel not found for the given user/channel.")
         
         # Check if it's a SOAP channel
         is_soap = (
@@ -219,7 +237,15 @@ class SoapCog(commands.Cog):  # SOAP commands
         )
         
         if not (is_soap or is_nnid):
-            return await ctx.send(f"{channel.mention} is not a SOAP or NNID channel!")
+            return await ctx.respond(f"{channel.mention} is not a SOAP or NNID channel!")
+        
+        # For slash/bridge invocations, acknowledge the interaction by deferring it
+        if hasattr(ctx, "defer"):
+            try:
+                await ctx.defer(ephemeral=True)
+            except TypeError:
+                # Some contexts don't support 'ephemeral' kwarg; fall back to plain defer
+                await ctx.defer()
         
         if is_soap:
             await self.deletesoap(channel, ctx)
@@ -228,7 +254,52 @@ class SoapCog(commands.Cog):  # SOAP commands
             if nnid_cog:
                 await nnid_cog.deletennid(channel, ctx)
             else:
-                await ctx.send("Error: NNIDCog not found.")
+                # Fall back error message in the channel if NNIDCog is missing
+                await channel.send("Error: NNIDCog not found.")
+
+    @command_with_perms(
+        min_role="Soaper",
+        name="boom",
+        help="Deletes SOAP or NNID channel (alias of deletechannel)",
+    )
+    async def boom(
+        self,
+        ctx,
+        user: BridgeOption(
+            discord.Member,
+            "User whose SOAP/NNID channel should be deleted",
+            required=False,
+        ) = None,
+        channel: BridgeOption(
+            discord.TextChannel,
+            "Specific SOAP/NNID channel to delete (defaults to current channel)",
+            required=False,
+        ) = None,
+    ):
+        """Slash/prefix alias for deletechannel with identical behavior."""
+        await self._perform_deletechannel(ctx, user=user, channel=channel)
+
+    @command_with_perms(
+        min_role="Soaper",
+        name="water",
+        help="Deletes SOAP or NNID channel (alias of deletechannel)",
+    )
+    async def water(
+        self,
+        ctx,
+        user: BridgeOption(
+            discord.Member,
+            "User whose SOAP/NNID channel should be deleted",
+            required=False,
+        ) = None,
+        channel: BridgeOption(
+            discord.TextChannel,
+            "Specific SOAP/NNID channel to delete (defaults to current channel)",
+            required=False,
+        ) = None,
+    ):
+        """Slash/prefix alias for deletechannel with identical behavior."""
+        await self._perform_deletechannel(ctx, user=user, channel=channel)
 
 
 def setup(bot):

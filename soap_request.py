@@ -294,7 +294,7 @@ class SOAPRequestCog(commands.Cog):
     @command_with_perms(
         name="requestsoap", help="Creates an embed with a button for SOAP requests"
     )
-    async def requestsoap(self, ctx: commands.Context):
+    async def requestsoap(self, ctx):
         if ctx.channel.id == REQUEST_SOAP_CHANNEL_ID:
             try:
                 await ctx.channel.purge(limit=None)
@@ -304,9 +304,9 @@ class SOAPRequestCog(commands.Cog):
                 print(f"Error clearing request SOAP channel: {e}")
         embed, view, file = self._create_soap_request_embed_and_view()
         if file:
-            await ctx.send(embed=embed, view=view, file=file)
+            await ctx.respond(embed=embed, view=view, file=file)
         else:
-            await ctx.send(embed=embed, view=view)
+            await ctx.respond(embed=embed, view=view)
 
 
 def setup(bot):

@@ -139,16 +139,16 @@ class TrackerCog(commands.Cog):
         aliases=["synctrackers", "forcetrackerupdate"],
         help="Force synchronize tracker voice channels with JSON counts",
     )
-    async def sync_trackers(self, ctx: commands.Context):
+    async def sync_trackers(self, ctx):
         """Force synchronize voice channels with JSON counts"""
         soap_count, nnid_count = self._read_counts()
         
-        await ctx.send(f"🔄 Synchronizing trackers... (SOAP: {soap_count}, NNID: {nnid_count})")
+        await ctx.respond(f"🔄 Synchronizing trackers... (SOAP: {soap_count}, NNID: {nnid_count})")
         
         for guild in self.bot.guilds:
             await self.update_trackers(guild)
         
-        await ctx.send("✅ Trackers synchronized!")
+        await ctx.respond("✅ Trackers synchronized!")
 
 
 

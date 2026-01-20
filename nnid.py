@@ -4,6 +4,7 @@ from perms import command_with_perms
 from exceptions import CategoryNotFound
 from log import log_to_soaper_log
 from discord.ext import commands
+from discord.ext.bridge import BridgeOption
 from constants import (
     NNID_CHANNEL_SUFFIX,
     BOOM_EMOTE_ID,
@@ -21,7 +22,7 @@ class NNIDCog(commands.Cog):  # NNID commands
         # Welcome embed
         embed = discord.Embed(
             title="🔄 Welcome to your NNID Channel!",
-            description="This is where we'll perform your NNID transfer. To get started, please follow the instructions below:\n"
+            description="This is where we'll perform your NNID transfer. To get started, please follow the instructions below:\n\n"
             "**📋 Step-by-Step Instructions**\n"
             "1. Ensure your SD card is in your target console (the console you want to transfer to)\n"
             "2. Hold START while powering on the console. This should boot you into GodMode9.\n"
@@ -134,18 +135,18 @@ class NNIDCog(commands.Cog):  # NNID commands
         aliases=["nnid", "setupnnid", "createnn"],
         help="Sets up NNID channel",
     )
-    async def creatennid(self, ctx: commands.Context, user: discord.Member | int | str):
-        if not isinstance(user, discord.Member):
-            await ctx.send("User not in server or does not exist!")
-            return
-
+    async def creatennid(
+        self,
+        ctx,
+        user: BridgeOption(discord.Member, "User to create an NNID channel for"),
+    ):
         channel_name = (
             user.name.lower().replace(".", "-") + NNID_CHANNEL_SUFFIX
         )  # channels can't have periods
         channel = discord.utils.get(ctx.guild.channels, name=channel_name)
 
         if channel:
-            await ctx.send(
+            await ctx.respond(
                 f"NNID channel already made for `{user.name}` at {channel.jump_url}"
             )
         else:
@@ -163,7 +164,7 @@ class NNIDCog(commands.Cog):  # NNID commands
 
             await new.set_permissions(user, read_messages=True)
             await self.create_nnid_interface(new, user)
-            await ctx.send(new.jump_url)
+            await ctx.respond(new.jump_url)
             await log_to_soaper_log(ctx, "Created NNID Channel")
 
 

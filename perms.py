@@ -1,13 +1,13 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, bridge
 from constants import SOAP_USABLE_IDS
 
 
 def command_with_perms(
-    *, min_role: str = "Default", **kwargs
+    *, min_role: str = "Default", slash: bool = True, **kwargs
 ):  # permission managment using roles
     def decorator(func):
-        async def perm_check(ctx: commands.Context):
+        async def perm_check(ctx):
             role = (
                 discord.utils.get(ctx.guild.roles, name=min_role)
                 if min_role != "Default"
@@ -18,7 +18,16 @@ def command_with_perms(
 
             return True
 
-        x = commands.command(extras={"min_role": min_role}, **kwargs)(func)
+        # Bridge command (prefix + slash) by default; allow opting out for complex signatures
+        if slash:
+            # Mirror the help text into the description
+            cmd_kwargs = dict(kwargs)
+            help_text = cmd_kwargs.get("help")
+            if help_text and "description" not in cmd_kwargs:
+                cmd_kwargs["description"] = help_text
+            x = bridge.bridge_command(extras={"min_role": min_role}, **cmd_kwargs)(func)
+        else:
+            x = commands.command(extras={"min_role": min_role}, **kwargs)(func)
         x = commands.check(perm_check)(x)
 
         return x
@@ -33,11 +42,12 @@ class WrongChannel(commands.CheckFailure):
 
 def soap_channels_only():  # lock command to SOAP, NNID and dev channels only
     def decorator(func):
-        async def soap_chan(ctx: commands.Context):
-            if ctx.channel.category.id in SOAP_USABLE_IDS:
+        async def soap_chan(ctx):
+            """Check that the command is used in an allowed SOAP/NNID/dev channel."""
+            category = getattr(ctx.channel, "category", None)
+            if category and category.id in SOAP_USABLE_IDS:
                 return True
-            else:
-                raise WrongChannel(ctx.command.name, ctx.channel.mention)
+            raise WrongChannel(ctx.command.name, ctx.channel.mention)
 
         return commands.check(soap_chan)(func)
 

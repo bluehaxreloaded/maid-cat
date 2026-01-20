@@ -25,13 +25,23 @@ async def log_to(
     if log_channel:
         log_embed = discord.Embed(title=title)
 
-        # Handle both Context and Interaction
+        # Handle Context, Interaction, and bridge contexts safely
         if isinstance(ctx, discord.Interaction):
             author = ctx.user
-            action = "Button interaction"
+            action = "Interaction"
         else:
-            author = ctx.message.author
-            action = ctx.message.content
+            message = getattr(ctx, "message", None)
+            if message is not None:
+                author = message.author
+                action = message.content
+            else:
+                # Bridge / application context without a backing message
+                author = getattr(ctx, "author", getattr(ctx, "user", None))
+                action = getattr(
+                    getattr(ctx, "command", None),
+                    "qualified_name",
+                    "Application command",
+                )
 
         log_embed.add_field(
             name="Action made by:",
