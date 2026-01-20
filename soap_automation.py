@@ -270,6 +270,31 @@ class SOAPAutomationCog(commands.Cog):
             await target_channel.send(embed=embed)
             return False
 
+    async def _find_progress_message(self, target_channel: discord.TextChannel):
+        """Find the progress message in the channel. Returns the message or None."""
+        async for msg in target_channel.history(limit=50):
+            if msg.author == self.bot.user and msg.embeds:
+                if (
+                    msg.embeds[0].author
+                    and msg.embeds[0].author.name
+                    == "🧼 SOAP Transfer - In Progress"
+                ):
+                    return msg
+        return None
+
+    async def _delete_progress_message(self, target_channel: discord.TextChannel):
+        """Delete the progress message from the channel asynchronously."""
+        async def delete_progress():
+            progress_message = await self._find_progress_message(target_channel)
+            if progress_message:
+                try:
+                    await progress_message.delete()
+                except Exception:
+                    pass
+
+        # Run deletion in background without blocking
+        asyncio.create_task(delete_progress())
+
     async def create_soap_interface(self, channel, user):
         """Create the welcome embed for new SOAP channels"""
         # Welcome embed
@@ -434,25 +459,7 @@ class SOAPAutomationCog(commands.Cog):
             await target_channel.send(content=user_mention, embed=embed, view=view)
 
             # Delete progress message asynchronously after sending success message
-            async def delete_progress():
-                progress_message = None
-                async for msg in target_channel.history(limit=50):
-                    if msg.author == self.bot.user and msg.embeds:
-                        if (
-                            msg.embeds[0].author
-                            and msg.embeds[0].author.name
-                            == "🧼 SOAP Transfer - In Progress"
-                        ):
-                            progress_message = msg
-                            break
-                if progress_message:
-                    try:
-                        await progress_message.delete()
-                    except Exception:
-                        pass
-
-            # Run deletion in background without blocking
-            asyncio.create_task(delete_progress())
+            await self._delete_progress_message(target_channel)
 
         if status_text == "LOTTERY" and target_channel:
             # Send LOTTERY message immediately
@@ -481,25 +488,16 @@ class SOAPAutomationCog(commands.Cog):
 
             # Update progress to 100% and delete asynchronously after sending lottery message
             async def update_and_delete_progress():
-                progress_message = None
-                async for msg in target_channel.history(limit=50):
-                    if msg.author == self.bot.user and msg.embeds:
-                        if (
-                            msg.embeds[0].author
-                            and msg.embeds[0].author.name
-                            == "🧼 SOAP Transfer - In Progress"
-                        ):
-                            progress_message = msg
-                            break
+                # Update to 100% with LOTTERY footer
+                footer = progress_footers.get(
+                    "SUCCESS", "SOAP transfer completed successfully!"
+                )
+                await self._update_progress_message(target_channel, 100, footer)
+                # Wait a moment then delete
+                await asyncio.sleep(1)
+                progress_message = await self._find_progress_message(target_channel)
                 if progress_message:
                     try:
-                        # Update to 100% with LOTTERY footer
-                        footer = progress_footers.get(
-                            "SUCCESS", "SOAP transfer completed successfully!"
-                        )
-                        await self._update_progress_message(target_channel, 100, footer)
-                        # Wait a moment then delete
-                        await asyncio.sleep(1)
                         await progress_message.delete()
                     except Exception:
                         pass
@@ -508,6 +506,9 @@ class SOAPAutomationCog(commands.Cog):
             asyncio.create_task(update_and_delete_progress())
 
         if status_text == "ERROR" and target_channel:
+            # Delete progress message when error occurs
+            await self._delete_progress_message(target_channel)
+            
             # Check if it's a serial mismatch error
             is_serial_error = status_detail and "SERIAL_MISMATCH" in status_detail.upper()
             
@@ -516,7 +517,7 @@ class SOAPAutomationCog(commands.Cog):
                 embed = discord.Embed(
                     title="⚠️ Serial Number Mismatch",
                     description=(
-                        "The serial number you provided does not match the serial number in your `essentials.exefs` file. Please ensure you have entered the serial number correctly. If you're still having trouble, follow these instructions to find your console's serial number."
+                        "The serial number you provided does not match the serial number in your `essentials.exefs` file. Please ensure you have entered the serial number correctly. If you're still having trouble, follow these instructions to find your console's serial number.\n"
                         "To find your console's serial number:\n"
                         "- Hold START while powering on your console. This will boot you into GodMode9.\n"
                         "- Go to `SYSNAND TWLNAND` -> `sys` -> `log` -> `inspect.log`\n"
@@ -529,6 +530,7 @@ class SOAPAutomationCog(commands.Cog):
                 user_mention = f"<@{user_id}>"
                 embed.set_footer(text="Once you've found the serial number and send it here, we will resume your SOAP Transfer.")
                 await target_channel.send(content=user_mention, embed=embed)
+                
             else:
                 # Error - requires Soaper intervention
                 embed = discord.Embed(
