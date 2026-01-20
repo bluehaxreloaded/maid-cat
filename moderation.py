@@ -1,5 +1,5 @@
 import discord
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from discord.ext import commands
 from constants import JOIN_LEAVE_LOG_ID
 
@@ -23,6 +23,23 @@ def _format_account_age(created_at: datetime) -> str:
         parts.append(f"{days} day{'s' if days != 1 else ''}")
 
     return ", ".join(parts)
+
+
+def _format_pst_time() -> str:
+    """Format current time in PST as 'Today at 4:04PM' or '12/7/2025 at 4:04PM'."""
+    pst = timezone(timedelta(hours=-8))  # PST is UTC-8
+    now_pst = datetime.now(pst)
+    
+    # Format time (12-hour format with AM/PM)
+    hour = now_pst.hour
+    minute = now_pst.minute
+    period = "AM" if hour < 12 else "PM"
+    hour_12 = hour if hour <= 12 else hour - 12
+    if hour_12 == 0:
+        hour_12 = 12
+    time_str = f"{hour_12}:{minute:02d}{period}"
+    
+    return f"Today at {time_str}"
 
 
 class ModerationCog(commands.Cog):
@@ -55,8 +72,8 @@ class ModerationCog(commands.Cog):
         age_str = _format_account_age(member.created_at)
         embed.add_field(name="Account Age", value=age_str, inline=False)
 
-        # Footer with ID and timestamp
-        timestamp = discord.utils.format_dt(datetime.now(timezone.utc), style="t")
+        # Footer with ID and timestamp (PST)
+        timestamp = _format_pst_time()
         embed.set_footer(text=f"ID: {member.id} • {timestamp}")
 
         await channel.send(embed=embed)

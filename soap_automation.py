@@ -2,12 +2,14 @@ import discord
 import re
 import asyncio
 from discord.ext import commands
+from log import log_to_soaper_log
 from constants import (
     BOTS_ONLY_CHANNEL_ID,
     SOAP_CHANNEL_CATEGORY_ID,
     MANUAL_SOAP_CATEGORY_ID,
     LOADING_EMOTE_ID,
     SOAPER_ROLE_ID,
+    SOAP_COMPLETION_AUTO_CLOSE_MINUTES,
     is_late_night_hours,
 )
 
@@ -15,10 +17,11 @@ from constants import (
 class CompletionFollowUpView(discord.ui.View):
     """View for the follow-up questions after eShop verification"""
 
-    def __init__(self, channel_id=None, show_close_button=True):
+    def __init__(self, channel_id=None, show_close_button=True, auto_close_task=None):
         super().__init__(timeout=None)
         self.channel_id = channel_id
         self.show_close_button = show_close_button
+        self.auto_close_task = auto_close_task
 
         # Remove I'm good if manual SOAP
         if not show_close_button:
@@ -39,6 +42,10 @@ class CompletionFollowUpView(discord.ui.View):
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         """Trigger boom command to delete the channel"""
+        # Cancel auto-close task if it exists
+        if self.auto_close_task and not self.auto_close_task.done():
+            self.auto_close_task.cancel()
+        
         # Disable all buttons in this view
         for item in self.children:
             item.disabled = True
@@ -78,6 +85,10 @@ class CompletionFollowUpView(discord.ui.View):
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         """Send assistance requested embed to channel"""
+        # Cancel auto-close task if it exists
+        if self.auto_close_task and not self.auto_close_task.done():
+            self.auto_close_task.cancel()
+        
         # Disable all buttons in this view
         for item in self.children:
             item.disabled = True
@@ -165,30 +176,85 @@ class EshopVerificationView(discord.ui.View):
         else:
             completion_embed = discord.Embed(
                 title="❔ Do you have any further questions?",
-                description="Services such as Pokemon Bank, Nintendo Network IDs, System Transfers, and the Nintendo eShop should now be working. You'll also be able to create a new Nintendo Network ID for your new region. Please click one of the buttons below.",
+                description="Services such as Pokemon Bank, Nintendo Network IDs, System Transfers, and the Nintendo eShop should now be working. You'll also be able to create a new Nintendo Network ID for your new region. \n\n**Please click one of the buttons below.**",
                 color=discord.Color.blurple(),
             )
-            view = CompletionFollowUpView(channel_id, show_close_button=True)
+            completion_embed.set_footer(
+                text=(
+                    f"Otherwise, this channel will automatically close in "
+                    f"{SOAP_COMPLETION_AUTO_CLOSE_MINUTES} minutes."
+                )
+            )
+            
+            # Create auto-close task first so we can pass it to the view
+            # Capture references before the async sleep
+            guild = interaction.guild
+            bot = interaction.client
+            
+            async def auto_close():
+                try:
+                    await asyncio.sleep(SOAP_COMPLETION_AUTO_CLOSE_MINUTES * 60)
+                    channel = guild.get_channel(channel_id)
+                    if not channel:
+                        return
+                    # Re-check that this is still a SOAP channel and not in the manual category
+                    if (
+                        not channel.category
+                        or channel.category.id == MANUAL_SOAP_CATEGORY_ID
+                    ):
+                        return
+                    
+                    # Extract user ID from channel topic for logging
+                    user_id = None
+                    if channel.topic:
+                        # Topic format: "This is the SOAP channel for <@user_id>, ..."
+                        match = re.search(r'<@!?(\d+)>', channel.topic)
+                        if match:
+                            user_id = int(match.group(1))
+                    
+                    soap_cog = bot.get_cog("SoapCog")
+                    if soap_cog:
+                        # Delete the channel (pass None for ctx since this is auto-close)
+                        await soap_cog.deletesoap(channel, None)
+                        
+                        # Log the auto-close with user ID
+                        if user_id:
+                            try:
+                                user = guild.get_member(user_id)
+                                if user:
+                                    ctx = type('Context', (), {
+                                        'guild': guild,
+                                        'message': type('Message', (), {
+                                            'author': user,
+                                            'content': 'Completion timeout'
+                                        })()
+                                    })()
+                                    await log_to_soaper_log(ctx, "Removed SOAP Channel")
+                            except Exception:
+                                pass
+                except asyncio.CancelledError:
+                    # Task was cancelled (user clicked a button)
+                    pass
+                except Exception:
+                    # Fail silently; auto-close is best-effort
+                    pass
+
+            auto_close_task = asyncio.create_task(auto_close())
+            view = CompletionFollowUpView(channel_id, show_close_button=True, auto_close_task=auto_close_task)
 
         # Send followup
         if interaction.response.is_done():
             if view is not None:
-                await interaction.followup.send(
-                    embed=completion_embed, view=view
-                )
+                await interaction.followup.send(embed=completion_embed, view=view)
             else:
-                await interaction.followup.send(
-                    embed=completion_embed
-                )
+                await interaction.followup.send(embed=completion_embed)
         else:
             if view is not None:
                 await interaction.response.send_message(
                     embed=completion_embed, view=view
                 )
             else:
-                await interaction.response.send_message(
-                    embed=completion_embed
-                )
+                await interaction.response.send_message(embed=completion_embed)
 
     @discord.ui.button(
         label="No, I need help",

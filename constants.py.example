@@ -20,10 +20,15 @@ SOAP_LOG_ID =  # channel that logging of SOAP creation/deletion and errors are p
 SOAPER_ROLE_ID = # role ID for Soapers who assist with SOAP requests
 MOD_LOG_ID =  # channel that logging of non-SOAP related actions are placed (excluding join/leaves)
 JOIN_LEAVE_LOG_ID =  # channel where join/leaves are logged
+BAN_LOG_ID = # channel where bans are logged
+MESSAGE_LOG_ID = # channel where message edits/deletes are logged
 ERROR_LOG_ID =  # channel that any error not dealt with gets logged to
 SOAP_TRACKER_ID =  # voice channel that displays SOAP count
 NNID_TRACKER_ID =  # voice channel that displays NNID count
 SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, ] # where soap channel specific commands can be used
+
+# SOAP completion auto-close behavior
+SOAP_COMPLETION_AUTO_CLOSE_MINUTES = 20  # minutes after completion prompt before channel auto-closes
 
 # late night hours configuration (24-hour format, PST timezone)
 LATE_NIGHT_START_HOUR = 24  # 12 PM PST
