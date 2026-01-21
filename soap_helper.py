@@ -403,6 +403,43 @@ class AwaitingErrorCodeView(discord.ui.View):
         modal.target_message = interaction.message
         await interaction.response.send_modal(modal)
 
+    @discord.ui.button(
+        label="⚠️ I need something else",
+        style=discord.ButtonStyle.danger,
+        custom_id="awaiting_error_no_code",
+    )
+    async def awaiting_no_code_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        """User doesn't have / want to enter an error code – go back to SOAP helper."""
+        # Disable buttons on the original awaiting message
+        for child in self.children:
+            child.disabled = True
+
+        try:
+            if interaction.response.is_done():
+                await interaction.message.edit(view=self)
+            else:
+                await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
+
+        embed = discord.Embed(
+            title="🔍 SOAP Helper",
+            description=(
+                "Need help with your SOAP transfer? Select the issue you're having from the dropdown below.\n\n"
+                "If you can't find what you're looking for, select **'My option is not listed here.'** "
+                "to request assistance from a Soaper."
+            ),
+            color=discord.Color.red(),
+        )
+        embed.set_footer(text="Select an option from the dropdown menu below")
+        view = SoapHelperView(context=self.context)
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, view=view)
+        else:
+            await interaction.response.send_message(embed=embed, view=view)
+
 
 class InvalidErrorCodeView(discord.ui.View):
     """Shown when the user enters an incorrectly-formatted error code."""
