@@ -1,7 +1,9 @@
 import discord
+import asyncio
 from datetime import datetime, timezone, timedelta
 from discord.ext import commands
-from constants import JOIN_LEAVE_LOG_ID
+from perms import command_with_perms
+from constants import JOIN_LEAVE_LOG_ID, SPAM_BOT_CHANNEL_ID, BAN_LOG_ID
 
 
 def _format_account_age(created_at: datetime) -> str:
@@ -42,8 +44,33 @@ def _format_pst_time() -> str:
     return f"Today at {time_str}"
 
 
+def _format_timeout_duration(until: datetime) -> str:
+    """Return a human-readable timeout length like '10 minutes' or '1 hour, 5 minutes'."""
+    now = datetime.now(timezone.utc)
+    # If already expired or invalid, just say expired
+    if until <= now:
+        return "expired"
+
+    delta = until - now
+    # Add 59 seconds so we effectively round UP to the next minute
+    total_seconds = max(0, int(delta.total_seconds() + 59))
+    days, rem = divmod(total_seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, _ = divmod(rem, 60)
+
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days} day{'s' if days != 1 else ''}")
+    if hours:
+        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+    if minutes or not parts:
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+
+    return ", ".join(parts)
+
+
 class ModerationCog(commands.Cog):
-    """Basic moderation/utility events like join/leave logging."""
+    """Basic moderation/utility events like join/leave logging and spam-bot handling."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -78,6 +105,144 @@ class ModerationCog(commands.Cog):
 
         await channel.send(embed=embed)
 
+    async def _log_mod_action(
+        self,
+        *,
+        guild: discord.Guild,
+        user: discord.Member | discord.User,
+        action: str,
+        moderator: discord.Member | discord.User | None = None,
+        reason: str | None = None,
+        source: str | None = None,
+        timeout_until: datetime | None = None,
+    ):
+        """Log a ban/kick to the ban log channel."""
+        if not BAN_LOG_ID:
+            return
+
+        log_channel = guild.get_channel(BAN_LOG_ID)
+        if log_channel is None:
+            return
+
+        if action.lower() == "ban":
+            title = "🔨 Member Banned"
+            color = discord.Color.red()
+        elif action.lower() == "unban":
+            title = "✅ Member Unbanned"
+            color = discord.Color.green()
+        elif action.lower() == "timeout":
+            title = "⏰ Member Timed Out"
+            color = discord.Color.yellow()
+        elif action.lower() == "untimeout":
+            title = "✅ Timeout Removed"
+            color = discord.Color.green()
+        else:  # kick
+            title = "🔨 Member Kicked"
+            color = discord.Color.orange()
+
+        embed = discord.Embed(
+            title=title,
+            color=color,
+        )
+        # Show who performed the action (or source, e.g., Honeypot)
+        if source:
+            author_name = source
+            # For honeypot, use bot's avatar
+            author_icon = self.bot.user.display_avatar.url if self.bot.user else None
+        elif moderator:
+            author_name = str(moderator)
+            author_icon = moderator.display_avatar.url
+        else:
+            author_name = "Unknown"
+            author_icon = self.bot.user.display_avatar.url if self.bot.user else None
+
+        embed.set_author(name=author_name, icon_url=author_icon)
+        embed.set_thumbnail(url=user.display_avatar.url)
+        
+        # User mention and username
+        embed.add_field(
+            name="",
+            value=f"{user.mention} {user}",
+            inline=False,
+        )
+
+        # Timeout length, if applicable
+        if action.lower() == "timeout" and timeout_until is not None:
+            length_str = _format_timeout_duration(timeout_until)
+            embed.add_field(
+                name="Timeout Length",
+                value=length_str,
+                inline=False,
+            )
+        
+        # Footer with ID and timestamp (PST)
+        timestamp = _format_pst_time()
+        embed.set_footer(text=f"ID: {user.id} • {timestamp}")
+
+         # Reason, if available
+        if reason:
+            embed.add_field(
+                name="Reason",
+                value=reason,
+                inline=False,
+            )
+
+        try:
+            await log_channel.send(embed=embed)
+        except Exception:
+            pass
+
+    async def _ensure_spam_bot_info_message(self, guild: discord.Guild):
+        """Ensure the spam bot channel has the info embed present."""
+        if not SPAM_BOT_CHANNEL_ID:
+            return
+
+        channel = guild.get_channel(SPAM_BOT_CHANNEL_ID)
+        if channel is None or not isinstance(channel, discord.TextChannel):
+            return
+
+        info_title = "🍯 Honeypot"
+
+        # Look for an existing info message from the bot
+        message_exists = False
+        try:
+            async for msg in channel.history(limit=25):
+                if (
+                    msg.author == self.bot.user
+                    and msg.embeds
+                    and msg.embeds[0].title == info_title
+                ):
+                    message_exists = True
+                    break
+        except Exception:
+            pass
+
+        # If message doesn't exist, clear channel and send new one
+        if not message_exists:
+            # Clear the channel first
+            try:
+                await channel.purge()
+            except Exception:
+                # If purge fails, continue anyway to try sending the message
+                pass
+
+            # Send the info embed
+            embed = discord.Embed(
+                title=info_title,
+                description=(
+                    "This channel is to catch spam bots that flood the server with messages.\n\n"
+                    "If you can see this channel, **do not send messages here.** "
+                    "Messages sent in this channel will ban you from the server. If you are human, ignore this channel or remove it from your channel list."
+                ),
+                color=discord.Color.yellow(),
+            )
+            embed.set_footer(text="Do not type here, you will be banned.")
+
+            try:
+                await channel.send(embed=embed)
+            except Exception:
+                pass
+
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         await self._send_member_log(member, joined=True)
@@ -85,6 +250,263 @@ class ModerationCog(commands.Cog):
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
         await self._send_member_log(member, joined=False)
+        # Also check if this was a kick and log it
+        await self._maybe_log_kick(member)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """On startup, ensure the spam bot info message exists in each guild."""
+        for guild in self.bot.guilds:
+            await self._ensure_spam_bot_info_message(guild)
+
+    @commands.Cog.listener()
+    async def on_member_ban(self, guild: discord.Guild, user: discord.User):
+        """Log all ban actions (except honeypot, which is already logged explicitly)."""
+        if not BAN_LOG_ID:
+            return
+
+        moderator = None
+        reason = None
+
+        try:
+            async for entry in guild.audit_logs(action=discord.AuditLogAction.ban, limit=5):
+                if entry.target.id == user.id:
+                    moderator = entry.user
+                    reason = entry.reason
+                    break
+        except Exception:
+            pass
+
+        # Skip if this was the honeypot ban (already logged)
+        if reason == "Spam bot auto-ban/unban":
+            return
+
+        await self._log_mod_action(
+            guild=guild,
+            user=user,
+            action="ban",
+            moderator=moderator,
+            reason=reason,
+            source=None,
+        )
+
+    @commands.Cog.listener()
+    async def on_member_unban(self, guild: discord.Guild, user: discord.User):
+        """Log all unban actions."""
+        if not BAN_LOG_ID:
+            return
+
+        moderator = None
+        reason = None
+
+        try:
+            async for entry in guild.audit_logs(action=discord.AuditLogAction.unban, limit=5):
+                if entry.target.id == user.id:
+                    moderator = entry.user
+                    reason = entry.reason
+                    break
+        except Exception:
+            pass
+
+        await self._log_mod_action(
+            guild=guild,
+            user=user,
+            action="unban",
+            moderator=moderator,
+            reason=reason,
+            source=None,
+        )
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        """Log timeout actions when a member's timeout status changes."""
+        if not BAN_LOG_ID:
+            return
+
+        # Check if timeout status changed (Pycord uses communication_disabled_until for timeouts)
+        before_timeout = getattr(before, "communication_disabled_until", None)
+        after_timeout = getattr(after, "communication_disabled_until", None)
+
+        # Timeout was applied
+        if before_timeout is None and after_timeout is not None:
+            moderator = None
+            reason = None
+
+            try:
+                async for entry in after.guild.audit_logs(
+                    action=discord.AuditLogAction.member_update, limit=10
+                ):
+                    if (
+                        entry.target.id == after.id
+                        and getattr(entry.after, "communication_disabled_until", None) is not None
+                        and getattr(entry.before, "communication_disabled_until", None) is None
+                    ):
+                        moderator = entry.user
+                        reason = entry.reason
+                        break
+            except Exception:
+                pass
+
+            await self._log_mod_action(
+                guild=after.guild,
+                user=after,
+                action="timeout",
+                moderator=moderator,
+                reason=reason,
+                source=None,
+                timeout_until=after_timeout,
+            )
+        # Timeout was removed
+        elif before_timeout is not None and after_timeout is None:
+            moderator = None
+            reason = None
+
+            try:
+                async for entry in after.guild.audit_logs(
+                    action=discord.AuditLogAction.member_update, limit=10
+                ):
+                    if (
+                        entry.target.id == after.id
+                        and getattr(entry.after, "communication_disabled_until", None) is None
+                        and getattr(entry.before, "communication_disabled_until", None)
+                    ):
+                        moderator = entry.user
+                        reason = entry.reason
+                        break
+            except Exception:
+                pass
+
+            # Log as "untimeout"
+            await self._log_mod_action(
+                guild=after.guild,
+                user=after,
+                action="untimeout",
+                moderator=moderator,
+                reason=reason,
+                source=None,
+            )
+
+    @command_with_perms(
+        min_role="Developer",
+        name="resethoneypot",
+        help="Wipe the honeypot channel and resend the info embed. Developers only.",
+    )
+    async def reset_spam_bot_channel(self, ctx):
+        """
+        Wipe the honeypot channel and resend the info embed.
+        Requires Developer role.
+        """
+        if not SPAM_BOT_CHANNEL_ID:
+            return await ctx.respond(
+                "SPAM_BOT_CHANNEL_ID is not configured in constants.py.", ephemeral=True
+            )
+
+        channel = ctx.guild.get_channel(SPAM_BOT_CHANNEL_ID)
+        if channel is None or not isinstance(channel, discord.TextChannel):
+            return await ctx.respond(
+                "Spam bot channel not found or is not a text channel.", ephemeral=True
+            )
+
+        # Purge all messages in the spam bot channel
+        try:
+            await channel.purge()
+        except Exception:
+            return await ctx.respond(
+                "Failed to clear the spam bot channel. Check my permissions.", ephemeral=True
+            )
+
+        # Ensure info message is resent
+        await self._ensure_spam_bot_info_message(ctx.guild)
+        await ctx.respond(
+            f"Spam bot channel {channel.mention} has been reset and the info embed was resent.",
+            ephemeral=True,
+        )
+
+    async def _maybe_log_kick(self, member: discord.Member):
+        """Check recent audit logs to see if the member was kicked and log it."""
+        if not BAN_LOG_ID:
+            return
+
+        guild = member.guild
+        try:
+            async for entry in guild.audit_logs(action=discord.AuditLogAction.kick, limit=5):
+                if entry.target.id == member.id:
+                    # Only log if the kick is recent (within ~10 seconds)
+                    if (datetime.now(timezone.utc) - entry.created_at).total_seconds() <= 10:
+                        await self._log_mod_action(
+                            guild=guild,
+                            user=member,
+                            action="kick",
+                            moderator=entry.user,
+                            reason=entry.reason,
+                            source=None,
+                        )
+                    break
+        except Exception:
+            pass
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Handle spam bot channel - auto ban/unban users without sending DMs"""
+        # Only process messages in the spam bot channel
+        if not message.guild or message.channel.id != SPAM_BOT_CHANNEL_ID:
+            return
+        
+        # Ignore bot messages
+        if message.author.bot:
+            return
+
+        # Delete the message
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        
+        guild = message.guild
+        user = message.author
+        
+        # Ban the user (clearing messages from the last hour)
+        reason = "Spam bot auto-ban/unban"
+        try:
+            await guild.ban(user, delete_message_seconds=3600, reason=reason)
+        except discord.Forbidden:
+            # Bot doesn't have ban permissions
+            print(f"Failed to ban {user} - missing ban permissions")
+            return
+        except discord.HTTPException as e:
+            # Log HTTP errors for debugging
+            print(f"Failed to ban {user} - HTTP error: {e}")
+            return
+        except Exception as e:
+            # Log other errors
+            print(f"Failed to ban {user} - error: {e}")
+            return
+        
+        # Log the honeypot ban as a moderated ban
+        await self._log_mod_action(
+            guild=guild,
+            user=user,
+            action="ban",
+            moderator=guild.me,
+            reason=reason,
+            source="Honeypot",
+        )
+        
+        # Small delay to ensure ban is processed
+        await asyncio.sleep(0.5)
+        
+        # Unban the user immediately
+        try:
+            await guild.unban(user, reason="Spam bot auto-unban")
+        except discord.NotFound:
+            # User wasn't banned (shouldn't happen, but handle gracefully)
+            pass
+        except discord.HTTPException as e:
+            # Log HTTP errors for debugging
+            print(f"Failed to unban {user} - HTTP error: {e}")
+        except Exception as e:
+            # Log other errors
+            print(f"Failed to unban {user} - error: {e}")
 
 
 def setup(bot: commands.Bot):

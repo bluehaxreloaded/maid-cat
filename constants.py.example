@@ -22,6 +22,7 @@ MOD_LOG_ID =  # channel that logging of non-SOAP related actions are placed (exc
 JOIN_LEAVE_LOG_ID =  # channel where join/leaves are logged
 BAN_LOG_ID = # channel where bans are logged
 MESSAGE_LOG_ID = # channel where message edits/deletes are logged
+SPAM_BOT_CHANNEL_ID =  # channel where spam bot feature is active
 ERROR_LOG_ID =  # channel that any error not dealt with gets logged to
 SOAP_TRACKER_ID =  # voice channel that displays SOAP count
 NNID_TRACKER_ID =  # voice channel that displays NNID count
