@@ -389,29 +389,50 @@ class AwaitingErrorCodeView(discord.ui.View):
     def __init__(self, context=None):
         super().__init__(timeout=None)
         self.context = context
+        # Encode context in custom_id so it persists after bot restart
+        ctx_suffix = context or ""
 
-    @discord.ui.button(
-        label="🔢 Enter Error Code",
-        style=discord.ButtonStyle.primary,
-        custom_id="error_code_input_button",
-    )
-    async def input_error_button(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ):
+        # Dynamically create buttons with context-encoded custom_ids
+        enter_button = discord.ui.Button(
+            label="🔢 Enter Error Code",
+            style=discord.ButtonStyle.primary,
+            custom_id=f"error_code_input_button:{ctx_suffix}",
+        )
+        enter_button.callback = self._input_error_callback
+        self.add_item(enter_button)
+
+        something_else_button = discord.ui.Button(
+            label="⚠️ I need something else",
+            style=discord.ButtonStyle.danger,
+            custom_id=f"awaiting_error_no_code:{ctx_suffix}",
+        )
+        something_else_button.callback = self._no_code_callback
+        self.add_item(something_else_button)
+
+    async def _input_error_callback(self, interaction: discord.Interaction):
         """Open the error code modal, tied to this awaiting message."""
-        modal = ErrorCodeModal(context=self.context)
+        # Extract context from custom_id if self.context is None (after bot restart)
+        context = self.context
+        if context is None:
+            custom_id = interaction.custom_id
+            if ":" in custom_id:
+                ctx_suffix = custom_id.split(":", 1)[1]
+                context = ctx_suffix if ctx_suffix else None
+
+        modal = ErrorCodeModal(context=context)
         modal.target_message = interaction.message
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(
-        label="⚠️ I need something else",
-        style=discord.ButtonStyle.danger,
-        custom_id="awaiting_error_no_code",
-    )
-    async def awaiting_no_code_button(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ):
+    async def _no_code_callback(self, interaction: discord.Interaction):
         """User doesn't have / want to enter an error code – go back to SOAP helper."""
+        # Extract context from custom_id if self.context is None (after bot restart)
+        context = self.context
+        if context is None:
+            custom_id = interaction.custom_id
+            if ":" in custom_id:
+                ctx_suffix = custom_id.split(":", 1)[1]
+                context = ctx_suffix if ctx_suffix else None
+
         # Disable buttons on the original awaiting message
         for child in self.children:
             child.disabled = True
@@ -434,7 +455,7 @@ class AwaitingErrorCodeView(discord.ui.View):
             color=discord.Color.red(),
         )
         embed.set_footer(text="Select an option from the dropdown menu below")
-        view = SoapHelperView(context=self.context)
+        view = SoapHelperView(context=context)
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed, view=view)
         else:
@@ -448,30 +469,51 @@ class InvalidErrorCodeView(discord.ui.View):
         super().__init__(timeout=None)
         self.target_message = target_message
         self.context = context
+        # Encode context in custom_id so it persists after bot restart
+        ctx_suffix = context or ""
 
-    @discord.ui.button(
-        label="🔢 Enter Error Code",
-        style=discord.ButtonStyle.primary,
-        custom_id="invalid_error_reenter",
-    )
-    async def reenter_button(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ):
+        # Dynamically create buttons with context-encoded custom_ids
+        reenter_button = discord.ui.Button(
+            label="🔢 Enter Error Code",
+            style=discord.ButtonStyle.primary,
+            custom_id=f"invalid_error_reenter:{ctx_suffix}",
+        )
+        reenter_button.callback = self._reenter_callback
+        self.add_item(reenter_button)
+
+        something_else_button = discord.ui.Button(
+            label="⚠️ I need something else",
+            style=discord.ButtonStyle.danger,
+            custom_id=f"invalid_error_no_code:{ctx_suffix}",
+        )
+        something_else_button.callback = self._no_code_callback
+        self.add_item(something_else_button)
+
+    async def _reenter_callback(self, interaction: discord.Interaction):
         """Re-open the error code modal."""
-        modal = ErrorCodeModal(context=self.context)
+        # Extract context from custom_id if self.context is None (after bot restart)
+        context = self.context
+        if context is None:
+            custom_id = interaction.custom_id
+            if ":" in custom_id:
+                ctx_suffix = custom_id.split(":", 1)[1]
+                context = ctx_suffix if ctx_suffix else None
+
+        modal = ErrorCodeModal(context=context)
         if self.target_message is not None:
             modal.target_message = self.target_message
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(
-        label="⚠️ I need something else",
-        style=discord.ButtonStyle.danger,
-        custom_id="invalid_error_no_code",
-    )
-    async def no_code_button(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ):
+    async def _no_code_callback(self, interaction: discord.Interaction):
         """Return the user to the main SOAP helper menu."""
+        # Extract context from custom_id if self.context is None (after bot restart)
+        context = self.context
+        if context is None:
+            custom_id = interaction.custom_id
+            if ":" in custom_id:
+                ctx_suffix = custom_id.split(":", 1)[1]
+                context = ctx_suffix if ctx_suffix else None
+
         # First disable these buttons on the original message
         for child in self.children:
             child.disabled = True
@@ -494,7 +536,7 @@ class InvalidErrorCodeView(discord.ui.View):
             color=discord.Color.red(),
         )
         embed.set_footer(text="Select an option from the dropdown menu below")
-        view = SoapHelperView(context=self.context)
+        view = SoapHelperView(context=context)
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed, view=view)
         else:
@@ -515,6 +557,8 @@ class SoapHelperDropdown(discord.ui.Select):
                 - None: Standalone /soaphelp command (no follow-up)
         """
         self.context = context
+        # Encode context in custom_id so it persists after bot restart
+        ctx_suffix = context or ""
         options = [
             discord.SelectOption(
                 label="The eShop still doesn't work",
@@ -564,12 +608,20 @@ class SoapHelperDropdown(discord.ui.Select):
             min_values=1,
             max_values=1,
             options=options,
-            custom_id="soap_helper_dropdown",
+            custom_id=f"soap_helper_dropdown:{ctx_suffix}",
         )
 
     async def callback(self, interaction: discord.Interaction):
         """Handle dropdown selection"""
         value = self.values[0]
+
+        # Extract context from custom_id if self.context is None (after bot restart)
+        context = self.context
+        if context is None:
+            custom_id = self.custom_id
+            if ":" in custom_id:
+                ctx_suffix = custom_id.split(":", 1)[1]
+                context = ctx_suffix if ctx_suffix else None
 
         # Disable the dropdown after use to prevent spam
         if self.view is not None:
@@ -598,10 +650,10 @@ class SoapHelperDropdown(discord.ui.Select):
             )
             awaiting_msg = await interaction.channel.send(
                 embed=awaiting_embed,
-                view=AwaitingErrorCodeView(context=self.context),
+                view=AwaitingErrorCodeView(context=context),
             )
 
-            modal = ErrorCodeModal(context=self.context)
+            modal = ErrorCodeModal(context=context)
             modal.target_message = awaiting_msg
             await interaction.response.send_modal(modal)
             return
@@ -699,7 +751,7 @@ class SoapHelperDropdown(discord.ui.Select):
         await interaction.response.send_message(embed=embed)
 
         # Send context-aware follow-up (or none for standalone /soaphelp)
-        if self.context == "eshop_issue":
+        if context == "eshop_issue":
             followup_embed = discord.Embed(
                 title="❓ Does the eShop work now?",
                 description=f"{interaction.user.mention}, please let us know if this resolved your issue.",
@@ -707,7 +759,7 @@ class SoapHelperDropdown(discord.ui.Select):
             )
             view = EshopResolutionView(channel_id=interaction.channel_id)
             await interaction.followup.send(embed=followup_embed, view=view)
-        elif self.context == "other_questions":
+        elif context == "other_questions":
             followup_embed = discord.Embed(
                 title="❓ Is your issue resolved?",
                 description=f"{interaction.user.mention}, please let us know if this resolved your issue.",
@@ -806,12 +858,16 @@ class SoapHelperCog(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """Register persistent views on bot startup"""
-        self.bot.add_view(SoapHelperView())
+        # Register views for all possible context values
+        contexts = [None, "eshop_issue", "other_questions"]
+        for ctx in contexts:
+            self.bot.add_view(SoapHelperView(context=ctx))
+            self.bot.add_view(AwaitingErrorCodeView(context=ctx))
+            self.bot.add_view(InvalidErrorCodeView(target_message=None, context=ctx))
+
         self.bot.add_view(ErrorResolutionView())
         self.bot.add_view(EshopResolutionView())
         self.bot.add_view(IssueResolutionView())
-        self.bot.add_view(AwaitingErrorCodeView())
-        self.bot.add_view(InvalidErrorCodeView(target_message=None))
 
 
 def setup(bot):
