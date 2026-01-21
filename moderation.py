@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from discord.ext import commands
 from perms import command_with_perms
-from constants import JOIN_LEAVE_LOG_ID, SPAM_BOT_CHANNEL_ID, BAN_LOG_ID
+from constants import JOIN_LEAVE_LOG_ID, SPAM_BOT_CHANNEL_ID, BAN_LOG_ID, MESSAGE_LOG_ID
 
 
 def _format_account_age(created_at: datetime) -> str:
@@ -385,6 +385,105 @@ class ModerationCog(commands.Cog):
                 reason=reason,
                 source=None,
             )
+
+    # Message edit/delete logs
+
+    def _get_message_log_channel(self, guild: discord.Guild) -> discord.TextChannel | None:
+        """Return the message log channel, if configured."""
+        if not MESSAGE_LOG_ID:
+            return None
+        channel = guild.get_channel(MESSAGE_LOG_ID)
+        if isinstance(channel, discord.TextChannel):
+            return channel
+        return None
+
+    @commands.Cog.listener()
+    async def on_message_edit(self, before: discord.Message, after: discord.Message):
+        """Log message edits in the message log channel (Dyno-style)."""
+        # Ignore DMs and bots
+        if not after.guild or after.author.bot:
+            return
+
+        # No channel configured
+        log_channel = self._get_message_log_channel(after.guild)
+        if log_channel is None:
+            return
+
+        # Skip if content didn't actually change or we don't have old content
+        if before.content == after.content:
+            return
+
+        # Build embed
+        embed = discord.Embed(color=discord.Color.blurple())
+        # Author is the user who edited the message
+        embed.set_author(
+            name=str(after.author),
+            icon_url=after.author.display_avatar.url,
+        )
+
+        # One-line description with channel and jump link
+        desc = f"Message edited in {after.channel.mention}"
+        try:
+            desc += f" • [Jump to Message]({after.jump_url})"
+        except Exception:
+            pass
+        embed.description = desc
+
+        before_text = before.content or "*no content*"
+        after_text = after.content or "*no content*"
+
+        # Truncate to avoid hitting field limits
+        if len(before_text) > 1024:
+            before_text = before_text[:1021] + "..."
+        if len(after_text) > 1024:
+            after_text = after_text[:1021] + "..."
+
+        embed.add_field(name="Before", value=before_text, inline=False)
+        embed.add_field(name="After", value=after_text, inline=False)
+
+        timestamp = _format_pst_time()
+        embed.set_footer(text=f"User ID: {after.author.id} • {timestamp}")
+
+        try:
+            await log_channel.send(embed=embed)
+        except Exception:
+            pass
+
+    @commands.Cog.listener()
+    async def on_message_delete(self, message: discord.Message):
+        """Log message deletions in the message log channel (Dyno-style)."""
+        # Ignore DMs and bots
+        if not message.guild or message.author.bot:
+            return
+
+        log_channel = self._get_message_log_channel(message.guild)
+        if log_channel is None:
+            return
+
+        embed = discord.Embed(color=discord.Color.red())
+        embed.set_author(
+            name=str(message.author),
+            icon_url=message.author.display_avatar.url,
+        )
+
+        content = message.content or "*no content*"
+        if len(content) > 1024:
+            content = content[:1021] + "..."
+
+        first_line = (
+            f"**Message sent by {message.author.mention} • Deleted in {message.channel.mention}**"
+        )
+        embed.description = f"{first_line}\n{content}"
+
+        timestamp = _format_pst_time()
+        embed.set_footer(
+            text=f"Author: {message.author.id} | Message ID: {message.id} • {timestamp}"
+        )
+
+        try:
+            await log_channel.send(embed=embed)
+        except Exception:
+            pass
 
     @command_with_perms(
         min_role="Developer",

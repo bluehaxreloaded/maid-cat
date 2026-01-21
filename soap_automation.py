@@ -8,7 +8,6 @@ from constants import (
     SOAP_CHANNEL_CATEGORY_ID,
     MANUAL_SOAP_CATEGORY_ID,
     LOADING_EMOTE_ID,
-    SOAPER_ROLE_ID,
     SOAP_COMPLETION_AUTO_CLOSE_MINUTES,
     is_late_night_hours,
 )
@@ -122,17 +121,20 @@ class CompletionFollowUpView(discord.ui.View):
                         break
 
         if channel:
-            # Send assistance requested embed and ping Soaper role
-            soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
+            # Send SOAP helper embed with dropdown
+            from soap_helper import SoapHelperView
             embed = discord.Embed(
-                title="🆘 Assistance Requested",
-                description=f"{interaction.user.mention} has requested additional help. Please wait for a Soaper to assist you.",
-                color=discord.Color.yellow(),
+                title="🧼 SOAP Helper",
+                description=(
+                    f"{interaction.user.mention} has some questions. "
+                    "Select a topic from the dropdown below to get answers to common questions.\n\n"
+                    "If you can't find what you're looking for, select **'Still Need Help'** to request assistance from a Soaper."
+                ),
+                color=discord.Color.blue(),
             )
-            embed.set_footer(
-                text="Describe in detail what's happening and please include error codes if possible."
-            )
-            await channel.send(content=soaper_ping, embed=embed)
+            embed.set_footer(text="Select an option from the dropdown menu below")
+            view = SoapHelperView()
+            await channel.send(embed=embed, view=view)
 
 
 class EshopVerificationView(discord.ui.View):
@@ -275,21 +277,22 @@ class EshopVerificationView(discord.ui.View):
         except Exception:
             await interaction.response.defer()
 
-        # Send assistance requested embed
-        soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
+        # Send SOAP helper embed with dropdown
+        from soap_helper import SoapHelperView
         embed = discord.Embed(
-            title="🆘 Assistance Requested",
-            description=f"{interaction.user.mention} has requested additional help. Please wait for a Soaper to assist you.",
-            color=discord.Color.yellow(),
+            title="🧼 SOAP Helper",
+            description=(
+                "We're here to help. Select a topic from the dropdown below.\n\n"
+            ),
+            color=discord.Color.red(),
         )
-        embed.set_footer(
-            text="Describe in detail what's happening and please include error codes if possible."
-        )
+        embed.set_footer(text="Select an option from the dropdown menu below")
+        view = SoapHelperView()
 
         if interaction.response.is_done():
-            await interaction.followup.send(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
+            await interaction.followup.send(embed=embed, view=view)
         else:
-            await interaction.response.send_message(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
+            await interaction.response.send_message(embed=embed, view=view)
 
 
 class SOAPAutomationCog(commands.Cog):
