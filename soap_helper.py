@@ -1,10 +1,39 @@
 import discord
 import json
+import re
 from pathlib import Path
 from discord.ext import commands
 from perms import command_with_perms
-from constants import SOAPER_ROLE_ID
+from constants import (
+    SOAPER_ROLE_ID,
+    AWAITING_EMOTE_ID,
+    SOAP_COMPLETION_AUTO_CLOSE_MINUTES,
+)
 
+
+def _load_error_info(error_code: str) -> dict | None:
+    """Load a single error definition from error_codes.json."""
+    error_codes_path = Path(__file__).parent / "error_codes.json"
+    try:
+        with open(error_codes_path, "r", encoding="utf-8") as f:
+            raw_db = json.load(f)
+
+        error_codes_db: dict[str, dict] = {}
+
+        for key, value in raw_db.items():
+            if key == "groups" and isinstance(value, dict):
+                for group in value.values():
+                    codes = group.get("codes", [])
+                    template = {k: v for k, v in group.items() if k != "codes"}
+                    for code in codes:
+                        if isinstance(code, str):
+                            error_codes_db[code] = template
+            elif isinstance(value, dict):
+                error_codes_db[key] = value
+
+        return error_codes_db.get(error_code)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
 
 class ErrorResolutionView(discord.ui.View):
     """View with buttons to confirm if error was resolved"""
@@ -13,7 +42,7 @@ class ErrorResolutionView(discord.ui.View):
         super().__init__(timeout=None)
     
     @discord.ui.button(
-        label="Yes, it's fixed!",
+        label="Yes, my issue is resolved",
         style=discord.ButtonStyle.success,
         emoji="✅",
         custom_id="error_resolved_yes",
@@ -58,14 +87,158 @@ class ErrorResolutionView(discord.ui.View):
         await interaction.followup.send(embed=embed, view=view)
 
 
+class EshopResolutionView(discord.ui.View):
+    """View shown after helping a user who reported eShop not working."""
+
+    def __init__(self, channel_id=None):
+        super().__init__(timeout=None)
+        self.channel_id = channel_id
+
+    @discord.ui.button(
+        label="Yes, it works now!",
+        style=discord.ButtonStyle.success,
+        emoji="✅",
+        custom_id="eshop_resolution_yes",
+    )
+    async def eshop_works_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        """eShop is working - show the completion follow-up flow"""
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(view=self)
+
+        from soap_automation import CompletionFollowUpView
+
+        channel_id = self.channel_id or interaction.channel_id
+        completion_embed = discord.Embed(
+            title="❔ Do you have any further questions?",
+            description=(
+                "Services such as Pokemon Bank, Nintendo Network IDs, System Transfers, "
+                "and the Nintendo eShop should now be working. You'll also be able to create "
+                "a new Nintendo Network ID for your new region.\n\n"
+                "**Please click one of the buttons below.**"
+            ),
+            color=discord.Color.blurple(),
+        )
+        completion_embed.set_footer(
+            text=(
+                f"Otherwise, this channel will automatically close in "
+                f"{SOAP_COMPLETION_AUTO_CLOSE_MINUTES} minutes."
+            )
+        )
+
+        view = CompletionFollowUpView(
+            channel_id=channel_id,
+            show_close_button=True,
+            bot=interaction.client,
+            guild=interaction.guild,
+        )
+        await interaction.followup.send(embed=completion_embed, view=view)
+
+    @discord.ui.button(
+        label="No, I still need help",
+        style=discord.ButtonStyle.danger,
+        emoji="❕",
+        custom_id="eshop_resolution_no",
+    )
+    async def eshop_still_broken_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        """eShop still not working - show helper again"""
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(view=self)
+
+        embed = discord.Embed(
+            title="🔍 SOAP Helper",
+            description=(
+                "Let's try again. Select the issue you're having from the dropdown below.\n\n"
+                "If you can't find what you're looking for, select **'My option is not listed here.'** "
+                "to request assistance from a Soaper."
+            ),
+            color=discord.Color.red(),
+        )
+        embed.set_footer(text="Select an option from the dropdown menu below")
+        view = SoapHelperView(context="eshop_issue")
+        await interaction.followup.send(embed=embed, view=view)
+
+
+class IssueResolutionView(discord.ui.View):
+    """View shown after helping a user who had other questions."""
+
+    def __init__(self, channel_id=None):
+        super().__init__(timeout=None)
+        self.channel_id = channel_id
+
+    @discord.ui.button(
+        label="Yes, close the channel",
+        style=discord.ButtonStyle.success,
+        emoji="👋",
+        custom_id="issue_resolution_close",
+    )
+    async def close_channel_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        """Issue resolved - close the channel"""
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(view=self)
+
+        channel = None
+        if self.channel_id:
+            channel = interaction.guild.get_channel(self.channel_id)
+        if not channel:
+            channel = interaction.channel
+
+        if not channel:
+            await interaction.followup.send("Channel not found.", ephemeral=True)
+            return
+
+        soap_cog = interaction.client.get_cog("SoapCog")
+        if soap_cog:
+            try:
+                await soap_cog.deletesoap(channel, interaction)
+            except Exception:
+                pass
+        else:
+            await interaction.followup.send("Error: SoapCog not found.", ephemeral=True)
+
+    @discord.ui.button(
+        label="No, I still need help",
+        style=discord.ButtonStyle.danger,
+        emoji="❕",
+        custom_id="issue_resolution_no",
+    )
+    async def still_need_help_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        """Issue not resolved - show helper again"""
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(view=self)
+
+        embed = discord.Embed(
+            title="🔍 SOAP Helper",
+            description=(
+                "Let's try again. Select the issue you're having from the dropdown below.\n\n"
+                "If you can't find what you're looking for, select **'My option is not listed here.'** "
+                "to request assistance from a Soaper."
+            ),
+            color=discord.Color.red(),
+        )
+        embed.set_footer(text="Select an option from the dropdown menu below")
+        view = SoapHelperView(context="other_questions")
+        await interaction.followup.send(embed=embed, view=view)
+
+
 class ErrorCodeModal(discord.ui.Modal):
     """Modal for submitting error codes"""
-    
-    def __init__(self, service_name: str, emoji: str):
-        self.service_name = service_name
-        self.emoji = emoji
-        super().__init__(title=f"{emoji} {service_name} Error Report")
-        
+
+    def __init__(self, context=None):
+        super().__init__(title="🆘 Error Code Help")
+        self.context = context
+
         # Create text inputs using the proper pycord syntax
         self.error_code_input = discord.ui.InputText(
             label="What is the error code displayed?",
@@ -74,29 +247,74 @@ class ErrorCodeModal(discord.ui.Modal):
             max_length=10,
         )
         self.add_item(self.error_code_input)
-    
+
+    def _get_followup_embed_and_view(self, interaction: discord.Interaction):
+        """Get the context-aware follow-up embed and view."""
+        if self.context == "eshop_issue":
+            embed = discord.Embed(
+                title="❓ Does the eShop work now?",
+                description="After following the steps in the message above, please let us know if this resolved your issue.",
+                color=discord.Color.red(),
+            )
+            view = EshopResolutionView(channel_id=interaction.channel_id)
+            return embed, view
+        elif self.context == "other_questions":
+            embed = discord.Embed(
+                title="❓ Was your issue/question resolved?",
+                description="After reviewing the instructions/explanation in the message above, please let us know if this resolved your issue.",
+                color=discord.Color.red(),
+            )
+            view = IssueResolutionView(channel_id=interaction.channel_id)
+            return embed, view
+        return None, None
+
     async def callback(self, interaction: discord.Interaction):
         """Handle modal submission"""
         error_code = self.error_code_input.value.strip()
+
+        # Validate basic format XXX-XXXX (three digits, dash, four digits)
+        if not re.fullmatch(r"\d{3}-\d{4}", error_code):
+            invalid_embed = discord.Embed(
+                title="🆘 Invalid Error Code Format",
+                description=(
+                    f"{interaction.user.mention}, error codes are in the format **XXX-XXXX**.\n\n"
+                    "Please double-check the error screen on your 3DS. The code is shown at the top as:\n"
+                    "**Error Code: XXX-XXXX**.\n\n"
+                    "If you don't see an error code or you're unsure, you can go back to the SOAP helper menu."
+                ),
+                color=discord.Color.orange(),
+            )
+            invalid_embed.set_image(
+                url="https://hacksguidewiki.sfo3.digitaloceanspaces.com/hacksguidewiki/3DS_error_code.jpg"
+            )
+
+            target_message = getattr(self, "target_message", None)
+            view = InvalidErrorCodeView(target_message=target_message, context=self.context)
+
+            if target_message is not None:
+                # Edit the existing awaiting message
+                try:
+                    await interaction.response.defer()
+                except Exception:
+                    pass
+                try:
+                    await target_message.edit(embed=invalid_embed, view=view)
+                except Exception:
+                    # If editing fails, fall back to sending a new message
+                    await interaction.followup.send(embed=invalid_embed, view=view)
+            else:
+                # No known target message; send a fresh one
+                await interaction.response.send_message(embed=invalid_embed, view=view)
+            return
+
+        # Load error definition from database
+        error_info = _load_error_info(error_code)
         
-        # Load error codes database
-        error_codes_path = Path(__file__).parent / "error_codes.json"
-        error_info = None
-        
-        try:
-            with open(error_codes_path, 'r', encoding='utf-8') as f:
-                error_codes_db = json.load(f)
-                error_info = error_codes_db.get(error_code)
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
-        
-        if error_info and error_info.get("service", "").lower() in self.service_name.lower():
-            # Error code found in database - show resolution steps
-            # Add each step as a numbered list
+        if error_info:
             steps_text = "\n".join([f"**{i+1}.** {step}" for i, step in enumerate(error_info['steps'])])
             
             embed = discord.Embed(
-                title=f"{self.emoji} {error_code} - {error_info['title']}",
+                title=f"{error_code} - {error_info['title']}",
                 description=(
                     f"{error_info['description']}\n\n"
                     f"**Steps to resolve:**\n{steps_text}"
@@ -104,41 +322,162 @@ class ErrorCodeModal(discord.ui.Modal):
                 color=discord.Color.blue(),
             )
             
-            embed.set_footer(text="Try these steps, try the eShop again, and let us know if the issue is resolved.")
-            
-            # Send to the channel (not ephemeral)
-            await interaction.response.send_message(embed=embed)
-            
-            # Send follow-up embed asking if issue was resolved
-            followup_embed = discord.Embed(
-                title="❓ Did this resolve your issue?",
-                description=f"{interaction.user.mention}, please let us know if the steps above helped or if you still need help.",
-                color=discord.Color.red(),
-            )
-            view = ErrorResolutionView()
-            await interaction.followup.send(embed=followup_embed, view=view)
+            embed.set_footer(text="Try these steps and let us know if the issue is resolved.")
+
+            target_message = getattr(self, "target_message", None)
+
+            followup_embed, followup_view = self._get_followup_embed_and_view(interaction)
+
+            if target_message is not None:
+                # Edit the original 'Awaiting' message with the resolution embed
+                try:
+                    await target_message.edit(content=None, embed=embed, view=None)
+                except Exception:
+                    # Fallback to normal behavior if editing fails
+                    await interaction.response.send_message(embed=embed)
+                    if followup_embed and followup_view:
+                        await interaction.followup.send(embed=followup_embed, view=followup_view)
+                else:
+                    # Use the modal response for the follow-up question
+                    if followup_embed and followup_view:
+                        await interaction.response.send_message(embed=followup_embed, view=followup_view)
+                    else:
+                        await interaction.response.defer()
+            else:
+                # No target message, behave like the original flow
+                await interaction.response.send_message(embed=embed)
+                if followup_embed and followup_view:
+                    await interaction.followup.send(embed=followup_embed, view=followup_view)
         else:
-            # Error code not found
-            embed = discord.Embed(
-                title=f"{self.emoji} {self.service_name} Error Report",
+            # Error code not found in our database
+            unknown_embed = discord.Embed(
+                title="🆘 Unknown Error Code",
                 description=(
-                    f"{interaction.user.mention} is experiencing issues with {self.service_name}.\n\n"
-                    f"**Error Code:** {error_code}\n\n"
-                    "This error code is not in our database. A Soaper will assist you shortly."
+                    f"{interaction.user.mention} is reporting experiencing an error that is not in our database.\n\n"
+                    f"**Error Code:** `{error_code}`\n\n"
                 ),
                 color=discord.Color.orange(),
             )
-            
-            embed.set_footer(text="Please wait for a Soaper to assist you.")
-            
-            # Send to the channel
-            await interaction.response.send_message(embed=embed)
+            unknown_embed.set_footer(text="Please wait for a Soaper to assist you.")
+
+            # Delete the old awaiting/invalid message
+            target_message = getattr(self, "target_message", None)
+            if target_message is not None:
+                try:
+                    await target_message.delete()
+                except Exception:
+                    pass
+
+            # Ensure the modal interaction is acknowledged
+            if not interaction.response.is_done():
+                try:
+                    await interaction.response.defer(ephemeral=True)
+                except Exception:
+                    pass
+
+            soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
+            await interaction.channel.send(
+                content=soaper_ping,
+                embed=unknown_embed,
+                allowed_mentions=discord.AllowedMentions(roles=True),
+            )
+
+
+class AwaitingErrorCodeView(discord.ui.View):
+    """View that provides a button to open the error code modal."""
+
+    def __init__(self, context=None):
+        super().__init__(timeout=None)
+        self.context = context
+
+    @discord.ui.button(
+        label="🔢 Enter Error Code",
+        style=discord.ButtonStyle.primary,
+        custom_id="error_code_input_button",
+    )
+    async def input_error_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        """Open the error code modal, tied to this awaiting message."""
+        modal = ErrorCodeModal(context=self.context)
+        modal.target_message = interaction.message
+        await interaction.response.send_modal(modal)
+
+
+class InvalidErrorCodeView(discord.ui.View):
+    """Shown when the user enters an incorrectly-formatted error code."""
+
+    def __init__(self, target_message: discord.Message | None, context=None):
+        super().__init__(timeout=None)
+        self.target_message = target_message
+        self.context = context
+
+    @discord.ui.button(
+        label="🔢 Enter Error Code",
+        style=discord.ButtonStyle.primary,
+        custom_id="invalid_error_reenter",
+    )
+    async def reenter_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        """Re-open the error code modal."""
+        modal = ErrorCodeModal(context=self.context)
+        if self.target_message is not None:
+            modal.target_message = self.target_message
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(
+        label="⚠️ I need something else",
+        style=discord.ButtonStyle.danger,
+        custom_id="invalid_error_no_code",
+    )
+    async def no_code_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        """Return the user to the main SOAP helper menu."""
+        # First disable these buttons on the original message
+        for child in self.children:
+            child.disabled = True
+
+        try:
+            if interaction.response.is_done():
+                await interaction.message.edit(view=self)
+            else:
+                await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
+
+        embed = discord.Embed(
+            title="🔍 SOAP Helper",
+            description=(
+                "Need help with your SOAP transfer? Select the issue you're having from the dropdown below.\n\n"
+                "If you can't find what you're looking for, select **'My option is not listed here.'** "
+                "to request assistance from a Soaper."
+            ),
+            color=discord.Color.red(),
+        )
+        embed.set_footer(text="Select an option from the dropdown menu below")
+        view = SoapHelperView(context=self.context)
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, view=view)
+        else:
+            await interaction.response.send_message(embed=embed, view=view)
 
 
 class SoapHelperDropdown(discord.ui.Select):
     """Dropdown menu for common SOAP questions"""
 
-    def __init__(self):
+    def __init__(self, context: str | None = None):
+        """
+        Initialize the dropdown.
+
+        Args:
+            context: The context this helper was triggered from:
+                - "eshop_issue": User clicked "No, eShop doesn't work" in automation
+                - "other_questions": User clicked "I have more questions" in automation
+                - None: Standalone /soaphelp command (no follow-up)
+        """
+        self.context = context
         options = [
             discord.SelectOption(
                 label="The eShop still doesn't work",
@@ -153,20 +492,26 @@ class SoapHelperDropdown(discord.ui.Select):
                 value="pokemon_bank_not_working",
             ),
             discord.SelectOption(
-                label="Switching between Pretendo & Nintendo Network?",
+                label="Switching from Pretendo to Nintendo Network?",
                 description="Information regarding using Nimbus",
                 emoji="🌐",
                 value="pretendo_switch",
             ),
             discord.SelectOption(
+                label="Where's my serial number?",
+                description="How to quickly find your serial number",
+                emoji="📂",
+                value="serial_number",
+            ),
+            discord.SelectOption(
                 label="What is a SOAP lottery?",
-                description="Information regarding lottery SOAPs",
+                description="Info regarding lottery SOAPs",
                 emoji="🎉",
                 value="region_settings",
             ),
             discord.SelectOption(
-                label="Do I have to wait 7 days?",
-                description="Info regarding system transferring after a SOAP",
+                label="When can I system transfer?",
+                description="Info regarding the seven day cooldown",
                 emoji="⏳",
                 value="nand_backup",
             ),
@@ -188,20 +533,42 @@ class SoapHelperDropdown(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         """Handle dropdown selection"""
         value = self.values[0]
-        
+
+        # Disable the dropdown after use to prevent spam
+        if self.view is not None:
+            for child in self.view.children:
+                if isinstance(child, discord.ui.Select):
+                    child.disabled = True
+            try:
+                await interaction.message.edit(view=self.view)
+            except Exception:
+                pass
+
         # Create response embed based on selection
-        if value == "eshop_not_working":
-            # Show modal directly
-            modal = ErrorCodeModal("eShop", "🛒")
+        if value in ("eshop_not_working", "pokemon_bank_not_working"):
+            # Shared flow for both eShop and Pokémon Bank error-code paths
+            awaiting_emoji = discord.utils.get(
+                interaction.guild.emojis, id=AWAITING_EMOTE_ID
+            )
+            title_prefix = f"{awaiting_emoji} " if awaiting_emoji else ""
+            awaiting_embed = discord.Embed(
+                title=f"{title_prefix}Awaiting Error Code",
+                description=(
+                    f"{interaction.user.mention}, enter the code shown on your console in the form that just opened.\n"
+                    "If you closed it by accident, you can click **Enter Error Code** below to reopen it."
+                ),
+                color=discord.Color.orange(),
+            )
+            awaiting_msg = await interaction.channel.send(
+                embed=awaiting_embed,
+                view=AwaitingErrorCodeView(context=self.context),
+            )
+
+            modal = ErrorCodeModal(context=self.context)
+            modal.target_message = awaiting_msg
             await interaction.response.send_modal(modal)
             return
-            
-        elif value == "pokemon_bank_not_working":
-            # Show modal directly
-            modal = ErrorCodeModal("Pokémon Bank", "📦")
-            await interaction.response.send_modal(modal)
-            return
-            
+
         elif value == "pretendo_switch":
             embed = discord.Embed(
                 title="🌐 Switching Between Pretendo and Nintendo Network",
@@ -216,6 +583,21 @@ class SoapHelperDropdown(discord.ui.Select):
                 color=discord.Color.blue(),
             )
             embed.set_footer(text="You'll need to reboot each time you switch.")
+
+        elif value == "serial_number":
+            embed = discord.Embed(
+                title="📂 Finding Your Serial Number",
+                description=(
+                    "Follow these instructions to find your console's serial number.\n\n"
+                    "**To find your console's serial number:**\n"
+                    "- Hold START while powering on your console. This will boot you into GodMode9.\n"
+                    "- Go to `SYSNAND TWLNAND` -> `sys` -> `log` -> `inspect.log`\n"
+                    "- Select `Open in Textviewer`.\n\n"
+                    "The correct serial number (three-letter prefix followed by nine numbers) should be in the file."
+                ),
+                color=discord.Color.blue(),
+            )
+            embed.set_footer(text="You may also send us a picture if you're unsure.")
             
         elif value == "region_settings":  # "What is a SOAP lottery?"
             embed = discord.Embed(
@@ -238,7 +620,7 @@ class SoapHelperDropdown(discord.ui.Select):
             
         elif value == "nand_backup":  # "Do I have to wait 7 days?"
             embed = discord.Embed(
-                title="⏳ Do I Have to Wait 7 Days?",
+                title="⏳ Post-SOAP System Transfer",
                 description=(
                     "If you don't want to system transfer to or from another 3DS, you're free to use your newly SOAPed console as normal. If you do want to system transfer:\n\n"
                     "**After a normal SOAP transfer:**\n"
@@ -276,25 +658,45 @@ class SoapHelperDropdown(discord.ui.Select):
             )
             return
         
-        # Send response (not ephemeral) with follow-up
+        # Send response
         await interaction.response.send_message(embed=embed)
-        
-        # Send follow-up embed asking if issue was resolved
-        followup_embed = discord.Embed(
-            title="❓ Did this resolve your issue?",
-            description=f"{interaction.user.mention}, please let us know if the steps above helped or if you still need help.",
-            color=discord.Color.red(),
-        )
-        view = ErrorResolutionView()
-        await interaction.followup.send(embed=followup_embed, view=view)
+
+        # Send context-aware follow-up (or none for standalone /soaphelp)
+        if self.context == "eshop_issue":
+            followup_embed = discord.Embed(
+                title="❓ Does the eShop work now?",
+                description=f"{interaction.user.mention}, please let us know if this resolved your issue.",
+                color=discord.Color.red(),
+            )
+            view = EshopResolutionView(channel_id=interaction.channel_id)
+            await interaction.followup.send(embed=followup_embed, view=view)
+        elif self.context == "other_questions":
+            followup_embed = discord.Embed(
+                title="❓ Is your issue resolved?",
+                description=f"{interaction.user.mention}, please let us know if this resolved your issue.",
+                color=discord.Color.red(),
+            )
+            view = IssueResolutionView(channel_id=interaction.channel_id)
+            await interaction.followup.send(embed=followup_embed, view=view)
+        # No follow-up for standalone /soaphelp (context=None)
 
 
 class SoapHelperView(discord.ui.View):
     """View containing the SOAP helper dropdown"""
-    
-    def __init__(self):
+
+    def __init__(self, context: str | None = None):
+        """
+        Initialize the view.
+
+        Args:
+            context: The context this helper was triggered from:
+                - "eshop_issue": User clicked "No, eShop doesn't work" in automation
+                - "other_questions": User clicked "I have more questions" in automation
+                - None: Standalone /soaphelp command (no follow-up)
+        """
         super().__init__(timeout=None)
-        self.add_item(SoapHelperDropdown())
+        self.context = context
+        self.add_item(SoapHelperDropdown(context=context))
 
 
 class SoapHelperCog(commands.Cog):
@@ -312,7 +714,7 @@ class SoapHelperCog(commands.Cog):
             title="🔍 SOAP Helper",
             description=(
                 "Need help with your SOAP transfer? Select the issue you're having from the dropdown below.\n\n"
-                "If you can't find what you're looking for, select **'Other'** to request assistance from a Soaper."
+                "If you can't find what you're looking for, select **'My option is not listed here.'** to request assistance from a Soaper."
             ),
             color=discord.Color.red(),
         )
@@ -321,11 +723,58 @@ class SoapHelperCog(commands.Cog):
         view = SoapHelperView()
         await ctx.respond(embed=embed, view=view)
 
+    @command_with_perms(
+        name="error",
+        aliases=["err"],
+        help="Look up a 3DS error code from the common error code list",
+    )
+    async def error_lookup(self, ctx, code: str):
+        """Lookup a common error code and display its info."""
+        raw = code.strip().upper()
+        # Normalize plain 7-digit codes into XXX-XXXX
+        if re.fullmatch(r"\d{3}-\d{4}", raw) is None:
+            if re.fullmatch(r"\d{7}", raw):
+                raw = f"{raw[:3]}-{raw[3:]}"
+
+        error_info = _load_error_info(raw)
+
+        if not error_info:
+            embed = discord.Embed(
+                title="Unknown Error Code",
+                description=(
+                    f"`{raw}` is not a registered error code in our database.\n\n"
+                    "Make sure you entered the code in the format **XXX-XXXX** "
+                    "and that it's a 3DS eShop / network / Pokémon Bank error.\n"
+                    "If you're sure it's correct, please ask a Soaper for help."
+                ),
+                color=discord.Color.orange(),
+            )
+            await ctx.respond(embed=embed)
+            return
+
+        steps_text = "\n".join(
+            f"**{i+1}.** {step}" for i, step in enumerate(error_info["steps"])
+        )
+
+        embed = discord.Embed(
+            title=f"{raw} - {error_info['title']}",
+            description=(
+                f"{error_info['description']}\n\n"
+                f"**Steps to resolve:**\n{steps_text}"
+            ),
+            color=discord.Color.blue(),
+        )
+        await ctx.respond(embed=embed)
+
     @commands.Cog.listener()
     async def on_ready(self):
         """Register persistent views on bot startup"""
         self.bot.add_view(SoapHelperView())
         self.bot.add_view(ErrorResolutionView())
+        self.bot.add_view(EshopResolutionView())
+        self.bot.add_view(IssueResolutionView())
+        self.bot.add_view(AwaitingErrorCodeView())
+        self.bot.add_view(InvalidErrorCodeView(target_message=None))
 
 
 def setup(bot):

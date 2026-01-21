@@ -12,16 +12,17 @@ from constants import (
     SOAP_COMPLETION_AUTO_CLOSE_MINUTES,
     is_late_night_hours,
 )
+from soap_helper import SoapHelperView
 
 
 class CompletionFollowUpView(discord.ui.View):
     """View for the follow-up questions after eShop verification"""
 
-    def __init__(self, channel_id=None, show_close_button=True, auto_close_task=None):
+    def __init__(self, channel_id=None, show_close_button=True, bot=None, guild=None):
         super().__init__(timeout=None)
         self.channel_id = channel_id
         self.show_close_button = show_close_button
-        self.auto_close_task = auto_close_task
+        self.auto_close_task = None
 
         # Remove I'm good if manual SOAP
         if not show_close_button:
@@ -31,6 +32,56 @@ class CompletionFollowUpView(discord.ui.View):
                     and item.custom_id == "completion_no_thanks"
                 ):
                     self.remove_item(item)
+
+        # Start auto-close timer if we have the necessary references
+        if show_close_button and bot and guild and channel_id:
+            self._start_auto_close(bot, guild, channel_id)
+
+    def _start_auto_close(self, bot, guild, channel_id):
+        """Start the auto-close timer for this channel."""
+        async def auto_close():
+            try:
+                await asyncio.sleep(SOAP_COMPLETION_AUTO_CLOSE_MINUTES * 60)
+                channel = guild.get_channel(channel_id)
+                if not channel:
+                    return
+                if (
+                    not channel.category
+                    or channel.category.id == MANUAL_SOAP_CATEGORY_ID
+                ):
+                    return
+
+                # Extract user ID from channel topic for logging
+                user_id = None
+                if channel.topic:
+                    match = re.search(r'<@!?(\d+)>', channel.topic)
+                    if match:
+                        user_id = int(match.group(1))
+
+                soap_cog = bot.get_cog("SoapCog")
+                if soap_cog:
+                    await soap_cog.deletesoap(channel, None)
+
+                    if user_id:
+                        try:
+                            user = guild.get_member(user_id)
+                            if user:
+                                ctx = type('Context', (), {
+                                    'guild': guild,
+                                    'message': type('Message', (), {
+                                        'author': user,
+                                        'content': 'Completion timeout'
+                                    })()
+                                })()
+                                await log_to_soaper_log(ctx, "Removed SOAP Channel")
+                        except Exception:
+                            pass
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+
+        self.auto_close_task = asyncio.create_task(auto_close())
 
     @discord.ui.button(
         label="I'm good, thanks!",
@@ -122,17 +173,19 @@ class CompletionFollowUpView(discord.ui.View):
                         break
 
         if channel:
-            # Send assistance requested embed and ping Soaper role
-            soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
+            # Show SOAP helper with context for follow-up questions
             embed = discord.Embed(
-                title="🆘 Assistance Requested",
-                description=f"{interaction.user.mention} has requested additional help. Please wait for a Soaper to assist you.",
-                color=discord.Color.yellow(),
+                title="🔍 SOAP Helper",
+                description=(
+                    "Select the issue you're having from the dropdown below.\n\n"
+                    "If you can't find what you're looking for, select **'My option is not listed here.'** "
+                    "to request assistance from a Soaper."
+                ),
+                color=discord.Color.red(),
             )
-            embed.set_footer(
-                text="Describe in detail what's happening and please include error codes if possible."
-            )
-            await channel.send(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
+            embed.set_footer(text="Select an option from the dropdown menu below")
+            view = SoapHelperView(context="other_questions")
+            await channel.send(content=interaction.user.mention, embed=embed, view=view)
 
 
 class EshopVerificationView(discord.ui.View):
@@ -186,61 +239,12 @@ class EshopVerificationView(discord.ui.View):
                 )
             )
 
-            # Create auto-close task first so we can pass it to the view
-            # Capture references before the async sleep
-            guild = interaction.guild
-            bot = interaction.client
-
-            async def auto_close():
-                try:
-                    await asyncio.sleep(SOAP_COMPLETION_AUTO_CLOSE_MINUTES * 60)
-                    channel = guild.get_channel(channel_id)
-                    if not channel:
-                        return
-                    # Re-check that this is still a SOAP channel and not in the manual category
-                    if (
-                        not channel.category
-                        or channel.category.id == MANUAL_SOAP_CATEGORY_ID
-                    ):
-                        return
-
-                    # Extract user ID from channel topic for logging
-                    user_id = None
-                    if channel.topic:
-                        # Topic format: "This is the SOAP channel for <@user_id>, ..."
-                        match = re.search(r'<@!?(\d+)>', channel.topic)
-                        if match:
-                            user_id = int(match.group(1))
-
-                    soap_cog = bot.get_cog("SoapCog")
-                    if soap_cog:
-                        # Delete the channel (pass None for ctx since this is auto-close)
-                        await soap_cog.deletesoap(channel, None)
-
-                        # Log the auto-close with user ID
-                        if user_id:
-                            try:
-                                user = guild.get_member(user_id)
-                                if user:
-                                    ctx = type('Context', (), {
-                                        'guild': guild,
-                                        'message': type('Message', (), {
-                                            'author': user,
-                                            'content': 'Completion timeout'
-                                        })()
-                                    })()
-                                    await log_to_soaper_log(ctx, "Removed SOAP Channel")
-                            except Exception:
-                                pass
-                except asyncio.CancelledError:
-                    # Task was cancelled (user clicked a button)
-                    pass
-                except Exception:
-                    # Fail silently; auto-close is best-effort
-                    pass
-
-            auto_close_task = asyncio.create_task(auto_close())
-            view = CompletionFollowUpView(channel_id, show_close_button=True, auto_close_task=auto_close_task)
+            view = CompletionFollowUpView(
+                channel_id=channel_id,
+                show_close_button=True,
+                bot=interaction.client,
+                guild=interaction.guild,
+            )
 
         # Send followup
         if interaction.response.is_done():
@@ -275,21 +279,23 @@ class EshopVerificationView(discord.ui.View):
         except Exception:
             await interaction.response.defer()
 
-        # Send assistance requested embed
-        soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
+        # Show SOAP helper with context for eShop issues
         embed = discord.Embed(
-            title="🆘 Assistance Requested",
-            description=f"{interaction.user.mention} has requested additional help. Please wait for a Soaper to assist you.",
-            color=discord.Color.yellow(),
+            title="🔍 SOAP Helper",
+            description=(
+                "Select the issue you're having from the dropdown below.\n\n"
+                "If you can't find what you're looking for, select **'My option is not listed here.'** "
+                "to request assistance from a Soaper."
+            ),
+            color=discord.Color.red(),
         )
-        embed.set_footer(
-            text="Describe in detail what's happening and please include error codes if possible."
-        )
+        embed.set_footer(text="Select an option from the dropdown menu below")
+        view = SoapHelperView(context="eshop_issue")
 
         if interaction.response.is_done():
-            await interaction.followup.send(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
+            await interaction.followup.send(embed=embed, view=view)
         else:
-            await interaction.response.send_message(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
+            await interaction.response.send_message(embed=embed, view=view)
 
 
 class SOAPAutomationCog(commands.Cog):

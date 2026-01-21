@@ -1,54 +1,75 @@
 {
-  "007-2001": {
-    "title": "eShop Authentication Error",
-    "description": "This error occurs when opening the eShop on a region changed console. This typically requires a SOAP transfer to resolve.",
-    "steps": [
-      "This error usually indicates your console needs a SOAP transfer.",
-      "A SOAP transfer will change your console's region and restore access to region-locked services like the eShop.",
-      "Please request a SOAP transfer in #request-soap to resolve this issue. If you are already in a soap channel, please ask a Soaper for help."
-    ],
-    "service": "eShop"
-  },
-  "009-2001": {
-    "title": "Pokémon Bank Authentication Error",
-    "description": "This error occurs when opening Pokémon Bank on a region changed console. This typically requires a SOAP transfer to resolve.",
-    "steps": [
-      "This error usually indicates your console needs a SOAP transfer.",
-      "A SOAP transfer will change your console's region and restore access to region-locked services like Pokémon Bank.",
-      "Please request a SOAP transfer in #request-soap to resolve this issue. If you are already in a soap channel, please ask a Soaper for help."
-    ],
-    "service": "Pokémon Bank"
-  },
-  "005-5958": {
-    "title": "Pokémon Bank Connection Error",
-    "description": "This error occurs when opening Pokémon Bank on a region changed console. This typically requires a SOAP transfer to resolve.",
-    "steps": [
-      "This error usually indicates your console needs a SOAP transfer.",
-      "A SOAP transfer will change your console's region and restore access to region-locked services like Pokémon Bank.",
-      "Please request a SOAP transfer in #request-soap to resolve this issue. If you are already in a soap channel, please ask a Soaper for help."
-    ],
-    "service": "Pokémon Bank"
+  "groups": {
+    "pokemon_bank_region_changed": {
+      "codes": ["009-2001", "005-5958"],
+      "title": "Pokémon Bank Authentication/Connection Error",
+      "description": "This error occurs when opening Pokémon Bank on a region changed console, which typically requires a SOAP transfer to resolve.",
+      "steps": [
+        "This error usually indicates your console needs a SOAP transfer.",
+        "Please request a SOAP transfer via #request-soap to resolve this issue. If you are already in a SOAP channel, please ask a Soaper for help."
+      ],
+      "service": "Pokémon Bank"
+    },
+    "internet_after_soap": {
+      "codes": ["022-5515", "005-4305", "005-4040", "007-2920", "007-2100", "014-0062"],
+      "title": "Internet / Network Error After SOAP",
+      "description": "This error occurs after a SOAP transfer when your Nintendo 3DS has trouble connecting to Nintendo Network or downloading from the eShop.",
+      "steps": [
+        "Power cycle your router and modem, then try again.",
+        "Check your internet connection for congestion or bandwidth issues. If other devices are using a lot of bandwidth, your connection may time out.",
+        "Check for wireless interference and try moving closer to your router.",
+        "Enter alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4) into your 3DS Internet settings. [Guide](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/217>)",
+        "If the issue persists, this may indicate a temporary service issue on Nintendo's end. Try again tomorrow."
+      ],
+      "service": "eShop"
+    },
+    "pretendo_enabled": {
+      "codes": ["007-2670", "022-5432", "022-2482"],
+      "title": "Network Error - Pretendo Enabled",
+      "description": "This error occurs when Pretendo is enabled and you're trying to access Nintendo services.",
+      "steps": [
+        "Pretendo is currently enabled on your console.",
+        "Open the **Nimbus** app on your 3DS.",
+        "Select **Nintendo Network**.",
+        "Try opening the eShop or Pokémon Bank again.",
+        "If you're not using Pretendo, this may be a network issue. Please ask a Soaper for help."
+      ],
+      "service": "eShop"
+    },
+    "eshop_region_changed": {
+      "codes": ["007-2001", "005-5602"],
+      "title": "eShop Region-Changed Console Error",
+      "description": "This error occurs when opening the eShop on a region changed console, which typically requires a SOAP transfer to resolve.",
+      "steps": [
+        "This error indicates your console needs a SOAP transfer.",
+        "Please request a SOAP transfer via #request-soap to resolve this issue. If you are already in a SOAP channel, please ask a Soaper for help."
+      ],
+      "service": "eShop"
+    },
+    "network_connection_error": {
+      "codes": ["022-5540", "011-3051"],
+      "title": "Network Connection Error",
+      "description": "This error can occur due to server maintenance, poor internet connection, or Pretendo being enabled.",
+      "steps": [
+        "If you're using Pretendo, switch to Nintendo Network using the Nimbus app.",
+        "Check your internet connection and try power cycling your router and modem.",
+        "Enter alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4) into your 3DS Internet settings. [Guide](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/217>)",
+        "If the issue persists, the server is most likely offline. Please wait for tomorrow and try again."
+      ],
+      "service": "eShop"
+    }
   },
   "009-1003": {
     "title": "Pokémon Bank Authentication Error",
     "description": "This error occurs when opening Pokémon Bank. You have an old Nintendo Network ID from the wrong region on your system.",
     "steps": [
-      "To resolve, you must remove your old Nintendo Network ID from your system.",
+      "To resolve, you must perform a SOAP transfer (via #request-soap). If you've already done this, skip to step 2.",
+      "After the SOAP transfer, you will need to remove your old Nintendo Network ID from your system.",
       "**1.** [Make a new NAND backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) and save it somewhere safe.",
       "**2.** Use GodMode9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>) without having to format your console.",
       "After removing the NNID, try opening Pokémon Bank again."
     ],
     "service": "Pokémon Bank"
-  },
-  "005-5602": {
-    "title": "eShop Connection Error",
-    "description": "This error occurs when opening the eShop on a region changed console. This typically requires a SOAP transfer to resolve.",
-    "steps": [
-      "This error usually indicates your console needs a SOAP transfer.",
-      "A SOAP transfer will change your console's region and restore access to region-locked services like the eShop.",
-      "Please request a SOAP transfer from a Soaper to resolve this issue."
-    ],
-    "service": "eShop"
   },
   "022-2502": {
     "title": "Out of Region NNID",
@@ -57,102 +78,40 @@
         "To resolve, you must remove your old Nintendo Network ID from your system.",
         "**1.** [Make a new NAND backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) and save it somewhere safe.",
         "**2.** Use GodMode9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>) without having to format your console.",
-        "After removing the NNID, try opening Pokémon Bank again."
+        "**3.** Create a new Nintendo Network ID on your console in System Settings.",
+        "After creating the new NNID, try opening Pokémon Bank again."
     ],
     "service": "eShop"
   },
-  "007-2100": {
-    "title": "eShop Download/Connection Error",
-    "description": "This error is often caused by slow download times due to interference or a slow Internet connection.",
+  "022-2571": {
+    "title": "Pretendo Network ID Handle Already In Use",
+    "description": "This error occurs when the Pretendo Network ID you are trying to create is already taken, or it matches your existing Nintendo Network ID.",
     "steps": [
-      "Check your internet settings and ensure your connection is stable.",
-      "Power cycle your router and modem, then try again.",
-      "Check for wireless interference and try moving closer to your router.",
-      "Enter alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4) into your 3DS Internet settings. [Guide](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/217>)",
-      "If the issue persists, check [Nintendo's Network Status](<https://support.nintendo.com/networkstatus>) for service maintenance or outages."
+      "If the handle is already taken, simply choose a different Pretendo Network ID handle and try again.",
+      "If the handle matches your NNID, **do not delete your NNID**. Just choose a different Pretendo Network ID handle and you are done.",
+      "If you attempted to create the Pretendo Network ID from Pretendo's website, create a new Pretendo Network ID there with a different handle and try signing in again on your console."
     ],
     "service": "eShop"
   },
-  "022-5515": {
-    "title": "Network Timeout Error)",
-    "description": "This error occurs due to a time-out error when connecting to Nintendo Network services.)",
+  "022-1021": {
+    "title": "NNID Required in New Region",
+    "description": "This error occurs when trying to access Pokémon Bank after a region change without having created a Nintendo Network ID (NNID) in the new region.",
     "steps": [
-      "Check for wireless interference and try moving closer to your router.",
-      "Turn your router and modem off and on again, then try again.",
-      "Enter alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4) into your 3DS Internet settings. [Guide](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/217>)",
-      "If the issue persists, this may indicate a weak wireless signal or that Nintendo's servers are down."
+      "On your 3DS, open **System Settings**.",
+      "Go to **Nintendo Network ID Settings**.",
+      "Create a **new NNID** that matches your new region (do not try to reuse an NNID from the old region).",
+      "After creating the new NNID, try opening **Pokémon Bank** again."
     ],
-    "service": "eShop"
+    "service": "Pokémon Bank"
   },
-  "005-4305": {
-    "title": "eShop Download Error",
-    "description": "This error occurswhen unable to complete a download from the Nintendo eShop. Your Internet connection may have timed out.",
+  "014-0016": {
+    "title": "Target Console Issue During System Transfer",
+    "description": "This error typically occurs on the **target console** during a system transfer when there is an issue with the target's existing data or configuration.",
     "steps": [
-      "Enter alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4) into your 3DS Internet settings. [For more information, see Nintendo's support page](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/4346/~/error-code%3A-005-4305>)",
-      "Power cycle your router and modem, then try again.",
-      "Check for wireless interference and try moving closer to your router.",
-      "If the issue persists, this may indicate a weak wireless signal or that Nintendo's servers are down."
-    ],
-    "service": "eShop"
-  },
-  "005-4040": {
-    "title": "eShop Connection Timeout",
-    "description": "This error occurs after a SOAP transfer when the Nintendo 3DS times out attempting to connect to the eShop.",
-    "steps": [
-      "Power cycle your router and modem, then try again.",
-      "Check your network's available bandwidth. If other devices are using bandwidth, your connection may time out.",
-      "Enter alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4) into your 3DS Internet settings. [Guide](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/217>)",
-      "If the issue persists, check for wireless interference and try moving closer to your router."
-    ],
-    "service": "eShop"
-  },
-  "007-2920": {
-    "title": "eShop Download Failed",
-    "description": "This error occurs after a SOAP transfer when a Nintendo eShop download failed.",
-    "steps": [
-      "Hold the POWER Button down on your system until it powers off, then turn it back on and try again.",
-      "Power cycle your home network (router and modem), then try again.",
-      "If you have previously changed your system's DNS settings, change this setting back to auto-obtain.",
-      "If the system is already set to auto-obtain a DNS, try entering alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4). [Guide](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/217>)",
-      "If the issue persists, this may indicate a temporary service issue. Please try again later."
-    ],
-    "service": "eShop"
-  },
-  "007-2670": {
-    "title": "eShop Connection Error - Pretendo (After SOAP)",
-    "description": "This error occurs after a SOAP transfer and is often caused by Pretendo being enabled.",
-    "steps": [
-      "If you're using Pretendo, switch back to Nintendo Network using the Nimbus app.",
-      "Open the **Nimbus** app on your 3DS.",
-      "Select **Nintendo Network**.",
-      "Try opening the eShop again.",
-      "If you're not using Pretendo, this may be a network issue. Check [Nintendo's support page](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/4383/~/error-code%3A-007-2670>) for more troubleshooting steps."
-    ],
-    "service": "eShop"
-  },
-  "022-5432": {
-    "title": "Network Error - Pretendo Enabled",
-    "description": "This error occurs when Pretendo is turned on and you're trying to access Nintendo services.",
-    "steps": [
-      "Pretendo is currently enabled on your console.",
-      "Open the **Nimbus** app on your 3DS.",
-      "Select **Nintendo Network**.",
-      "Try opening the eShop again."
-    ],
-    "service": "eShop"
-  },
-  "022-5540": {
-    "title": "Network Connection Error",
-    "description": "This error can occur due to server maintenance, poor internet connection, or Pretendo being enabled.",
-    "steps": [
-      "Check [Nintendo's Network Status](<https://support.nintendo.com/networkstatus>) to see if servers are under maintenance.",
-      "If you're using Pretendo, switch to Nintendo Network using the Nimbus app:",
-      "  • Open the **Nimbus** app on your 3DS",
-      "  • Select **Switch to Nintendo Network**",
-      "  • Your console will reboot",
-      "Check your internet connection and try power cycling your router and modem.",
-      "Enter alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4) into your 3DS Internet settings. [Guide](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/217>)",
-      "If the issue persists, try again later as this may indicate server maintenance."
+      "On the *target console*, make sure all important save data is backed up using **Checkpoint**.",
+      "Confirm that any other important data on the target console is safely backed up.",
+      "After verifying your backups, perform a **System Format** on the *target console* from System Settings.",
+      "Once the format is complete, try the system transfer again."
     ],
     "service": "eShop"
   }
