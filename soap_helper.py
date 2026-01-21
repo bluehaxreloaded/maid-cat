@@ -77,12 +77,12 @@ class ErrorResolutionView(discord.ui.View):
         embed = discord.Embed(
             title="🔍 SOAP Helper",
             description=(
-                "Need help with your SOAP transfer? Select the issue you're having from the dropdown below.\n\n"
+                "Need help with your SOAP transfer? We're here to help. Select the issue you're having from the dropdown below.\n\n"
                 "If you can't find what you're looking for, select **'My option is not listed here.'** to request assistance from a Soaper."
             ),
             color=discord.Color.red(),
         )
-        embed.set_footer(text="Select an option from the dropdown menu below")
+        embed.set_footer(text="Select an option from the dropdown menu below.")
         view = SoapHelperView()
         await interaction.followup.send(embed=embed, view=view)
 
@@ -227,7 +227,7 @@ class IssueResolutionView(discord.ui.View):
             ),
             color=discord.Color.red(),
         )
-        embed.set_footer(text="Select an option from the dropdown menu below")
+        embed.set_footer(text="Select an option from the dropdown menu below.")
         view = SoapHelperView(context="other_questions")
         await interaction.followup.send(embed=embed, view=view)
 
@@ -448,13 +448,13 @@ class AwaitingErrorCodeView(discord.ui.View):
         embed = discord.Embed(
             title="🔍 SOAP Helper",
             description=(
-                "Need help with your SOAP transfer? Select the issue you're having from the dropdown below.\n\n"
+                "Need help with your SOAP transfer? We're here to help. Select the issue you're having from the dropdown below.\n\n"
                 "If you can't find what you're looking for, select **'My option is not listed here.'** "
                 "to request assistance from a Soaper."
             ),
             color=discord.Color.red(),
         )
-        embed.set_footer(text="Select an option from the dropdown menu below")
+        embed.set_footer(text="Select an option from the dropdown menu below.")
         view = SoapHelperView(context=context)
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed, view=view)
@@ -529,13 +529,13 @@ class InvalidErrorCodeView(discord.ui.View):
         embed = discord.Embed(
             title="🔍 SOAP Helper",
             description=(
-                "Need help with your SOAP transfer? Select the issue you're having from the dropdown below.\n\n"
+                "Need help with your SOAP transfer? We're here to help. Select the issue you're having from the dropdown below.\n\n"
                 "If you can't find what you're looking for, select **'My option is not listed here.'** "
                 "to request assistance from a Soaper."
             ),
             color=discord.Color.red(),
         )
-        embed.set_footer(text="Select an option from the dropdown menu below")
+        embed.set_footer(text="Select an option from the dropdown menu below.")
         view = SoapHelperView(context=context)
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed, view=view)
@@ -802,12 +802,12 @@ class SoapHelperCog(commands.Cog):
         embed = discord.Embed(
             title="🔍 SOAP Helper",
             description=(
-                "Need help with your SOAP transfer? Select the issue you're having from the dropdown below.\n\n"
+                "Need help with your SOAP transfer? We're here to help. Select the issue you're having from the dropdown below.\n\n"
                 "If you can't find what you're looking for, select **'My option is not listed here.'** to request assistance from a Soaper."
             ),
             color=discord.Color.red(),
         )
-        embed.set_footer(text="Select an option from the dropdown menu below")
+        embed.set_footer(text="Select an option from the dropdown menu below.")
         
         view = SoapHelperView()
         await ctx.respond(embed=embed, view=view)
