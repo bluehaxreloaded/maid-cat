@@ -8,6 +8,7 @@ from constants import (
     SOAP_CHANNEL_CATEGORY_ID,
     MANUAL_SOAP_CATEGORY_ID,
     LOADING_EMOTE_ID,
+    SOAPER_ROLE_ID,
     SOAP_COMPLETION_AUTO_CLOSE_MINUTES,
     is_late_night_hours,
 )
@@ -44,7 +45,7 @@ class CompletionFollowUpView(discord.ui.View):
         # Cancel auto-close task if it exists
         if self.auto_close_task and not self.auto_close_task.done():
             self.auto_close_task.cancel()
-        
+
         # Disable all buttons in this view
         for item in self.children:
             item.disabled = True
@@ -87,7 +88,7 @@ class CompletionFollowUpView(discord.ui.View):
         # Cancel auto-close task if it exists
         if self.auto_close_task and not self.auto_close_task.done():
             self.auto_close_task.cancel()
-        
+
         # Disable all buttons in this view
         for item in self.children:
             item.disabled = True
@@ -121,20 +122,17 @@ class CompletionFollowUpView(discord.ui.View):
                         break
 
         if channel:
-            # Send SOAP helper embed with dropdown
-            from soap_helper import SoapHelperView
+            # Send assistance requested embed and ping Soaper role
+            soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
             embed = discord.Embed(
-                title="🧼 SOAP Helper",
-                description=(
-                    f"{interaction.user.mention} has some questions. "
-                    "Select a topic from the dropdown below to get answers to common questions.\n\n"
-                    "If you can't find what you're looking for, select **'Still Need Help'** to request assistance from a Soaper."
-                ),
-                color=discord.Color.blue(),
+                title="🆘 Assistance Requested",
+                description=f"{interaction.user.mention} has requested additional help. Please wait for a Soaper to assist you.",
+                color=discord.Color.yellow(),
             )
-            embed.set_footer(text="Select an option from the dropdown menu below")
-            view = SoapHelperView()
-            await channel.send(embed=embed, view=view)
+            embed.set_footer(
+                text="Describe in detail what's happening and please include error codes if possible."
+            )
+            await channel.send(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
 
 
 class EshopVerificationView(discord.ui.View):
@@ -164,10 +162,10 @@ class EshopVerificationView(discord.ui.View):
 
         channel_id = interaction.channel_id
         channel = interaction.channel
-        
+
         # Check if channel is in manual SOAP category
         is_manual_soap = channel and channel.category and channel.category.id == MANUAL_SOAP_CATEGORY_ID
-        
+
         if is_manual_soap:
             completion_embed = discord.Embed(
                 title="✅ You're all set!",
@@ -187,12 +185,12 @@ class EshopVerificationView(discord.ui.View):
                     f"{SOAP_COMPLETION_AUTO_CLOSE_MINUTES} minutes."
                 )
             )
-            
+
             # Create auto-close task first so we can pass it to the view
             # Capture references before the async sleep
             guild = interaction.guild
             bot = interaction.client
-            
+
             async def auto_close():
                 try:
                     await asyncio.sleep(SOAP_COMPLETION_AUTO_CLOSE_MINUTES * 60)
@@ -205,7 +203,7 @@ class EshopVerificationView(discord.ui.View):
                         or channel.category.id == MANUAL_SOAP_CATEGORY_ID
                     ):
                         return
-                    
+
                     # Extract user ID from channel topic for logging
                     user_id = None
                     if channel.topic:
@@ -213,12 +211,12 @@ class EshopVerificationView(discord.ui.View):
                         match = re.search(r'<@!?(\d+)>', channel.topic)
                         if match:
                             user_id = int(match.group(1))
-                    
+
                     soap_cog = bot.get_cog("SoapCog")
                     if soap_cog:
                         # Delete the channel (pass None for ctx since this is auto-close)
                         await soap_cog.deletesoap(channel, None)
-                        
+
                         # Log the auto-close with user ID
                         if user_id:
                             try:
@@ -277,22 +275,21 @@ class EshopVerificationView(discord.ui.View):
         except Exception:
             await interaction.response.defer()
 
-        # Send SOAP helper embed with dropdown
-        from soap_helper import SoapHelperView
+        # Send assistance requested embed
+        soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
         embed = discord.Embed(
-            title="🧼 SOAP Helper",
-            description=(
-                "We're here to help. Select a topic from the dropdown below.\n\n"
-            ),
-            color=discord.Color.red(),
+            title="🆘 Assistance Requested",
+            description=f"{interaction.user.mention} has requested additional help. Please wait for a Soaper to assist you.",
+            color=discord.Color.yellow(),
         )
-        embed.set_footer(text="Select an option from the dropdown menu below")
-        view = SoapHelperView()
+        embed.set_footer(
+            text="Describe in detail what's happening and please include error codes if possible."
+        )
 
         if interaction.response.is_done():
-            await interaction.followup.send(embed=embed, view=view)
+            await interaction.followup.send(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
         else:
-            await interaction.response.send_message(embed=embed, view=view)
+            await interaction.response.send_message(content=soaper_ping, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
 
 
 class SOAPAutomationCog(commands.Cog):
@@ -389,7 +386,7 @@ class SOAPAutomationCog(commands.Cog):
         )
         # Send with mention
         await channel.send(content=user.mention, embed=embed)
-        
+
         # Send late night delay warning if applicable
         if is_late_night_hours():
             late_night_embed = discord.Embed(
@@ -502,7 +499,7 @@ class SOAPAutomationCog(commands.Cog):
             tracker_cog = self.bot.get_cog("TrackerCog")
             if tracker_cog:
                 tracker_cog.increment_soap_count()
-            
+
             # Send SUCCESS message immediately
             boot_instruction = (
                 f"Boot the console with the serial {serial_number} normally (with the SD inserted into the console)"
@@ -518,7 +515,7 @@ class SOAPAutomationCog(commands.Cog):
                 "**3.** If using Pretendo, switch to Nintendo Network with Nimbus.\n"
                 "**4.** Then try opening the eShop.\n"
                 "**5.** Does the eShop launch successfully?",
-                
+
                 color=discord.Color.green(),
             )
             embed.set_footer(
@@ -578,10 +575,10 @@ class SOAPAutomationCog(commands.Cog):
         if status_text == "ERROR" and target_channel:
             # Delete progress message when error occurs
             await self._delete_progress_message(target_channel)
-            
+
             # Check if it's a serial mismatch error
             is_serial_error = status_detail and "SERIAL_MISMATCH" in status_detail.upper()
-            
+
             if is_serial_error:
                 # Send findserial instructions
                 embed = discord.Embed(
@@ -600,7 +597,7 @@ class SOAPAutomationCog(commands.Cog):
                 user_mention = f"<@{user_id}>"
                 embed.set_footer(text="Once you've found the serial number and send it here, we will resume your SOAP Transfer.")
                 await target_channel.send(content=user_mention, embed=embed)
-                
+
             else:
                 # Error - requires Soaper intervention
                 embed = discord.Embed(

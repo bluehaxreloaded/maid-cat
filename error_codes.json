@@ -124,8 +124,7 @@
     "steps": [
       "If you're using Pretendo, switch back to Nintendo Network using the Nimbus app.",
       "Open the **Nimbus** app on your 3DS.",
-      "Select **Switch to Nintendo Network**.",
-      "Your console will reboot.",
+      "Select **Nintendo Network**.",
       "Try opening the eShop again.",
       "If you're not using Pretendo, this may be a network issue. Check [Nintendo's support page](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/4383/~/error-code%3A-007-2670>) for more troubleshooting steps."
     ],
@@ -137,10 +136,8 @@
     "steps": [
       "Pretendo is currently enabled on your console.",
       "Open the **Nimbus** app on your 3DS.",
-      "Select **Switch to Nintendo Network**.",
-      "Your console will reboot.",
-      "You can now access Nintendo services like the eShop.",
-      "To switch back to Pretendo later, use Nimbus again and select **Switch to Pretendo**."
+      "Select **Nintendo Network**.",
+      "Try opening the eShop again."
     ],
     "service": "eShop"
   },
