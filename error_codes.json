@@ -65,8 +65,10 @@
     "steps": [
       "To resolve, you must perform a SOAP transfer (via #request-soap). If you've already done this, skip to step 2.",
       "After the SOAP transfer, you will need to remove your old Nintendo Network ID from your system.",
-      "**1.** [Make a new NAND backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) and save it somewhere safe.",
-      "**2.** Use GodMode9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>) without having to format your console.",
+      [
+        "[Make a new NAND backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) and save it somewhere safe.",
+        "Use GodMode9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>) without having to format your console."
+      ],
       "After removing the NNID, try opening Pokémon Bank again."
     ],
     "service": "Pokémon Bank"
@@ -76,9 +78,11 @@
     "description": "This error occurs when opening the eShop on a SOAP'd console with an out-of-region Nintendo Network ID. You must remove your old Nintendo Network ID from your system.",
     "steps": [
         "To resolve, you must remove your old Nintendo Network ID from your system.",
-        "**1.** [Make a new NAND backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) and save it somewhere safe.",
-        "**2.** Use GodMode9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>) without having to format your console.",
-        "**3.** Create a new Nintendo Network ID on your console in System Settings.",
+        [
+          "[Make a new NAND backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) and save it somewhere safe.",
+          "Use GodMode9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>) without having to format your console.",
+          "Create a new Nintendo Network ID on your console in System Settings."
+        ],
         "After creating the new NNID, try opening Pokémon Bank again."
     ],
     "service": "eShop"

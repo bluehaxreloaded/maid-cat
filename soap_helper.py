@@ -35,6 +35,20 @@ def _load_error_info(error_code: str) -> dict | None:
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
+def _format_steps(steps: list, level: int = 0) -> str:
+    """Formats the list of steps so it can be sent within Discord."""
+    output = []
+
+    for key, step in enumerate(steps):
+        stepNum = key + 1
+        if isinstance(step, list):
+            output.append(_format_steps(step, level + 1))
+        else:
+            output.append(("  " * level) + "**" + str(stepNum) + ".** " + step)
+    
+    return "\n".join(output)
+
+
 class ErrorResolutionView(discord.ui.View):
     """View with buttons to confirm if error was resolved"""
     
@@ -311,7 +325,7 @@ class ErrorCodeModal(discord.ui.Modal):
         error_info = _load_error_info(error_code)
         
         if error_info:
-            steps_text = "\n".join([f"**{i+1}.** {step}" for i, step in enumerate(error_info['steps'])])
+            steps_text = _format_steps(error_info["steps"])
             
             embed = discord.Embed(
                 title=f"{error_code} - {error_info['title']}",
@@ -664,10 +678,10 @@ class SoapHelperDropdown(discord.ui.Select):
                 description=(
                     "If you're using Pretendo and need to access Nintendo services:\n\n"
                     "**1.** Open the **Nimbus** app on your 3DS.\n"
-                    "**2.** Select **Switch to Nintendo Network**.\n"
+                    "**2.** Select **Nintendo**.\n"
                     "**3.** Your console will reboot.\n"
                     "**4.** You can now access Nintendo services like the eShop.\n\n"
-                    "To switch back to Pretendo, use Nimbus again and select **Switch to Pretendo**."
+                    "To switch back to Pretendo, use Nimbus again and select **Pretendo**."
                 ),
                 color=discord.Color.blue(),
             )
@@ -841,9 +855,7 @@ class SoapHelperCog(commands.Cog):
             await ctx.respond(embed=embed)
             return
 
-        steps_text = "\n".join(
-            f"**{i+1}.** {step}" for i, step in enumerate(error_info["steps"])
-        )
+        steps_text = _format_steps(error_info["steps"])
 
         embed = discord.Embed(
             title=f"{raw} - {error_info['title']}",
