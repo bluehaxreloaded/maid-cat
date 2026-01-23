@@ -38,13 +38,13 @@ def _load_error_info(error_code: str) -> dict | None:
 def _format_steps(steps: list, level: int = 0) -> str:
     """Formats the list of steps so it can be sent within Discord."""
     output = []
-
+    stepNum = 0
     for key, step in enumerate(steps):
-        stepNum = key + 1
+        stepNum += 1
         if isinstance(step, list):
             output.append(_format_steps(step, level + 1))
         else:
-            output.append(("  " * level) + "**" + str(stepNum) + ".** " + step)
+            output.append(("  " * level) + str(stepNum) + ". " + step)
     
     return "\n".join(output)
 
