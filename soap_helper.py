@@ -611,6 +611,12 @@ class SoapHelperDropdown(discord.ui.Select):
                 value="nand_backup",
             ),
             discord.SelectOption(
+                label="Do I have to do anything else?",
+                description="Additional steps after the SOAP transfer",
+                emoji="❔",
+                value="additional_steps",
+            ),
+            discord.SelectOption(
                 label="My option is not listed here.",
                 description="Request additional assistance from a Soaper",
                 emoji="🆘",
@@ -739,6 +745,17 @@ class SoapHelperDropdown(discord.ui.Select):
                 color=discord.Color.blue(),
             )
             embed.set_footer(text="Again, if you don't want to system transfer from your old console to this one, you're free to use your console as normal.")
+
+        elif value == "additional_steps":
+            embed = discord.Embed(
+                title="🔍 Post-SOAP Transfer",
+                description=(
+                    "If eShop is working and you don't want to system transfer to/from a different console (moving game/save data between two consoles), you are done.\n\n"
+                    "If you want to system transfer to/from a different console (moving game/save data between two consoles), you must wait 7 days before doing so. The only exception is if you won the SOAP lottery, which you would have already been told about in the SOAP completion message.\n\n"
+                    "If you want to use your console as normal, you can do so."
+                ),
+                color=discord.Color.blue(),
+            )
             
         elif value == "need_help":
             soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
