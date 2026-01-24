@@ -9,9 +9,18 @@ def command_with_perms(
 ):  # permission managment using roles
     def decorator(func):
         async def check_permissions(ctx):
-            # Bridge commands use ctx.user for slash, ctx.author for prefix
-            # Try both to support both command types
-            user = getattr(ctx, 'user', None) or getattr(ctx, 'author', None)
+            # Handle different context types (Interaction, Context, BridgeContext)
+            if isinstance(ctx, discord.Interaction):
+                user = ctx.user
+            else:
+                # For prefix commands, check message.author first
+                message = getattr(ctx, "message", None)
+                if message is not None:
+                    user = message.author
+                else:
+                    # Bridge / application context without a backing message
+                    user = getattr(ctx, "author", None) or getattr(ctx, "user", None)
+            
             if user is None:
                 raise commands.CheckFailure("Unable to determine user from context")
             
