@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands, bridge
+from functools import wraps
 from constants import SOAP_USABLE_IDS
 
 
@@ -7,7 +8,7 @@ def command_with_perms(
     *, min_role: str = "Default", slash: bool = True, **kwargs
 ):  # permission managment using roles
     def decorator(func):
-        async def perm_check(ctx):
+        async def check_permissions(ctx):
             # Bridge commands use ctx.user for slash, ctx.author for prefix
             # Try both to support both command types
             user = getattr(ctx, 'user', None) or getattr(ctx, 'author', None)
@@ -54,7 +55,15 @@ def command_with_perms(
                 raise commands.MissingRole(min_role)
 
             return True
-
+        
+        # Wrap the function to check permissions before executing
+        @wraps(func)
+        async def wrapped_func(ctx, *args, **func_kwargs):
+            # Check permissions first
+            await check_permissions(ctx)
+            # If check passes, call the original function
+            return await func(ctx, *args, **func_kwargs)
+        
         # Bridge command (prefix + slash) by default; allow opting out for complex signatures
         if slash:
             # Mirror the help text into the description
@@ -62,12 +71,12 @@ def command_with_perms(
             help_text = cmd_kwargs.get("help")
             if help_text and "description" not in cmd_kwargs:
                 cmd_kwargs["description"] = help_text
-            x = bridge.bridge_command(extras={"min_role": min_role}, **cmd_kwargs)(func)
+            x = bridge.bridge_command(extras={"min_role": min_role}, **cmd_kwargs)(wrapped_func)
         else:
-            x = commands.command(extras={"min_role": min_role}, **kwargs)(func)
+            x = commands.command(extras={"min_role": min_role}, **kwargs)(wrapped_func)
         
-        # Apply the check after creating the command
-        x = commands.check(perm_check)(x)
+        # Also apply as a check decorator for additional safety
+        x = commands.check(check_permissions)(x)
 
         return x
 
