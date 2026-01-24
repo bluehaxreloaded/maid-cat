@@ -72,6 +72,7 @@ async def error_log(ctx: commands.Context, error: Exception):
         )
 
         await error_log_channel.send(embed=error_log_embed)
+        raise error
     else:  # last ditch effort to at least display SOMETHING if no error log is found for some reason
         raise ErrorLogChannelNotFound(ERROR_LOG_ID, error) from error
 

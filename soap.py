@@ -101,10 +101,15 @@ class SoapCog(commands.Cog):  # SOAP commands
         self, channel: discord.TextChannel, ctx: commands.Context | discord.Interaction = None
     ):
         """Helper method to delete a SOAP channel with boom effect"""
-        await channel.send("Self-destruct sequence initiated!")
-        await channel.send(f"<a:boomparrot:{BOOM_EMOTE_ID}>")
-        await asyncio.sleep(2.75)
-        await channel.delete()
+        try:
+            await channel.send("Self-destruct sequence initiated!")
+            await channel.send(f"<a:boomparrot:{BOOM_EMOTE_ID}>")
+            await asyncio.sleep(2.75)
+            await channel.delete()
+
+        except discord.errors.NotFound:
+            return
+
         if ctx:
             try:
                 await log_to_soaper_log(ctx, "Removed SOAP Channel")
