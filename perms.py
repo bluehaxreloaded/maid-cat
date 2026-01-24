@@ -10,16 +10,25 @@ def command_with_perms(
     def decorator(func):
         async def check_permissions(ctx):
             # Handle different context types (Interaction, Context, BridgeContext)
+            user = None
+            
+            # Try multiple ways to get the user, in order of preference
+            # 1. Direct Interaction
             if isinstance(ctx, discord.Interaction):
                 user = ctx.user
-            else:
-                # For prefix commands, check message.author first
-                message = getattr(ctx, "message", None)
-                if message is not None:
-                    user = message.author
-                else:
-                    # Bridge / application context without a backing message
-                    user = getattr(ctx, "author", None) or getattr(ctx, "user", None)
+            # 2. Message-based context (prefix commands)
+            elif hasattr(ctx, 'message') and ctx.message is not None and hasattr(ctx.message, 'author'):
+                user = ctx.message.author
+            # 3. Context with author attribute (prefix commands)
+            elif hasattr(ctx, 'author') and ctx.author is not None:
+                user = ctx.author
+            # 4. Context with user attribute (slash/bridge commands)
+            elif hasattr(ctx, 'user') and ctx.user is not None:
+                user = ctx.user
+            # 5. Bridge context with interaction attribute
+            elif hasattr(ctx, 'interaction') and ctx.interaction is not None:
+                if hasattr(ctx.interaction, 'user'):
+                    user = ctx.interaction.user
             
             if user is None:
                 raise commands.CheckFailure("Unable to determine user from context")
