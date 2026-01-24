@@ -65,13 +65,16 @@ def command_with_perms(
 
             return True
         
-        # Wrap the function to check permissions before executing
+        # Wrap the function to explicitly check permissions before executing
         @wraps(func)
         async def wrapped_func(ctx, *args, **func_kwargs):
-            # Check permissions first
+            # Explicitly check permissions - this will raise MissingRole if user doesn't have permission
             await check_permissions(ctx)
-            # If check passes, call the original function
+            # If check passes (no exception raised), call the original function
             return await func(ctx, *args, **func_kwargs)
+        
+        # Apply the check decorator as well for additional safety
+        wrapped_func = commands.check(check_permissions)(wrapped_func)
         
         # Bridge command (prefix + slash) by default; allow opting out for complex signatures
         if slash:
@@ -84,7 +87,7 @@ def command_with_perms(
         else:
             x = commands.command(extras={"min_role": min_role}, **kwargs)(wrapped_func)
         
-        # Also apply as a check decorator for additional safety
+        # Apply check one more time after command creation for maximum safety
         x = commands.check(check_permissions)(x)
 
         return x
