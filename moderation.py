@@ -528,7 +528,7 @@ class ModerationCog(commands.Cog):
         )
 
     @command_with_perms(
-        min_role="Soaper",
+        min_role="Staff",
         name="restrict",
         aliases=["blacklist"],
         help="Restrict a user from requesting SOAP/NNID transfers by giving them the restricted role.",
@@ -536,7 +536,7 @@ class ModerationCog(commands.Cog):
     async def restrict_user(self, ctx, user: discord.Member, *, reason: str = None):
         """
         Restrict a user from requesting SOAP/NNID transfers.
-        Requires Soaper role or higher.
+        Requires Staff role or higher.
         """
         if not RESTRICTED_ROLE_ID:
             embed = discord.Embed(
@@ -551,6 +551,15 @@ class ModerationCog(commands.Cog):
             embed = discord.Embed(
                 title="❌ Configuration Error",
                 description="Restricted role not found. Check RESTRICTED_ROLE_ID in constants.py.",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        # Check role hierarchy - can't restrict users with equal or higher roles
+        if ctx.author.top_role.position <= user.top_role.position and ctx.author != ctx.guild.owner:
+            embed = discord.Embed(
+                title="❌ Permission Denied",
+                description=f"You cannot restrict {user.mention} because they have an equal or higher role than you.",
                 color=discord.Color.red(),
             )
             return await ctx.respond(embed=embed, ephemeral=True)
@@ -614,7 +623,7 @@ class ModerationCog(commands.Cog):
         await ctx.respond(embed=embed, ephemeral=True)
 
     @command_with_perms(
-        min_role="Soaper",
+        min_role="Staff",
         name="unrestrict",
         aliases=["unblacklist"],
         help="Remove restriction from a user by removing the restricted role.",
@@ -622,7 +631,7 @@ class ModerationCog(commands.Cog):
     async def unrestrict_user(self, ctx, user: discord.Member, *, reason: str = None):
         """
         Remove restriction from a user.
-        Requires Soaper role or higher.
+        Requires Staff role or higher.
         """
         if not RESTRICTED_ROLE_ID:
             embed = discord.Embed(
@@ -637,6 +646,16 @@ class ModerationCog(commands.Cog):
             embed = discord.Embed(
                 title="❌ Configuration Error",
                 description="Restricted role not found. Check RESTRICTED_ROLE_ID in constants.py.",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        # Check role hierarchy - can't unrestrict users with equal or higher roles (unless they're already restricted)
+        # But we still check hierarchy to prevent abuse
+        if ctx.author.top_role.position <= user.top_role.position and ctx.author != ctx.guild.owner:
+            embed = discord.Embed(
+                title="❌ Permission Denied",
+                description=f"You cannot modify restrictions for {user.mention} because they have an equal or higher role than you.",
                 color=discord.Color.red(),
             )
             return await ctx.respond(embed=embed, ephemeral=True)
