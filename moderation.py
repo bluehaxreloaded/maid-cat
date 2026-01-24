@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from discord.ext import commands
 from perms import command_with_perms
-from constants import JOIN_LEAVE_LOG_ID, SPAM_BOT_CHANNEL_ID, BAN_LOG_ID, MESSAGE_LOG_ID
+from constants import JOIN_LEAVE_LOG_ID, SPAM_BOT_CHANNEL_ID, BAN_LOG_ID, MESSAGE_LOG_ID, RESTRICTED_ROLE_ID
 
 
 def _format_account_age(created_at: datetime) -> str:
@@ -116,7 +116,7 @@ class ModerationCog(commands.Cog):
         source: str | None = None,
         timeout_until: datetime | None = None,
     ):
-        """Log a ban/kick to the ban log channel."""
+        """Log moderation actions (ban, kick, timeout, restrict, etc.) to the ban log channel."""
         if not BAN_LOG_ID:
             return
 
@@ -135,6 +135,12 @@ class ModerationCog(commands.Cog):
             color = discord.Color.yellow()
         elif action.lower() == "untimeout":
             title = "✅ Timeout Removed"
+            color = discord.Color.green()
+        elif action.lower() == "restrict":
+            title = "⛔ Member Restricted"
+            color = discord.Color.red()
+        elif action.lower() == "unrestrict":
+            title = "✅ Restriction Removed"
             color = discord.Color.green()
         else:  # kick
             title = "🔨 Member Kicked"
@@ -520,6 +526,178 @@ class ModerationCog(commands.Cog):
             f"Spam bot channel {channel.mention} has been reset and the info embed was resent.",
             ephemeral=True,
         )
+
+    @command_with_perms(
+        min_role="Soaper",
+        name="restrict",
+        aliases=["blacklist"],
+        help="Restrict a user from requesting SOAP/NNID transfers by giving them the restricted role.",
+    )
+    async def restrict_user(self, ctx, user: discord.Member, *, reason: str = None):
+        """
+        Restrict a user from requesting SOAP/NNID transfers.
+        Requires Soaper role or higher.
+        """
+        if not RESTRICTED_ROLE_ID:
+            embed = discord.Embed(
+                title="❌ Configuration Error",
+                description="RESTRICTED_ROLE_ID is not configured in constants.py.",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        restricted_role = ctx.guild.get_role(RESTRICTED_ROLE_ID)
+        if restricted_role is None:
+            embed = discord.Embed(
+                title="❌ Configuration Error",
+                description="Restricted role not found. Check RESTRICTED_ROLE_ID in constants.py.",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        # Check if user already has the role
+        if restricted_role in user.roles:
+            embed = discord.Embed(
+                title="⚠️ Already Restricted",
+                description=f"{user.mention} is already restricted from requesting SOAP/NNID transfers.",
+                color=discord.Color.orange(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        # Add the role
+        try:
+            await user.add_roles(restricted_role, reason=reason or f"Restricted by {ctx.author}")
+        except discord.Forbidden:
+            embed = discord.Embed(
+                title="❌ Permission Error",
+                description="I don't have permission to add roles. Check my permissions.",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+        except discord.HTTPException as e:
+            embed = discord.Embed(
+                title="❌ Error",
+                description=f"Failed to restrict user: {e}",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        # Log the action
+        await self._log_mod_action(
+            guild=ctx.guild,
+            user=user,
+            action="restrict",
+            moderator=ctx.author,
+            reason=reason,
+            source=None,
+        )
+
+        embed = discord.Embed(
+            title="✅ User Restricted",
+            description=f"{user.mention} has been restricted from requesting SOAP/NNID transfers.",
+            color=discord.Color.red(),
+        )
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.add_field(
+            name="Moderator",
+            value=ctx.author.mention,
+            inline=True,
+        )
+        if reason:
+            embed.add_field(
+                name="Reason",
+                value=reason,
+                inline=False,
+            )
+        embed.set_footer(text=f"User ID: {user.id}")
+
+        await ctx.respond(embed=embed, ephemeral=True)
+
+    @command_with_perms(
+        min_role="Soaper",
+        name="unrestrict",
+        aliases=["unblacklist"],
+        help="Remove restriction from a user by removing the restricted role.",
+    )
+    async def unrestrict_user(self, ctx, user: discord.Member, *, reason: str = None):
+        """
+        Remove restriction from a user.
+        Requires Soaper role or higher.
+        """
+        if not RESTRICTED_ROLE_ID:
+            embed = discord.Embed(
+                title="❌ Configuration Error",
+                description="RESTRICTED_ROLE_ID is not configured in constants.py.",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        restricted_role = ctx.guild.get_role(RESTRICTED_ROLE_ID)
+        if restricted_role is None:
+            embed = discord.Embed(
+                title="❌ Configuration Error",
+                description="Restricted role not found. Check RESTRICTED_ROLE_ID in constants.py.",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        # Check if user has the role
+        if restricted_role not in user.roles:
+            embed = discord.Embed(
+                title="⚠️ Not Restricted",
+                description=f"{user.mention} is not currently restricted.",
+                color=discord.Color.orange(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        # Remove the role
+        try:
+            await user.remove_roles(restricted_role, reason=reason or f"Unrestricted by {ctx.author}")
+        except discord.Forbidden:
+            embed = discord.Embed(
+                title="❌ Permission Error",
+                description="I don't have permission to remove roles. Check my permissions.",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+        except discord.HTTPException as e:
+            embed = discord.Embed(
+                title="❌ Error",
+                description=f"Failed to unrestrict user: {e}",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        # Log the action
+        await self._log_mod_action(
+            guild=ctx.guild,
+            user=user,
+            action="unrestrict",
+            moderator=ctx.author,
+            reason=reason,
+            source=None,
+        )
+
+        embed = discord.Embed(
+            title="✅ Restriction Removed",
+            description=f"Restriction has been removed from {user.mention}.\n\nThey can now request SOAP/NNID transfers again.",
+            color=discord.Color.green(),
+        )
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.add_field(
+            name="Moderator",
+            value=ctx.author.mention,
+            inline=True,
+        )
+        if reason:
+            embed.add_field(
+                name="Reason",
+                value=reason,
+                inline=False,
+            )
+        embed.set_footer(text=f"User ID: {user.id}")
+
+        await ctx.respond(embed=embed, ephemeral=True)
 
     async def _maybe_log_kick(self, member: discord.Member):
         """Check recent audit logs to see if the member was kicked and log it."""

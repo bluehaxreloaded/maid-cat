@@ -7,7 +7,8 @@ NNID_CHANNEL_SUFFIX = "-needs-nnid" # what each nnid channel ends with
 BOOM_EMOTE_ID = "boomparrot" # emoji shown on boom (deletesoap)
 BLOBSOAP_EMOTE_ID = # SOAP loading emote ID
 SOAP_LOADING_ID =  # SOAP loading sticker ID
-LOADING_EMOTE_ID = # Loading animated emote
+LOADING_EMOTE_ID = # Loading animated emote (used for loading gif)
+AWAITING_EMOTE_ID = # Awaiting animated emote (used for user inputs)
 
 # channel and user IDs
 SOAP_CHANNEL_CATEGORY_ID =  # category to put all the SOAP channels into
@@ -17,7 +18,6 @@ REQUEST_SOAP_CHANNEL_ID =  # channel where the SOAP request embed is posted on s
 REQUEST_NNID_CHANNEL_ID = # channel where the NNID request embed is posted on startup
 BOTS_ONLY_CHANNEL_ID = # bot where maid-cat and soap-cat can communicate with each other
 SOAP_LOG_ID =  # channel that logging of SOAP creation/deletion and errors are placed
-SOAPER_ROLE_ID = # role ID for Soapers who assist with SOAP requests
 MOD_LOG_ID =  # channel that logging of non-SOAP related actions are placed (excluding join/leaves)
 JOIN_LEAVE_LOG_ID =  # channel where join/leaves are logged
 BAN_LOG_ID = # channel where bans are logged
@@ -27,6 +27,10 @@ ERROR_LOG_ID =  # channel that any error not dealt with gets logged to
 SOAP_TRACKER_ID =  # voice channel that displays SOAP count
 NNID_TRACKER_ID =  # voice channel that displays NNID count
 SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, ] # where soap channel specific commands can be used
+
+# role IDs
+SOAPER_ROLE_ID = # role ID for Soapers who assist with SOAP requests
+RESTRICTED_ROLE_ID = # role ID for users who are restricted from requesting a SOAP/NNID transfer
 
 # SOAP completion auto-close behavior
 SOAP_COMPLETION_AUTO_CLOSE_MINUTES = 20  # minutes after completion prompt before channel auto-closes

@@ -2,7 +2,7 @@ from pathlib import Path
 import discord
 from discord.ext import commands
 from perms import command_with_perms
-from constants import REQUEST_SOAP_CHANNEL_ID
+from constants import REQUEST_SOAP_CHANNEL_ID, RESTRICTED_ROLE_ID
 
 
 class CFWCheckView(discord.ui.View):
@@ -236,6 +236,18 @@ class SOAPRequestView(discord.ui.View):
                 f"Please go to: {existing_channel.mention}",
                 color=discord.Color.orange(),
             )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        # check if user has the restricted role (set role in constants.py)
+        restricted_role = discord.utils.get(interaction.guild.roles, id=RESTRICTED_ROLE_ID)
+        if restricted_role not in interaction.user.roles:
+            embed = discord.Embed(
+                title="⛔ Restricted from Bluehax Services",
+                description="You are unable to request a new SOAP transfer. This restriction may be temporary or permanent, depending on the reason.\n\nYou may still receive help with previously completed SOAP transfers in #soap-help.",
+                color=discord.Color.red(),
+            )
+            embed.set_footer(text="If you believe this is a mistake, please contact a Soaper or Staff Member.")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
