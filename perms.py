@@ -14,34 +14,43 @@ def command_with_perms(
             if user is None:
                 raise commands.CheckFailure("Unable to determine user from context")
             
-            # Guild owner always has permission
-            if user == ctx.guild.owner:
-                return True
-            
-            role = (
-                discord.utils.get(ctx.guild.roles, name=min_role)
-                if min_role != "Default"
-                else ctx.guild.default_role
-            )
-            
-            if role is None:
-                raise commands.MissingRole(min_role)
-            
-            # Check if user has the role or a higher role
-            # For bridge commands, user might be a User object, need to get Member
+            # Get member object - might be User or Member
             if isinstance(user, discord.Member):
                 member = user
             else:
-                # Try to get member from guild
+                # Try to get member from cache first
                 member = ctx.guild.get_member(user.id)
                 if member is None:
-                    # If we can't get member, deny access
-                    raise commands.MissingRole(min_role)
+                    # If not in cache, fetch it
+                    try:
+                        member = await ctx.guild.fetch_member(user.id)
+                    except discord.NotFound:
+                        # User not in guild, deny access
+                        raise commands.MissingRole(min_role)
+                    except Exception:
+                        # Other error, deny access to be safe
+                        raise commands.MissingRole(min_role)
             
-            has_role = role in member.roles
+            # Guild owner always has permission
+            if member == ctx.guild.owner:
+                return True
+            
+            if min_role == "Default":
+                # Default role means everyone can use it
+                return True
+            
+            role = discord.utils.get(ctx.guild.roles, name=min_role)
+            
+            if role is None:
+                # Role doesn't exist, deny access
+                raise commands.MissingRole(min_role)
+            
+            # Check if user has the role or any role with higher position
+            has_exact_role = role in member.roles
             has_higher_role = member.top_role.position > role.position
             
-            if not (has_role or has_higher_role):
+            if not (has_exact_role or has_higher_role):
+                # User doesn't have the role and doesn't have a higher role
                 raise commands.MissingRole(min_role)
 
             return True
@@ -56,6 +65,8 @@ def command_with_perms(
             x = bridge.bridge_command(extras={"min_role": min_role}, **cmd_kwargs)(func)
         else:
             x = commands.command(extras={"min_role": min_role}, **kwargs)(func)
+        
+        # Apply the check after creating the command
         x = commands.check(perm_check)(x)
 
         return x
