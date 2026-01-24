@@ -16,18 +16,19 @@ def command_with_perms(
             # 1. Direct Interaction
             if isinstance(ctx, discord.Interaction):
                 user = ctx.user
-            # 2. Message-based context (prefix commands)
-            elif hasattr(ctx, 'message') and ctx.message is not None and hasattr(ctx.message, 'author'):
-                user = ctx.message.author
-            # 3. Context with author attribute (prefix commands)
+            # 2. Check if it's a bridge context - try author first (prefix), then user (slash)
             elif hasattr(ctx, 'author') and ctx.author is not None:
                 user = ctx.author
+            # 3. Message-based context (prefix commands) - check message.author
+            elif hasattr(ctx, 'message') and ctx.message is not None:
+                if hasattr(ctx.message, 'author') and ctx.message.author is not None:
+                    user = ctx.message.author
             # 4. Context with user attribute (slash/bridge commands)
             elif hasattr(ctx, 'user') and ctx.user is not None:
                 user = ctx.user
             # 5. Bridge context with interaction attribute
             elif hasattr(ctx, 'interaction') and ctx.interaction is not None:
-                if hasattr(ctx.interaction, 'user'):
+                if hasattr(ctx.interaction, 'user') and ctx.interaction.user is not None:
                     user = ctx.interaction.user
             
             if user is None:
