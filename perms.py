@@ -49,14 +49,16 @@ def command_with_perms(
         if cmd_kwargs.get("help") and "description" not in cmd_kwargs:
             cmd_kwargs["description"] = cmd_kwargs["help"]
 
+        # Apply the check to the function BEFORE creating the command
+        # This ensures it applies to both prefix and slash variants of bridge commands
+        checked_func = commands.check(check_perms)(func)
+
         # Create the command
         if slash:
-            cmd = bridge.bridge_command(extras={"min_role": min_role}, **cmd_kwargs)(func)
+            cmd = bridge.bridge_command(extras={"min_role": min_role}, **cmd_kwargs)(checked_func)
         else:
-            cmd = commands.command(extras={"min_role": min_role}, **cmd_kwargs)(func)
+            cmd = commands.command(extras={"min_role": min_role}, **cmd_kwargs)(checked_func)
 
-        # Add the permission check
-        cmd.add_check(check_perms)
         return cmd
 
     return decorator
