@@ -8,8 +8,14 @@ def command_with_perms(
 ):  # permission managment using roles
     def decorator(func):
         async def perm_check(ctx):
+            # Bridge commands use ctx.user for slash, ctx.author for prefix
+            # Try both to support both command types
+            user = getattr(ctx, 'user', None) or getattr(ctx, 'author', None)
+            if user is None:
+                raise commands.CheckFailure("Unable to determine user from context")
+            
             # Guild owner always has permission
-            if ctx.author == ctx.guild.owner:
+            if user == ctx.guild.owner:
                 return True
             
             role = (
@@ -22,8 +28,18 @@ def command_with_perms(
                 raise commands.MissingRole(min_role)
             
             # Check if user has the role or a higher role
-            has_role = role in ctx.author.roles
-            has_higher_role = ctx.author.top_role.position > role.position
+            # For bridge commands, user might be a User object, need to get Member
+            if isinstance(user, discord.Member):
+                member = user
+            else:
+                # Try to get member from guild
+                member = ctx.guild.get_member(user.id)
+                if member is None:
+                    # If we can't get member, deny access
+                    raise commands.MissingRole(min_role)
+            
+            has_role = role in member.roles
+            has_higher_role = member.top_role.position > role.position
             
             if not (has_role or has_higher_role):
                 raise commands.MissingRole(min_role)
