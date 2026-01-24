@@ -8,12 +8,24 @@ def command_with_perms(
 ):  # permission managment using roles
     def decorator(func):
         async def perm_check(ctx):
+            # Guild owner always has permission
+            if ctx.author == ctx.guild.owner:
+                return True
+            
             role = (
                 discord.utils.get(ctx.guild.roles, name=min_role)
                 if min_role != "Default"
                 else ctx.guild.default_role
             )
-            if role is None or ctx.author.top_role.position < role.position:  # how??
+            
+            if role is None:
+                raise commands.MissingRole(min_role)
+            
+            # Check if user has the role or a higher role
+            has_role = role in ctx.author.roles
+            has_higher_role = ctx.author.top_role.position > role.position
+            
+            if not (has_role or has_higher_role):
                 raise commands.MissingRole(min_role)
 
             return True
