@@ -241,7 +241,7 @@ class SOAPRequestView(discord.ui.View):
 
         # check if user has the restricted role (set role in constants.py)
         restricted_role = discord.utils.get(interaction.guild.roles, id=RESTRICTED_ROLE_ID)
-        if restricted_role not in interaction.user.roles:
+        if restricted_role in interaction.user.roles:
             embed = discord.Embed(
                 title="⛔ Restricted from Bluehax Services",
                 description="You are unable to request a new SOAP transfer. This restriction may be temporary or permanent, depending on the reason.\n\nYou may still receive help with previously completed SOAP transfers in #soap-help.",
