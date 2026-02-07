@@ -159,7 +159,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
                 "Follow these instructions to find your console's serial number.\n\n"
                 "**To find your console's serial number:**\n"
                 "- Hold START while powering on your console. This will boot you into GodMode9.\n"
-                "- Go to `SYSNAND TWLNAND` -> `sys` -> `log` -> `inspect.log`\n"
+                "- Go to `[2:] SYSNAND TWLN` -> `sys` -> `log` -> `inspect.log`\n"
                 "- Select `Open in Textviewer`.\n\n"
                 "The correct serial number (three-letter prefix followed by nine numbers) should be in the file. "
             ),
