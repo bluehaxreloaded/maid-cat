@@ -757,10 +757,29 @@ class ModerationCog(commands.Cog):
             await message.delete()
         except Exception:
             pass
-        
+
+        channel_id = message.channel.id
         guild = message.guild
         user = message.author
-        
+
+        # Schedule a retry purge 30s later in case the delete failed (e.g. rate limit)
+        async def retry_honeypot_purge():
+            await asyncio.sleep(30)
+            ch = guild.get_channel(channel_id)
+            if ch is None or not isinstance(ch, discord.TextChannel):
+                return
+            try:
+                def keep_info_embed(m: discord.Message) -> bool:
+                    if m.author != self.bot.user or not m.embeds:
+                        return False
+                    return m.embeds[0].title == "🍯 Honeypot"
+                await ch.purge(limit=50, check=lambda m: not keep_info_embed(m))
+            except Exception:
+                pass
+            await self._ensure_spam_bot_info_message(guild)
+
+        asyncio.create_task(retry_honeypot_purge())
+
         # Ban the user (clearing messages from the last hour)
         reason = "Spam bot auto-ban/unban"
         try:
@@ -777,7 +796,7 @@ class ModerationCog(commands.Cog):
             # Log other errors
             print(f"Failed to ban {user} - error: {e}")
             return
-        
+
         # Log the honeypot ban as a moderated ban
         await self._log_mod_action(
             guild=guild,
@@ -787,10 +806,10 @@ class ModerationCog(commands.Cog):
             reason=reason,
             source="Honeypot",
         )
-        
+
         # Small delay to ensure ban is processed
         await asyncio.sleep(0.5)
-        
+
         # Unban the user immediately
         try:
             await guild.unban(user, reason="Spam bot auto-unban")

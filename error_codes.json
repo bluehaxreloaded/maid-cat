@@ -57,6 +57,18 @@
         "If the issue persists, the server is most likely offline. Please wait for tomorrow and try again."
       ],
       "service": "eShop"
+    },
+    "removing_nnid": {
+      "codes": ["022-2634"],
+      "title": "Removing Nintendo Network ID",
+      "description": "You need to remove the old out-of-region Nintendo Network ID from your system.",
+      "steps": [
+        "[Make a new NAND backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) and save it somewhere safe.",
+        "Use GodMode9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>) without having to format your console.",
+        "Create a new Nintendo Network ID on your console in System Settings if needed.",
+        "Try opening the eShop or the app again."
+      ],
+      "service": "eShop"
     }
   },
   "009-1003": {
@@ -116,6 +128,14 @@
       "Confirm that any other important data on the target console is safely backed up.",
       "After verifying your backups, perform a **System Format** on the *target console* from System Settings.",
       "Once the format is complete, try the system transfer again."
+    ],
+    "service": "eShop"
+  },
+  "011-6433": {
+    "title": "eShopDelete Required (NNIDer)",
+    "description": "The NNIDer needs to run eShopDelete to resolve this. Please ask an NNIDer for help.",
+    "steps": [
+      "**NNIDer:** Run eShopDelete in cleaninty."
     ],
     "service": "eShop"
   }

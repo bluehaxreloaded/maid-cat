@@ -20,18 +20,24 @@ def _has_role_or_higher(member: discord.Member, role: discord.Role) -> bool:
 
 
 def command_with_perms(
-    *, min_role: str = "Default", slash: bool = True, **kwargs
+    *, min_role: str = "Default", allowed_roles: list[str] | None = None, slash: bool = True, **kwargs
 ):
-    """Decorator for bridge/prefix commands with role-based permission checking."""
+    """Decorator for bridge/prefix commands with role-based permission checking.
+    Use min_role for a single role (or hierarchy). Use allowed_roles for "any of these roles"."""
+    if allowed_roles is not None and min_role != "Default":
+        raise ValueError("Use either min_role or allowed_roles, not both")
 
     def check_perms(ctx) -> bool:
         member = _get_member(ctx)
         if member is None:
             raise commands.CheckFailure("Could not determine member from context")
 
-        # Guild owner bypasses all checks
-        if ctx.guild and member.id == ctx.guild.owner_id:
-            return True
+        if allowed_roles is not None:
+            for role_name in allowed_roles:
+                role = discord.utils.get(ctx.guild.roles, name=role_name)
+                if role and role in member.roles:
+                    return True
+            raise commands.MissingRole(" or ".join(allowed_roles))
 
         # Default = no restriction
         if min_role == "Default":
@@ -49,15 +55,17 @@ def command_with_perms(
         if cmd_kwargs.get("help") and "description" not in cmd_kwargs:
             cmd_kwargs["description"] = cmd_kwargs["help"]
 
+        extras_role = " or ".join(allowed_roles) if allowed_roles else min_role
+
         # Apply the check to the function BEFORE creating the command
         # This ensures it applies to both prefix and slash variants of bridge commands
         checked_func = commands.check(check_perms)(func)
 
         # Create the command
         if slash:
-            cmd = bridge.bridge_command(extras={"min_role": min_role}, **cmd_kwargs)(checked_func)
+            cmd = bridge.bridge_command(extras={"min_role": extras_role}, **cmd_kwargs)(checked_func)
         else:
-            cmd = commands.command(extras={"min_role": min_role}, **cmd_kwargs)(checked_func)
+            cmd = commands.command(extras={"min_role": extras_role}, **cmd_kwargs)(checked_func)
 
         return cmd
 

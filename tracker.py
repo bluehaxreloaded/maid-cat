@@ -134,7 +134,7 @@ class TrackerCog(commands.Cog):
                     self.increment_nnid_count()
 
     @command_with_perms(
-        min_role="Soaper",
+        allowed_roles=["Developer", "Staff"],
         name="sync",
         aliases=["synctrackers", "forcetrackerupdate"],
         help="Force synchronize tracker voice channels with JSON counts",
