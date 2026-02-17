@@ -397,6 +397,30 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             color=discord.Color.yellow(),
         )
         await ctx.respond(embed=embed)
+    
+    @command_with_perms(
+        min_role="Soaper",
+        name="updateessential",
+        help="How to update embedded essential.exefs backup"
+    )
+    async def updateessential(self, ctx):
+        embed = discord.Embed(
+            title="💾 Update essential.exefs",
+            description=(
+                "1. Delete (or backup to your PC and then delete) all copies of `essential.exefs` from the `/gm9/out` folder on your SD card\n"
+                "2. Insert the SD card back into the console.\n"
+                "3. Hold START while powering on your console. This will boot you into GodMode9.\n"
+                "4. Navigate to `[S:] SYSNAND VIRTUAL`, press A on `nand.bin` and select `NAND image options...` -> `Update embedded backup`\n"
+                "5. Then go back to `[S:] SYSNAND VIRTUAL`, press A on `essential.exefs` and select `Copy to 0:/gm9/out`\n"
+                "6. Power off your console\n"
+                "7. Insert your SD card into your PC or connect to your console via FTPD\n"
+                "8. Navigate to /gm9/out/, where essential.exefs should be located\n"
+                "9. Upload the essential.exefs file and provide your serial number below\n"
+                "10. Please wait for a Soaper to assist you"
+            ),
+            color=discord.Color.blue(),
+        )
+        await ctx.respond(embed=embed)
 
 
 def setup(bot):
