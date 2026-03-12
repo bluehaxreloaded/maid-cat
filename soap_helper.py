@@ -765,10 +765,13 @@ class SoapHelperDropdown(discord.ui.Select):
         
         elif value == "another_soap":
             embed = discord.Embed(
-                title="🧼 Can I request a SOAP for a another 3DS?",
-                description=("Yes, you may request multiple SOAPs for personal use. We do not encourage you to request SOAPs for others, please ask your friends to request their own SOAPs.\n",
-                "You may **not** request SOAPs for consoles you intend on selling. Please direct your customers to request their own SOAPs. You will be blacklisted from requesting new SOAPs if it is discovered you are in violation of this.\n\n",
-                "To request another SOAP, please finish the current SOAP request and create another request using <#1427093890787315913>."
+                title="🧼 Can I request a SOAP for another 3DS?",
+                description=(
+                    "Yes, you may request multiple SOAPs for personal use. We do not encourage you to request SOAPs for others; "
+                    "please ask your friends to request their own SOAPs.\n\n"
+                    "You may **not** request SOAPs for consoles you intend on selling. Please direct your customers to request their own SOAPs. "
+                    "You will be blacklisted from requesting new SOAPs if it is discovered you are in violation of this.\n\n"
+                    "To request another SOAP, please finish the current SOAP request and create another request using <#1427093890787315913>."
                 ),
                 color=discord.Color.blue(),
             )
