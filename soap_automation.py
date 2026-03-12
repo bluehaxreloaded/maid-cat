@@ -8,7 +8,6 @@ from constants import (
     SOAP_CHANNEL_CATEGORY_ID,
     MANUAL_SOAP_CATEGORY_ID,
     LOADING_EMOTE_ID,
-    SOAPER_ROLE_ID,
     SOAP_COMPLETION_AUTO_CLOSE_MINUTES,
     is_late_night_hours,
 )
@@ -429,29 +428,29 @@ class SOAPAutomationCog(commands.Cog):
             print(f"No match found for {content}")
             return
 
-        user_id = int(match.group(1))
+        channel_id = int(match.group(1))
         status_text = match.group(2).upper()
         status_detail = match.group(3).upper() if match.group(3) else None
 
         serial_number = status_detail if status_text in ["SUCCESS", "LOTTERY"] else None
 
+        # Get the SOAP channel by ID
+        target_channel = message.guild.get_channel(channel_id)
+
         try:
-            await message.channel.send(f"RESPONSE_ACK {user_id} {status_text}")
+            # Just in case channel is missing, send warning
+            if target_channel is None:
+                await message.channel.send(
+                    f"RESPONSE_ACK {channel_id} {status_text} [WARN: CHANNEL NOT FOUND]"
+                )
+            else:
+                await message.channel.send(f"RESPONSE_ACK {channel_id} {status_text}")
         except Exception:
             pass
 
-        target_channel = None
-        mention_plain = f"<@{user_id}>"
-        mention_nick = f"<@!{user_id}>"
-        for ch in message.guild.text_channels:
-            if ch.category and ch.category.id in [
-                SOAP_CHANNEL_CATEGORY_ID,
-                MANUAL_SOAP_CATEGORY_ID,
-            ]:
-                topic = getattr(ch, "topic", None)
-                if topic and (mention_plain in topic or mention_nick in topic):
-                    target_channel = ch
-                    break
+        # If we don't have a channel, we can't route anything further.
+        if target_channel is None:
+            return
 
         # Progress status mapping
         progress_percentages = {
@@ -507,6 +506,17 @@ class SOAPAutomationCog(commands.Cog):
                 tracker_cog.increment_soap_count()
 
             # Send SUCCESS message immediately
+            # Try to recover the user ID from the channel topic so we can mention them.
+            user_id = None
+            topic = getattr(target_channel, "topic", None)
+            if topic:
+                m = re.search(r"<@!?(\d+)>", topic)
+                if m:
+                    try:
+                        user_id = int(m.group(1))
+                    except ValueError:
+                        user_id = None
+
             boot_instruction = (
                 f"Boot the console with the serial {serial_number} normally (with the SD inserted into the console)"
                 if serial_number != "SKIP"
@@ -528,14 +538,27 @@ class SOAPAutomationCog(commands.Cog):
                 text="⚠️ If you want to system transfer to/from another 3DS, you must wait 7 days.\nOtherwise, you're free to use your console as normal."
             )
             view = EshopVerificationView()
-            user_mention = f"<@{user_id}>"
-            await target_channel.send(content=user_mention, embed=embed, view=view)
+            user_mention = f"<@{user_id}>" if user_id else None
+            await target_channel.send(
+                content=user_mention, embed=embed, view=view
+            )
 
             # Delete progress message asynchronously after sending success message
             await self._delete_progress_message(target_channel)
 
         if status_text == "LOTTERY" and target_channel:
             # Send LOTTERY message immediately
+            # Try to recover the user ID from the channel topic so we can mention them.
+            user_id = None
+            topic = getattr(target_channel, "topic", None)
+            if topic:
+                m = re.search(r"<@!?(\d+)>", topic)
+                if m:
+                    try:
+                        user_id = int(m.group(1))
+                    except ValueError:
+                        user_id = None
+
             boot_instruction = (
                 f"Boot the console with the serial {serial_number} normally (with the SD inserted into the console)"
                 if serial_number != "SKIP"
@@ -556,8 +579,10 @@ class SOAPAutomationCog(commands.Cog):
                 text="No system transfer was needed - you can transfer to/from another 3DS right away if you want!"
             )
             view = EshopVerificationView()
-            user_mention = f"<@{user_id}>"
-            await target_channel.send(content=user_mention, embed=embed, view=view)
+            user_mention = f"<@{user_id}>" if user_id else None
+            await target_channel.send(
+                content=user_mention, embed=embed, view=view
+            )
 
             # Update progress to 100% and delete asynchronously after sending lottery message
             async def update_and_delete_progress():
@@ -586,6 +611,17 @@ class SOAPAutomationCog(commands.Cog):
             is_serial_error = status_detail and "SERIAL_MISMATCH" in status_detail.upper()
 
             if is_serial_error:
+                # Try to recover the user ID from the channel topic so we can mention them.
+                user_id = None
+                topic = getattr(target_channel, "topic", None)
+                if topic:
+                    m = re.search(r"<@!?(\d+)>", topic)
+                    if m:
+                        try:
+                            user_id = int(m.group(1))
+                        except ValueError:
+                            user_id = None
+
                 # Send findserial instructions
                 embed = discord.Embed(
                     title="⚠️ Serial Number Mismatch",
@@ -600,7 +636,7 @@ class SOAPAutomationCog(commands.Cog):
                     ),
                     color=discord.Color.yellow(),
                 )
-                user_mention = f"<@{user_id}>"
+                user_mention = f"<@{user_id}>" if user_id else None
                 embed.set_footer(text="Once you've found the serial number and send it here, we will resume your SOAP Transfer.")
                 await target_channel.send(content=user_mention, embed=embed)
 
