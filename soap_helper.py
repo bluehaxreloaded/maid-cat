@@ -617,6 +617,12 @@ class SoapHelperDropdown(discord.ui.Select):
                 value="additional_steps",
             ),
             discord.SelectOption(
+                label="Can I request another SOAP?",
+                description="How to get another SOAP transfer",
+                emoji="🧼",
+                value="another_soap",
+            ),
+            discord.SelectOption(
                 label="My option is not listed here.",
                 description="Request additional assistance from a Soaper",
                 emoji="🆘",
@@ -756,7 +762,17 @@ class SoapHelperDropdown(discord.ui.Select):
                 ),
                 color=discord.Color.blue(),
             )
-            
+        
+        elif value == "another_soap":
+            embed = discord.Embed(
+                title="🧼 Can I request a SOAP for a another 3DS?",
+                description=("Yes, you may request multiple SOAPs for personal use. We do not encourage you to request SOAPs for others, please ask your friends to request their own SOAPs.\n",
+                "You may **not** request SOAPs for consoles you intend on selling. Please direct your customers to request their own SOAPs. You will be blacklisted from requesting new SOAPs if it is discovered you are in violation of this.\n\n",
+                "To request another SOAP, please finish the current SOAP request and create another request using <#1427093890787315913>."
+                ),
+                color=discord.Color.blue(),
+            )
+
         elif value == "need_help":
             soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
             embed = discord.Embed(
