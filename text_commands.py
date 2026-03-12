@@ -178,7 +178,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     @command_with_perms(
         min_role="Soaper",
         name="soapwait",
-        aliases=["wait"],
+        aliases=["wait", 'aait'],
         help="Claiming a soap channel, for soapers",
     )
     @soap_channels_only()

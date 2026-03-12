@@ -118,7 +118,7 @@ class SoapCog(commands.Cog):  # SOAP commands
 
     # Leaving this for Manual SOAPs.
     @command_with_perms(
-        min_role="Soaper",
+        allowed_roles=["Developer", "Staff"],
         name="createsoap",
         aliases=["soup", "setupsoap", "soap", "siap", "setupsoup", "createsoup"],
         help="Sets up SOAP channel",

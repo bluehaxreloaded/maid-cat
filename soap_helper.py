@@ -710,7 +710,7 @@ class SoapHelperDropdown(discord.ui.Select):
             
         elif value == "region_settings":  # "What is a SOAP lottery?"
             embed = discord.Embed(
-                title="🎉 What is a SOAP Lottery?",
+                title="❓ What is a SOAP Lottery?",
                 description=(
                     "A **SOAP lottery** occurs when your SOAP transfer doesn't require a system transfer to complete.\n\n"
                     "**Normal SOAP:**\n"

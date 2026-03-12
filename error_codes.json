@@ -11,10 +11,12 @@
       "service": "Pokémon Bank"
     },
     "internet_after_soap": {
-      "codes": ["022-5515", "005-4305", "005-4040", "007-2920", "007-2100", "014-0062"],
+      "codes": ["022-5515", "005-4305", "005-4040", "007-2920", "007-2100", "014-0062", "007-2720"],
       "title": "Internet / Network Error After SOAP",
       "description": "This error occurs after a SOAP transfer when your Nintendo 3DS has trouble connecting to Nintendo Network or downloading from the eShop.",
       "steps": [
+        "If you are using Pretendo, switch to Nintendo Network with Nimbus.",
+        "Ensure you are not using any eShop alternatives such as Brewtendo.",
         "Power cycle your router and modem, then try again.",
         "Check your internet connection for congestion or bandwidth issues. If other devices are using a lot of bandwidth, your connection may time out.",
         "Check for wireless interference and try moving closer to your router.",
@@ -136,6 +138,37 @@
     "description": "The NNIDer needs to run eShopDelete to resolve this. Please ask an NNIDer for help.",
     "steps": [
       "**NNIDer:** Run eShopDelete in cleaninty."
+    ],
+    "service": "eShop"
+  },
+  "022-2511": {
+    "title": "System Update Required",
+    "description": "This error indicates that your Nintendo 3DS needs to be updated before you can continue.",
+    "steps": [
+      "On your 3DS, open **System Settings**.",
+      "Go to **Other Settings** → go right until you see **System Update**.",
+      "Select **System Update** and follow the on-screen instructions to update your console.",
+      "After the update completes, try what you were doing again (e.g. opening the eShop or Pokémon Bank)."
+    ],
+    "service": "eShop"
+  },
+  "026-3131": {
+    "title": "eShop Not Available in Your Region",
+    "description": "This error occurs when trying to access the Nintendo eShop from a country or region where it is no longer available. In the Americas, the Nintendo 3DS eShop is currently only available in the United States, Canada, Brazil, and Mexico. See Nintendo's documentation for details: https://en-americas-support.nintendo.com/app/answers/detail/a_id/50031/~/error-code%3A-026-3131",
+    "steps": [
+      "Confirm which country your Nintendo 3DS system is set to in **System Settings → Other Settings → Profile → Region Settings**.",
+      "If you're in one of the supported countries and still get this error, double-check your region settings and try again. If the issue persists, please ask a Soaper for help.",
+      "If you are in an unsupported region, you must change your region to one of the supported countries and request another SOAP transfer."
+    ],
+    "service": "eShop"
+  },
+  "022-2501": {
+    "title": "NNID Already Linked to Another System",
+    "description": "This error means the Nintendo Network ID (NNID) you're trying to use is already linked to a different Nintendo 3DS system.",
+    "steps": [
+      "If you still have access to the console that your NNID is linked to, perform a normal **System Transfer** from that old console to your current one. If you just received a SOAP transfer, you may need to wait seven days before doing so.",
+      "If you no longer have access to the old console *but* you still have files from it (for example, an old NAND backup or `essential.exefs`), request an **NNID transfer** in <#1435117438264938587> and provide those files.",
+      "If you do not have the old console or any of its files, you will need to create a new Nintendo Network ID (NNID) on your console in System Settings."
     ],
     "service": "eShop"
   }
