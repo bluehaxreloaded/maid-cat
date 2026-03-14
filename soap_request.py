@@ -75,6 +75,76 @@ class CFWCheckView(discord.ui.View):
             await interaction.response.edit_message(embed=embed, view=view)
 
 
+class SOAPConfirmView(discord.ui.View):
+    """Confirmation step before creating the SOAP channel."""
+
+    def __init__(self, user: discord.Member):
+        super().__init__(timeout=180)
+        self.user = user
+
+    @discord.ui.button(
+        label="Ready to continue",
+        style=discord.ButtonStyle.green,
+        emoji="🚀",
+        custom_id="soap_confirm_button",
+    )
+    async def confirm_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        await interaction.response.defer(ephemeral=True)
+
+        soap_cog = interaction.client.get_cog("SoapCog")
+        if not soap_cog:
+            embed = discord.Embed(
+                title="❌ Error",
+                description="SOAP module not loaded. Please contact a Staff Member.",
+                color=discord.Color.red(),
+            )
+            await interaction.followup.edit_message(
+                interaction.message.id, embed=embed, view=None
+            )
+            return
+
+        success, channel, message = await soap_cog.create_soap_channel_for_user(
+            interaction.guild, self.user, interaction.user, ctx=interaction
+        )
+
+        if success:
+            embed = discord.Embed(
+                title="✅ Ready to Proceed!",
+                description=f"We'll perform your SOAP in {channel.mention}.\n\n",
+                color=discord.Color.green(),
+            )
+            embed.set_footer(
+                text="Please go there and follow the instructions to get started."
+            )
+            view = discord.ui.View()
+            link_button = discord.ui.Button(
+                label="Go to SOAP Channel",
+                style=discord.ButtonStyle.link,
+                emoji="🧼",
+                url=channel.jump_url,
+            )
+            view.add_item(link_button)
+        elif channel:
+            embed = discord.Embed(
+                title="⚠️ Channel Already Exists",
+                description=f"A SOAP channel already exists for {self.user.mention}\n\n"
+                f"Channel: {channel.mention}",
+                color=discord.Color.orange(),
+            )
+            view = None
+        else:
+            embed = discord.Embed(
+                title="❌ Error", description=message, color=discord.Color.red()
+            )
+            view = None
+
+        await interaction.followup.edit_message(
+            interaction.message.id, embed=embed, view=view
+        )
+
+
 class RegionChangeView(discord.ui.View):
     def __init__(self, user: discord.Member):
         super().__init__(timeout=180)
@@ -132,8 +202,20 @@ class RegionChangeView(discord.ui.View):
             await interaction.response.edit_message(embed=embed, view=None)
 
         else:  # yes
-            # create SOAP channel automatically
-            await self.create_soap_channel(interaction)
+            # show confirmation before creating channel
+            embed = discord.Embed(
+                title="📄 Pre-SOAP Information",
+                description=(
+                    "You will be given a SOAP channel to perform your transfer. Please...\n"
+                    "- **Have your Nintendo 3DS on-hand**, ready to power on.\n"
+                    "- **Be ready to get files off your console** using the SD card or FTPD over Wi‑Fi.\n"
+                    "- **Set aside 5-10 minutes**, ensure you are ready for the directions."
+                ),
+                color=discord.Color.blue(),
+            )
+            embed.set_footer(text="When you’re ready, click the button below to create your SOAP channel.")
+            view = SOAPConfirmView(self.user)
+            await interaction.response.edit_message(embed=embed, view=view)
 
     async def create_soap_channel(self, interaction: discord.Interaction):
         # defer the interaction first to prevent timeout
