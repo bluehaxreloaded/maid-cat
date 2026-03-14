@@ -3,7 +3,18 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from discord.ext import commands
 from perms import command_with_perms
-from constants import JOIN_LEAVE_LOG_ID, SPAM_BOT_CHANNEL_ID, BAN_LOG_ID, MESSAGE_LOG_ID, RESTRICTED_ROLE_ID
+from constants import (
+    JOIN_LEAVE_LOG_ID,
+    SPAM_BOT_CHANNEL_ID,
+    BAN_LOG_ID,
+    MESSAGE_LOG_ID,
+    RESTRICTED_ROLE_ID,
+    SOAP_CHANNEL_SUFFIX,
+    NNID_CHANNEL_SUFFIX,
+    SOAP_CHANNEL_CATEGORY_ID,
+    MANUAL_SOAP_CATEGORY_ID,
+    NNID_CHANNEL_CATEGORY_ID,
+)
 
 
 def _format_account_age(created_at: datetime) -> str:
@@ -67,6 +78,51 @@ def _format_timeout_duration(until: datetime) -> str:
         parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
 
     return ", ".join(parts)
+
+
+class HelpeeLeftView(discord.ui.View):
+    """View with a button to close the channel when the helpee has left."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Close Channel",
+        style=discord.ButtonStyle.danger,
+        emoji="🧹",
+        custom_id="helpee_left_close_channel",
+    )
+    async def close_channel_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        for item in self.children:
+            item.disabled = True
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            pass
+
+        channel = interaction.channel
+        if not channel or not channel.category:
+            return
+
+        is_soap = (
+            (channel.category.id == SOAP_CHANNEL_CATEGORY_ID and channel.name.endswith(SOAP_CHANNEL_SUFFIX))
+            or channel.category.id == MANUAL_SOAP_CATEGORY_ID
+        )
+        is_nnid = (
+            channel.category.id == NNID_CHANNEL_CATEGORY_ID
+            and channel.name.endswith(NNID_CHANNEL_SUFFIX)
+        )
+
+        if is_soap:
+            soap_cog = interaction.client.get_cog("SoapCog")
+            if soap_cog:
+                await soap_cog.deletesoap(channel, interaction)
+        elif is_nnid:
+            nnid_cog = interaction.client.get_cog("NNIDCog")
+            if nnid_cog:
+                await nnid_cog.deletennid(channel, interaction)
 
 
 class ModerationCog(commands.Cog):
@@ -258,10 +314,13 @@ class ModerationCog(commands.Cog):
         await self._send_member_log(member, joined=False)
         # Also check if this was a kick and log it
         await self._maybe_log_kick(member)
+        # If the member had a SOAP/NNID channel, alert in that channel with a close button
+        await self._maybe_alert_helpee_left(member)
 
     @commands.Cog.listener()
     async def on_ready(self):
         """On startup, ensure the spam bot info message exists in each guild."""
+        self.bot.add_view(HelpeeLeftView())
         for guild in self.bot.guilds:
             await self._ensure_spam_bot_info_message(guild)
 
@@ -740,6 +799,42 @@ class ModerationCog(commands.Cog):
                     break
         except Exception:
             pass
+
+    async def _maybe_alert_helpee_left(self, member: discord.Member):
+        """If the member had a SOAP or NNID channel, send an alert with a close button."""
+        guild = member.guild
+        mention_plain = f"<@{member.id}>"
+        mention_nick = f"<@!{member.id}>"
+
+        for ch in guild.text_channels:
+            if not ch.category or not isinstance(ch, discord.TextChannel):
+                continue
+            topic = getattr(ch, "topic", None) or ""
+            if mention_plain not in topic and mention_nick not in topic:
+                continue
+            # Channel belongs to this member - check if it's SOAP or NNID
+            is_soap = (
+                (ch.category.id == SOAP_CHANNEL_CATEGORY_ID and ch.name.endswith(SOAP_CHANNEL_SUFFIX))
+                or ch.category.id == MANUAL_SOAP_CATEGORY_ID
+            )
+            is_nnid = (
+                ch.category.id == NNID_CHANNEL_CATEGORY_ID
+                and ch.name.endswith(NNID_CHANNEL_SUFFIX)
+            )
+            if not (is_soap or is_nnid):
+                continue
+
+            transfer_type = "SOAP" if is_soap else "NNID"
+            embed = discord.Embed(
+                title="⚠️ Helpee Left the Server",
+                description=f"{member} (ID: {member.id}) has left the server.",
+                color=discord.Color.orange(),
+            )
+            embed.set_footer(text="Click the button below to close this channel.")
+            try:
+                await ch.send(embed=embed, view=HelpeeLeftView())
+            except Exception:
+                pass
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
