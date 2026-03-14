@@ -223,9 +223,8 @@ class BrokenReasonView(discord.ui.View):
                 title="🔒 Unable to Request NNID Transfer",
                 description=(
                     "We cannot perform NNID transfers when the source console was **sold** or **given away**.\n\n"
-                    "In these cases, we have no way to verify that the original owner is the one requesting the transfer. "
-                    "Assisting could risk tampering with another person's Nintendo Network ID.\n\n"
-                    "If your console was lost or stolen, you may be able to request a transfer through Nintendo's official support."
+                    "Assisting could risk tampering with the new owner's Nintendo Network ID as we can only transfer all NNIDs linked to a console at once.\n\n"
+                    "We apologize for the inconvenience."
                 ),
                 color=discord.Color.red(),
             )
