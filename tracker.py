@@ -3,6 +3,7 @@ import json
 import asyncio
 from pathlib import Path
 from discord.ext import commands
+from discord.ext.bridge import BridgeOption
 from perms import command_with_perms
 from constants import (
     NNID_CHANNEL_CATEGORY_ID,
@@ -142,14 +143,49 @@ class TrackerCog(commands.Cog):
     async def sync_trackers(self, ctx):
         """Force synchronize voice channels with JSON counts"""
         soap_count, nnid_count = self._read_counts()
-        
+
         await ctx.respond(f"🔄 Synchronizing trackers... (SOAP: {soap_count}, NNID: {nnid_count})")
-        
+
         for guild in self.bot.guilds:
             await self.update_trackers(guild)
-        
+
         await ctx.respond("✅ Trackers synchronized!")
 
+    @command_with_perms(
+        allowed_roles=["Developer", "Staff"],
+        name="setcount",
+        aliases=["settrackers", "setcounters"],
+        help="Manually set SOAP or NNID counter value. Usage: setcount soap 100 or setcount nnid 50",
+    )
+    async def set_count(
+        self,
+        ctx,
+        counter: BridgeOption(str, "Which counter to set: soap or nnid"),
+        value: BridgeOption(int, "The value to set"),
+    ):
+        """Manually set a tracker count. Usage: setcount soap 100 or setcount nnid 50"""
+        counter_lower = counter.strip().lower()
+        if counter_lower not in ("soap", "nnid"):
+            await ctx.respond("Counter must be `soap` or `nnid`.", ephemeral=True)
+            return
+
+        if value < 0:
+            await ctx.respond("Value cannot be negative.", ephemeral=True)
+            return
+
+        soap_count, nnid_count = self._read_counts()
+
+        if counter_lower == "soap":
+            soap_count = value
+        else:
+            nnid_count = value
+
+        self._save_counts_to_file(soap_count, nnid_count)
+
+        for guild in self.bot.guilds:
+            await self.update_trackers(guild)
+
+        await ctx.respond(f"✅ **{counter_lower.upper()}** count set to {value}. (SOAP: {soap_count}, NNID: {nnid_count})")
 
 
 def setup(bot):
