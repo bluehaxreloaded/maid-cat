@@ -98,9 +98,24 @@ class BrokenConsoleCheckView(discord.ui.View):
     ):
         broken_answer = select.values[0]
 
-        if broken_answer in ["broken", "new_to_old"]:
-            # Both "yes" options proceed to CFW check
-            # ask about target console CFW
+        if broken_answer == "broken":
+            # Ask why the console is inaccessible; we cannot help if sold or given away
+            embed = discord.Embed(
+                title="🔍 Pre-NNID Transfer Check",
+                description="Why is your source console inaccessible?",
+                color=discord.Color.orange(),
+            )
+            embed.add_field(
+                name="Question 2b of 3",
+                value="Select the reason that best applies:",
+                inline=False,
+            )
+            embed.set_footer(text="Questions? Drop us a line in #soap-help")
+            view = BrokenReasonView(self.user)
+            await interaction.response.edit_message(embed=embed, view=view)
+
+        elif broken_answer == "new_to_old":
+            # New-to-Old transfer: go straight to CFW check
             embed = discord.Embed(
                 title="🔍 Pre-NNID Transfer Check",
                 description="Great, one more thing to check:",
@@ -144,9 +159,8 @@ class BrokenConsoleCheckView(discord.ui.View):
                 "• Has a broken screen\n"
                 "• Has hardware damage preventing normal use\n"
                 "• Has a brick (software issue preventing boot)\n"
-                "• Lost or stolen\n"
-                "• Sold or given away\n"
-                "• No longer in your possession",
+                "• Lost or stolen\n\n"
+                "**We cannot assist** if the console was sold or given away (risk of tampering with another user's NNID).",
                 inline=False,
             )
             embed.add_field(
@@ -160,6 +174,78 @@ class BrokenConsoleCheckView(discord.ui.View):
                 inline=False,
             )
             await interaction.response.edit_message(embed=embed, view=None)
+
+
+class BrokenReasonView(discord.ui.View):
+    """Asks why the source console is inaccessible; rejects if sold or given away."""
+
+    def __init__(self, user: discord.Member):
+        super().__init__(timeout=180)
+        self.user = user
+
+    @discord.ui.select(
+        placeholder="Why is your source console inaccessible?",
+        options=[
+            discord.SelectOption(
+                label="Broken (won't power on, damaged, bricked, etc.)",
+                value="broken",
+                emoji="🔧",
+            ),
+            discord.SelectOption(
+                label="Lost",
+                value="lost",
+                emoji="🔍",
+            ),
+            discord.SelectOption(
+                label="Stolen",
+                value="stolen",
+                emoji="🚨",
+            ),
+            discord.SelectOption(
+                label="Given away",
+                value="given_away",
+                emoji="🎁",
+            ),
+            discord.SelectOption(
+                label="Sold",
+                value="sold",
+                emoji="💰",
+            ),
+        ],
+    )
+    async def reason_select(
+        self, select: discord.ui.Select, interaction: discord.Interaction
+    ):
+        reason = select.values[0]
+
+        if reason in ["given_away", "sold"]:
+            embed = discord.Embed(
+                title="🔒 Unable to Request NNID Transfer",
+                description=(
+                    "We cannot perform NNID transfers when the source console was **sold** or **given away**.\n\n"
+                    "In these cases, we have no way to verify that the original owner is the one requesting the transfer. "
+                    "Assisting could risk tampering with another person's Nintendo Network ID.\n\n"
+                    "If your console was lost or stolen, you may be able to request a transfer through Nintendo's official support."
+                ),
+                color=discord.Color.red(),
+            )
+            embed.set_footer(text="If you believe this is a mistake, please contact a Soaper or Staff Member.")
+            await interaction.response.edit_message(embed=embed, view=None)
+
+        else:  # broken, lost, stolen
+            embed = discord.Embed(
+                title="🔍 Pre-NNID Transfer Check",
+                description="Great, one more thing to check:",
+                color=discord.Color.orange(),
+            )
+            embed.add_field(
+                name="Question 3 of 3",
+                value="Is your **target console** (the console you want to transfer to) on custom firmware?",
+                inline=False,
+            )
+            embed.set_footer(text="Questions? Drop us a line in #soap-help")
+            view = CFWCheckView(self.user)
+            await interaction.response.edit_message(embed=embed, view=view)
 
 
 class CFWCheckView(discord.ui.View):
