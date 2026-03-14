@@ -131,7 +131,7 @@ class NNIDCog(commands.Cog):  # NNID commands
                 pass
 
     @command_with_perms(
-        min_role="Soaper",
+        min_role="Developer",
         name="creatennid",
         aliases=["nnid", "setupnnid", "createnn"],
         help="Sets up NNID channel",
