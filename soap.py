@@ -22,7 +22,7 @@ from perms import _has_role_or_higher
 
 # Topic format for archived channels: "Archived. Deletion scheduled: YYYY-MM-DD HH:MM:SS UTC. " + original
 ARCHIVE_PREFIX = "Archived. Deletion scheduled: "
-ARCHIVE_CHECK_INTERVAL = 30  # TEMP: 30 sec for testing. Change to 300 for production.
+ARCHIVE_CHECK_INTERVAL = 300  # 5 minutes
 ARCHIVE_EMBED_TITLE = "🗑️Archived Channel"
 ARCHIVE_DELETION_REGEX = re.compile(
     r"Archived\.\s*Deletion scheduled:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*UTC\.\s*"
@@ -353,8 +353,7 @@ class SoapCog(commands.Cog):  # SOAP commands
             await _notify_and_delete(channel, "Could not find user in channel topic. Deleting channel.")
             return
 
-        # TEMP: 30 seconds for testing. Change back to timedelta(days=7) for production.
-        deletion_time = datetime.now(timezone.utc) + timedelta(seconds=30)
+        deletion_time = datetime.now(timezone.utc) + timedelta(days=7)
         deletion_str = deletion_time.strftime("%Y-%m-%d %H:%M:%S")
         new_topic = f"{ARCHIVE_PREFIX}{deletion_str} UTC. {topic}"
 
