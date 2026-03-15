@@ -560,6 +560,102 @@ class SoapCog(commands.Cog):  # SOAP commands
             else:
                 await ctx.send(msg)
 
+    @command_with_perms(
+        min_role="Soaper",
+        name="manualsoap",
+        aliases=["manual"],
+        help="Move SOAP channel to manual SOAP category",
+    )
+    async def manualsoap(
+        self,
+        ctx,
+        user: BridgeOption(
+            discord.Member,
+            "User whose SOAP channel to move",
+            required=False,
+        ) = None,
+        channel: BridgeOption(
+            discord.TextChannel,
+            "SOAP channel to move (defaults to current channel)",
+            required=False,
+        ) = None,
+    ):
+        """Move SOAP channel to manual category."""
+        await self._move_soap_category(ctx, user, channel, MANUAL_SOAP_CATEGORY_ID, "manual")
+
+    @command_with_perms(
+        min_role="Soaper",
+        name="autosoap",
+        aliases=["auto"],
+        help="Move SOAP channel to auto SOAP category",
+    )
+    async def autosoap(
+        self,
+        ctx,
+        user: BridgeOption(
+            discord.Member,
+            "User whose SOAP channel to move",
+            required=False,
+        ) = None,
+        channel: BridgeOption(
+            discord.TextChannel,
+            "SOAP channel to move (defaults to current channel)",
+            required=False,
+        ) = None,
+    ):
+        """Move SOAP channel to auto category."""
+        await self._move_soap_category(ctx, user, channel, SOAP_CHANNEL_CATEGORY_ID, "auto")
+
+    async def _move_soap_category(
+        self,
+        ctx,
+        user: discord.Member | None,
+        channel: discord.TextChannel | None,
+        target_category_id: int,
+        category_name: str,
+    ):
+        """Move a SOAP channel to the given category."""
+        target_channel = channel
+        if target_channel is None and user is not None:
+            channel_name = user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
+            target_channel = discord.utils.get(ctx.guild.channels, name=channel_name)
+        if target_channel is None:
+            target_channel = ctx.channel
+
+        if not target_channel:
+            return await ctx.respond("Channel not found.", ephemeral=True)
+
+        is_archived = (
+            target_channel.category
+            and TEMP_ARCHIVE_CATEGORY_ID
+            and target_channel.category.id == TEMP_ARCHIVE_CATEGORY_ID
+        )
+        if is_archived:
+            return await ctx.respond("Cannot move archived channels.", ephemeral=True)
+
+        is_soap = (
+            target_channel.category
+            and (
+                (target_channel.category.id == SOAP_CHANNEL_CATEGORY_ID and target_channel.name.endswith(SOAP_CHANNEL_SUFFIX))
+                or target_channel.category.id == MANUAL_SOAP_CATEGORY_ID
+            )
+        )
+        if not is_soap:
+            return await ctx.respond(f"{target_channel.mention} is not a SOAP channel!", ephemeral=True)
+
+        category = discord.utils.get(ctx.guild.categories, id=target_category_id)
+        if not category:
+            return await ctx.respond("Category not found.", ephemeral=True)
+
+        if target_channel.category and target_channel.category.id == target_category_id:
+            return await ctx.respond(f"Channel is already in the {category_name} category.", ephemeral=True)
+
+        try:
+            await _edit_channel_with_retry(target_channel, category=category)
+            await ctx.respond(f"Moved {target_channel.mention} to {category_name} category.", ephemeral=True)
+        except Exception as e:
+            await ctx.respond(f"Failed to move channel: {e}", ephemeral=True)
+
     # Leaving this for Manual SOAPs.
     @command_with_perms(
         allowed_roles=["Developer", "Staff"],
