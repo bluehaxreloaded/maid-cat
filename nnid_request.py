@@ -387,8 +387,8 @@ class NNIDRequestView(discord.ui.View):
 
         # only check channels in the NNID category
         for channel in interaction.guild.text_channels:
-            if channel.name == channel_name:
-                if channel.category and channel.category.id == NNID_CHANNEL_CATEGORY_ID:
+            if channel.name == channel_name and channel.category:
+                if channel.category.id == NNID_CHANNEL_CATEGORY_ID:
                     existing_channel = channel
                     break
 

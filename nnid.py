@@ -9,6 +9,7 @@ from constants import (
     NNID_CHANNEL_SUFFIX,
     BOOM_EMOTE_ID,
     NNID_CHANNEL_CATEGORY_ID,
+    TEMP_ARCHIVE_CATEGORY_ID,
     is_late_night_hours,
 )
 
@@ -71,13 +72,10 @@ class NNIDCog(commands.Cog):  # NNID commands
         channel_name = safe_user_name + NNID_CHANNEL_SUFFIX
         existing_channel = None
 
-        # only check channels in the NNID categories
+        # Only check channels in the NNID category (exclude archived)
         for channel in guild.text_channels:
-            if channel.name == channel_name:
-                # check if it's in either NNID category
-                if channel.category and channel.category.id in [
-                    NNID_CHANNEL_CATEGORY_ID,
-                ]:
+            if channel.name == channel_name and channel.category:
+                if channel.category.id == NNID_CHANNEL_CATEGORY_ID:
                     existing_channel = channel
                     break
 
@@ -119,16 +117,21 @@ class NNIDCog(commands.Cog):  # NNID commands
         channel: discord.TextChannel,
         ctx: commands.Context | discord.Interaction = None,
     ):
-        """Helper method to delete a NNID channel with boom effect"""
-        await channel.send("Self-destruct sequence initiated!")
-        await channel.send(f"<a:boomparrot:{BOOM_EMOTE_ID}>")
-        await asyncio.sleep(2.75)
-        await channel.delete()
-        if ctx:
-            try:
-                await log_to_soaper_log(ctx, "Removed NNID Channel")
-            except Exception:
-                pass
+        """Helper method to archive a NNID channel (revoke access, move to temp archive, delete in 7 days)."""
+        soap_cog = self.bot.get_cog("SoapCog")
+        if soap_cog:
+            await soap_cog.archive_channel(channel, ctx, is_soap=False)
+        else:
+            # Fallback: delete immediately if SoapCog not available
+            await channel.send("Self-destruct sequence initiated!")
+            await channel.send(f"<a:boomparrot:{BOOM_EMOTE_ID}>")
+            await asyncio.sleep(2.75)
+            await channel.delete()
+            if ctx:
+                try:
+                    await log_to_soaper_log(ctx, "Removed NNID Channel")
+                except Exception:
+                    pass
 
     @command_with_perms(
         min_role="Developer",
@@ -145,6 +148,9 @@ class NNIDCog(commands.Cog):  # NNID commands
             user.name.lower().replace(".", "-") + NNID_CHANNEL_SUFFIX
         )  # channels can't have periods
         channel = discord.utils.get(ctx.guild.channels, name=channel_name)
+        # Don't count archived channels as existing
+        if channel and TEMP_ARCHIVE_CATEGORY_ID and channel.category and channel.category.id == TEMP_ARCHIVE_CATEGORY_ID:
+            channel = None
 
         if channel:
             await ctx.respond(

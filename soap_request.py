@@ -303,8 +303,8 @@ class SOAPRequestView(discord.ui.View):
         from constants import SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID
 
         for channel in interaction.guild.text_channels:
-            if channel.name == channel_name:
-                if channel.category and channel.category.id in [
+            if channel.name == channel_name and channel.category:
+                if channel.category.id in [
                     SOAP_CHANNEL_CATEGORY_ID,
                     MANUAL_SOAP_CATEGORY_ID,
                 ]:

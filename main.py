@@ -3,6 +3,7 @@ import traceback
 from log import ErrorLogChannelNotFound, error_log
 from discord.ext import commands, bridge
 from constants import KEY, SOAP_LOG_ID
+from soap import ArchiveView
 
 intent = discord.Intents().default()
 intent.message_content = True
@@ -115,6 +116,7 @@ async def on_application_command_error(ctx, error: commands.CommandError):
 @bot.event
 async def on_ready():
     print(f"Logged-in as {bot.user}")
+    bot.add_view(ArchiveView(0, 0, bot))
     log_channel = bot.get_channel(SOAP_LOG_ID)
     if log_channel:
         embed = discord.Embed(
