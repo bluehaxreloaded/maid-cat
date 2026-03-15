@@ -375,11 +375,19 @@ class SoapCog(commands.Cog):  # SOAP commands
             pass  # e.g. no override to remove; continue with move
 
         # Move channel and set topic
+        # Rename to -archive: e.g. aidenkt-needs-cleaning-🧼 -> aidenkt-needs-cleaning-archive
+        if channel.name.endswith(SOAP_CHANNEL_SUFFIX):
+            archive_name = channel.name.replace(SOAP_CHANNEL_SUFFIX, "-needs-cleaning-archive")
+        elif channel.name.endswith(NNID_CHANNEL_SUFFIX):
+            archive_name = channel.name.replace(NNID_CHANNEL_SUFFIX, "-needs-nnid-archive")
+        else:
+            archive_name = channel.name.rstrip("-") + "-archive"
+
         try:
             if len(new_topic) > 1024:
                 new_topic = new_topic[:1021] + "..."
             await _edit_channel_with_retry(
-                channel, category=temp_category, topic=new_topic
+                channel, category=temp_category, topic=new_topic, name=archive_name
             )
         except discord.NotFound:
             return
