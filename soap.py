@@ -370,9 +370,9 @@ class SoapCog(commands.Cog):  # SOAP commands
 
         try:
             target = channel.guild.get_member(user_id) or discord.Object(id=user_id)
-            await channel.set_permissions(target, read_messages=False)
+            await channel.set_permissions(target, overwrite=None)
         except Exception:
-            pass  # e.g. permission already denied; continue with move
+            pass  # e.g. no override to remove; continue with move
 
         # Move channel and set topic
         try:
