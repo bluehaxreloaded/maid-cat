@@ -377,11 +377,11 @@ class SoapCog(commands.Cog):  # SOAP commands
         # Move channel and set topic
         # Rename to -archive: e.g. aidenkt-needs-cleaning-🧼 -> aidenkt-needs-cleaning-archive
         if channel.name.endswith(SOAP_CHANNEL_SUFFIX):
-            archive_name = channel.name.replace(SOAP_CHANNEL_SUFFIX, "-needs-cleaning-archive")
+            archive_name = channel.name.replace(SOAP_CHANNEL_SUFFIX, "-needs-cleaning-aep")
         elif channel.name.endswith(NNID_CHANNEL_SUFFIX):
-            archive_name = channel.name.replace(NNID_CHANNEL_SUFFIX, "-needs-nnid-archive")
+            archive_name = channel.name.replace(NNID_CHANNEL_SUFFIX, "-needs-nnid-aep")
         else:
-            archive_name = channel.name.rstrip("-") + "-archive"
+            archive_name = channel.name.rstrip("-") + "-aep"
 
         try:
             if len(new_topic) > 1024:
