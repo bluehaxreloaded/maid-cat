@@ -289,6 +289,24 @@ class SoapCog(commands.Cog):  # SOAP commands
                     report.append((guild.name, channel.name, f"({deletion_str!r} parse error: {e})", False))
         return report
 
+    async def _update_archive_category_name(self):
+        """Rename TEMP_ARCHIVE_CATEGORY to 'AEP Archive [X]' where X = channel count - 1 (archive-info)."""
+        if not TEMP_ARCHIVE_CATEGORY_ID:
+            return
+        for guild in self.bot.guilds:
+            temp_cat = discord.utils.get(guild.categories, id=TEMP_ARCHIVE_CATEGORY_ID)
+            if not temp_cat:
+                continue
+            text_channels = [c for c in temp_cat.channels if isinstance(c, discord.TextChannel)]
+            count = len(text_channels) - 1  # Exclude #archive-info
+            count = max(0, count)
+            new_name = f"AEP Archive [{count}]"
+            if temp_cat.name != new_name:
+                try:
+                    await temp_cat.edit(name=new_name)
+                except Exception:
+                    pass
+
     async def _check_archived_channels(self):
         """Delete channels in TEMP_ARCHIVE_CATEGORY whose deletion time has passed."""
         if not TEMP_ARCHIVE_CATEGORY_ID:
@@ -327,6 +345,7 @@ class SoapCog(commands.Cog):  # SOAP commands
                             pass
                 except (ValueError, TypeError):
                     continue
+        await self._update_archive_category_name()
 
     async def archive_channel(
         self,
@@ -434,6 +453,7 @@ class SoapCog(commands.Cog):  # SOAP commands
 
         asyncio.create_task(send_archive_message())
 
+        await self._update_archive_category_name()
         await _try_log_soap(ctx, "Archived SOAP Channel" if is_soap else "Archived NNID Channel")
 
     async def create_soap_channel_for_user(
@@ -531,6 +551,7 @@ class SoapCog(commands.Cog):  # SOAP commands
                 await ctx.defer(ephemeral=True)
             except TypeError:
                 await ctx.defer()
+        await self._update_archive_category_name()
         report = await self._get_archived_channels_report()
         now = datetime.now(timezone.utc)
         now_str = now.strftime("%Y-%m-%d %H:%M:%S")
