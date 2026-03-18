@@ -298,7 +298,7 @@ class ModerationCog(commands.Cog):
                 ),
                 color=discord.Color.yellow(),
             )
-            embed.set_footer(text="Do not type here, you will be banned.")
+            embed.set_footer(text="Do not type here or you will be banned.")
 
             try:
                 await channel.send(embed=embed)
