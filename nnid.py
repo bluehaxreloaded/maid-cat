@@ -117,7 +117,7 @@ class NNIDCog(commands.Cog):  # NNID commands
         channel: discord.TextChannel,
         ctx: commands.Context | discord.Interaction = None,
     ):
-        """Helper method to archive a NNID channel (revoke access, move to temp archive, delete in 7 days)."""
+        """Helper method to archive a NNID channel (revoke access, move to temp archive for deletion)."""
         soap_cog = self.bot.get_cog("SoapCog")
         if soap_cog:
             await soap_cog.archive_channel(channel, ctx, is_soap=False)

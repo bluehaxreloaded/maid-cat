@@ -289,6 +289,50 @@ class SoapCog(commands.Cog):  # SOAP commands
                     report.append((guild.name, channel.name, f"({deletion_str!r} parse error: {e})", False))
         return report
 
+    async def _delete_oldest_archived_channel(self, guild: discord.Guild) -> bool:
+        """Delete the archive channel closest to its deletion time. Returns True if one was deleted."""
+        if not TEMP_ARCHIVE_CATEGORY_ID:
+            return False
+        temp_cat = discord.utils.get(guild.categories, id=TEMP_ARCHIVE_CATEGORY_ID)
+        if not temp_cat:
+            return False
+        oldest_channel = None
+        oldest_dt = None
+        for ch in temp_cat.channels:
+            if not isinstance(ch, discord.TextChannel):
+                continue
+            topic = await _get_channel_topic(ch)
+            match = ARCHIVE_DELETION_REGEX.search(topic)
+            if not match:
+                continue
+            try:
+                deletion_dt = datetime.strptime(
+                    match.group(1), "%Y-%m-%d %H:%M:%S"
+                ).replace(tzinfo=timezone.utc)
+                if oldest_dt is None or deletion_dt < oldest_dt:
+                    oldest_dt = deletion_dt
+                    oldest_channel = ch
+            except (ValueError, TypeError):
+                continue
+        if oldest_channel:
+            try:
+                await oldest_channel.delete()
+                embed = discord.Embed(
+                    title="Early-deleted archived channel (category full)",
+                    description=f"#{oldest_channel.name}",
+                    color=discord.Color.orange(),
+                )
+                embed.add_field(
+                    name="Deletion was scheduled",
+                    value=f"{oldest_dt.strftime('%Y-%m-%d %H:%M:%S')} UTC",
+                    inline=False,
+                )
+                await _send_to_log(guild, SOAP_LOG_ID, embed=embed)
+                return True
+            except Exception:
+                pass
+        return False
+
     async def _update_archive_category_name(self):
         """Rename TEMP_ARCHIVE_CATEGORY to 'AEP Archive [X]' where X = channel count - 1 (archive-info)."""
         if not TEMP_ARCHIVE_CATEGORY_ID:
@@ -372,7 +416,7 @@ class SoapCog(commands.Cog):  # SOAP commands
             await _notify_and_delete(channel, "Could not find user in channel topic. Deleting channel.")
             return
 
-        deletion_time = datetime.now(timezone.utc) + timedelta(days=7)
+        deletion_time = datetime.now(timezone.utc) + timedelta(days=3)
         deletion_str = deletion_time.strftime("%Y-%m-%d %H:%M:%S")
         new_topic = f"{ARCHIVE_PREFIX}{deletion_str} UTC. {topic}"
 
@@ -411,21 +455,37 @@ class SoapCog(commands.Cog):  # SOAP commands
         except discord.NotFound:
             return
         except Exception as e:
-            err_msg = f"Failed to move channel to archive: {e}"
-            try:
-                await channel.send(err_msg)
-            except Exception:
-                pass
-            await _respond_ephemeral(ctx, err_msg)
-            if ERROR_LOG_ID:
-                err_embed = discord.Embed(
-                    title="Archive channel failed",
-                    description=str(e),
-                    color=discord.Color.red(),
-                )
-                err_embed.add_field(name="Channel", value=channel.mention, inline=False)
-                await _send_to_log(channel.guild, ERROR_LOG_ID, embed=err_embed)
-            return
+            err_str = str(e)
+            retry_succeeded = False
+            # Category full (50 channels): delete oldest archive channel and retry
+            if "Maximum number of channels" in err_str or "50035" in err_str:
+                if await self._delete_oldest_archived_channel(channel.guild):
+                    try:
+                        await _edit_channel_with_retry(
+                            channel, category=temp_category, topic=new_topic, name=archive_name
+                        )
+                        retry_succeeded = True
+                    except discord.NotFound:
+                        return
+                    except Exception as retry_err:
+                        e = retry_err
+                        err_str = str(e)
+            if not retry_succeeded:
+                err_msg = f"Failed to move channel to archive: {e}"
+                try:
+                    await channel.send(err_msg)
+                except Exception:
+                    pass
+                await _respond_ephemeral(ctx, err_msg)
+                if ERROR_LOG_ID:
+                    err_embed = discord.Embed(
+                        title="Archive channel failed",
+                        description=str(e),
+                        color=discord.Color.red(),
+                    )
+                    err_embed.add_field(name="Channel", value=channel.mention, inline=False)
+                    await _send_to_log(channel.guild, ERROR_LOG_ID, embed=err_embed)
+                return
 
         async def send_archive_message():
             await asyncio.sleep(2.5)  # Let category/topic edit propagate
