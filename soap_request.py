@@ -7,7 +7,7 @@ from constants import REQUEST_SOAP_CHANNEL_ID, RESTRICTED_ROLE_ID
 
 class CFWCheckView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=180)
+        super().__init__(timeout=None)
 
     @discord.ui.select(
         placeholder="Is your console on custom firmware?",
@@ -79,7 +79,7 @@ class SOAPConfirmView(discord.ui.View):
     """Confirmation step before creating the SOAP channel."""
 
     def __init__(self, user: discord.Member):
-        super().__init__(timeout=180)
+        super().__init__(timeout=None)
         self.user = user
 
     @discord.ui.button(
@@ -147,7 +147,7 @@ class SOAPConfirmView(discord.ui.View):
 
 class RegionChangeView(discord.ui.View):
     def __init__(self, user: discord.Member):
-        super().__init__(timeout=180)
+        super().__init__(timeout=None)
         self.user = user
 
     @discord.ui.select(

@@ -7,7 +7,7 @@ from constants import REQUEST_NNID_CHANNEL_ID, NNID_CHANNEL_SUFFIX, NNID_CHANNEL
 
 class FilesCheckView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=180)
+        super().__init__(timeout=None)
 
     @discord.ui.select(
         placeholder="Do you have one of the required files?",
@@ -75,7 +75,7 @@ class FilesCheckView(discord.ui.View):
 
 class BrokenConsoleCheckView(discord.ui.View):
     def __init__(self, user: discord.Member):
-        super().__init__(timeout=180)
+        super().__init__(timeout=None)
         self.user = user
 
     @discord.ui.select(
@@ -180,7 +180,7 @@ class BrokenReasonView(discord.ui.View):
     """Asks why the source console is inaccessible; rejects if sold or given away."""
 
     def __init__(self, user: discord.Member):
-        super().__init__(timeout=180)
+        super().__init__(timeout=None)
         self.user = user
 
     @discord.ui.select(
@@ -249,7 +249,7 @@ class BrokenReasonView(discord.ui.View):
 
 class CFWCheckView(discord.ui.View):
     def __init__(self, user: discord.Member):
-        super().__init__(timeout=180)
+        super().__init__(timeout=None)
         self.user = user
 
     @discord.ui.select(
