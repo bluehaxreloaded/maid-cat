@@ -623,6 +623,12 @@ class SoapHelperDropdown(discord.ui.Select):
                 value="another_soap",
             ),
             discord.SelectOption(
+                label="Will I ever need to redo a SOAP Transfer?",
+                description="When you might need another SOAP",
+                emoji="🔄",
+                value="redo_soap",
+            ),
+            discord.SelectOption(
                 label="My option is not listed here.",
                 description="Request additional assistance from a Soaper",
                 emoji="🆘",
@@ -772,6 +778,17 @@ class SoapHelperDropdown(discord.ui.Select):
                     "You may **not** request SOAPs for consoles you intend on selling. Please direct your customers to request their own SOAPs. "
                     "You will be blacklisted from requesting new SOAPs if it is discovered you are in violation of this.\n\n"
                     "To request another SOAP, please finish the current SOAP request and create another request using <#1427093890787315913>."
+                ),
+                color=discord.Color.blue(),
+            )
+
+        elif value == "redo_soap":
+            embed = discord.Embed(
+                title="🔄 Will I ever need to redo a SOAP Transfer?",
+                description=(
+                    "In most cases, **no**, a SOAP transfer is a one-time process. Once completed, your region-changed console "
+                    "should continue to work normally with the eShop, Pokémon Bank, NNID, and other services.\n\n"
+                    "You would only need a SOAP if you region change the same console again.\n"
                 ),
                 color=discord.Color.blue(),
             )
