@@ -15,6 +15,7 @@ from constants import (
     NNID_CHANNEL_SUFFIX,
     NNID_CHANNEL_CATEGORY_ID,
     TEMP_ARCHIVE_CATEGORY_ID,
+    ARCHIVE_CHANNEL_SUFFIX,
     SOAP_LOG_ID,
     ERROR_LOG_ID,
 )
@@ -158,8 +159,9 @@ class ArchiveConfirmView(discord.ui.View):
         for item in self.children:
             item.disabled = True
         await interaction.response.edit_message(
-            content="Confirmed.", view=self, embed=None
+            content="Confirmed, deleting channel...", view=self, embed=None
         )
+        await asyncio.sleep(3)
         try:
             await channel.delete()
         except discord.NotFound:
@@ -438,13 +440,9 @@ class SoapCog(commands.Cog):  # SOAP commands
             pass  # e.g. no override to remove; continue with move
 
         # Move channel and set topic
-        # Rename to -archive: e.g. aidenkt-needs-cleaning-🧼 -> aidenkt-needs-cleaning-archive
-        if channel.name.endswith(SOAP_CHANNEL_SUFFIX):
-            archive_name = channel.name.replace(SOAP_CHANNEL_SUFFIX, "-needs-cleaning-aep")
-        elif channel.name.endswith(NNID_CHANNEL_SUFFIX):
-            archive_name = channel.name.replace(NNID_CHANNEL_SUFFIX, "-needs-nnid-aep")
-        else:
-            archive_name = channel.name.rstrip("-") + "-aep"
+        # Append archive suffix: e.g. aidenkt-soap🧼 -> aidenkt-soap🧼-aep
+        suffix = ARCHIVE_CHANNEL_SUFFIX if ARCHIVE_CHANNEL_SUFFIX.startswith("-") else "-" + ARCHIVE_CHANNEL_SUFFIX
+        archive_name = channel.name.rstrip("-") + suffix
 
         try:
             if len(new_topic) > 1024:

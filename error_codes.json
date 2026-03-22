@@ -11,7 +11,7 @@
       "service": "Pokémon Bank"
     },
     "internet_after_soap": {
-      "codes": ["022-5515", "005-4305", "005-4040", "007-2920", "007-2100", "014-0062", "007-2720"],
+      "codes": ["022-5515", "005-4305", "005-4040", "007-2920", "007-2100", "014-0062", "007-2720", "003-2101"],
       "title": "Internet / Network Error After SOAP",
       "description": "This error occurs after a SOAP transfer when your Nintendo 3DS has trouble connecting to Nintendo Network or downloading from the eShop.",
       "steps": [
@@ -57,6 +57,22 @@
         "Check your internet connection and try power cycling your router and modem.",
         "Enter alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4) into your 3DS Internet settings. [Guide](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/217>)",
         "If the issue persists, the server is most likely offline. Please wait for tomorrow and try again."
+      ],
+      "service": "eShop"
+    },
+    "eshop_maintenance_or_region": {
+      "codes": ["011-3136"],
+      "title": "eShop Maintenance or Not Available in Region",
+      "description": "This error usually means eShop maintenance is in progress, or the eShop is not available in your region. Try the steps below to narrow it down.",
+      "steps": [
+        "**First, rule out connection or maintenance:** If you're using Pretendo, switch to Nintendo Network using the Nimbus app.",
+        "Check your internet connection and try power cycling your router and modem.",
+        "Enter alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4) into your 3DS Internet settings. [Guide](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/217>)",
+        "If the issue persists, the server is most likely offline. Please wait for tomorrow and try again.",
+        "**Then, check your region:** Confirm which country your Nintendo 3DS system is set to in **System Settings → Other Settings → Profile → Region Settings**.",
+        "In the Americas, the 3DS eShop is only available in the United States, Canada, Brazil, and Mexico.",
+        "If you're in one of the supported countries and still get this error, double-check your region settings and try again. If the issue persists, please ask a Soaper for help.",
+        "If you are in an unsupported region, you must change your region to one of the supported countries and request another SOAP transfer."
       ],
       "service": "eShop"
     },
