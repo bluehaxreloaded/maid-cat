@@ -189,6 +189,36 @@ class CompletionFollowUpView(discord.ui.View):
             await channel.send(content=interaction.user.mention, embed=embed, view=view)
 
 
+class CopySerialView(discord.ui.View):
+    """View with a copy button that sends the serial as an ephemeral message."""
+
+    def __init__(self, serial: str = None):
+        super().__init__(timeout=None)
+        self.serial = serial
+
+    @discord.ui.button(
+        label="",
+        style=discord.ButtonStyle.secondary,
+        emoji="📋",
+        custom_id="copy_serial",
+    )
+    async def copy_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        serial = self.serial
+        if not serial and interaction.message.embeds:
+            # Fallback: parse from embed description (e.g. "**CWH123456789**")
+            desc = interaction.message.embeds[0].description or ""
+            match = re.search(r"\*\*([A-Z0-9]+)\*\*", desc)
+            serial = match.group(1) if match else None
+        if serial:
+            await interaction.response.send_message(serial, ephemeral=True)
+        else:
+            await interaction.response.send_message(
+                "Could not find serial number.", ephemeral=True
+            )
+
+
 class SerialNumberModal(discord.ui.Modal):
     """Modal for submitting serial number (2–3 letters + 8-9 digits)."""
 
@@ -218,7 +248,8 @@ class SerialNumberModal(discord.ui.Modal):
             description=f"{interaction.user.mention} submitted: **{serial}**",
             color=discord.Color.green(),
         )
-        await interaction.response.send_message(embed=serial_embed)
+        copy_view = CopySerialView(serial=serial)
+        await interaction.response.send_message(embed=serial_embed, view=copy_view)
 
         # Disable buttons on the serial prompt message
         if self.prompt_message_id and interaction.channel:
@@ -629,6 +660,7 @@ class SOAPAutomationCog(commands.Cog):
         self.bot.add_view(EshopVerificationView())
         self.bot.add_view(SerialNumberCheckView())
         self.bot.add_view(SerialNumberFollowUpView())
+        self.bot.add_view(CopySerialView())
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
