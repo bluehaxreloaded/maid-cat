@@ -3,6 +3,7 @@ import discord
 import re
 from perms import command_with_perms, soap_channels_only, nnid_channels_only
 from discord.ext import commands
+from discord.ext.bridge import BridgeOption
 from functools import wraps
 from constants import (
     SOAP_CHANNEL_SUFFIX,
@@ -531,7 +532,79 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         )
         embed.set_footer(text="Donor consoles help make SOAP transfers possible for others.")
         await ctx.respond(embed=embed)
-    
+
+    @command_with_perms(
+        allowed_roles=["Developer", "Staff"],
+        name="say",
+        aliases=["embed"],
+        help="Send a custom embed. Use \\n in text fields for newlines.",
+    )
+    async def say(
+        self,
+        ctx,
+        title: BridgeOption(str, "Embed title", required=False) = None,
+        description: BridgeOption(str, "Embed description. Use \\n for newlines.", required=False) = None,
+        color: BridgeOption(str, "Color: blue, green, red, orange, yellow, blurple", required=False) = None,
+        footer: BridgeOption(str, "Footer text", required=False) = None,
+        image: BridgeOption(str, "Image URL (large image at bottom)", required=False) = None,
+        thumbnail: BridgeOption(str, "Thumbnail URL (small image top-right)", required=False) = None,
+        author: BridgeOption(str, "Author name (top of embed)", required=False) = None,
+        url: BridgeOption(str, "URL to make title clickable", required=False) = None,
+        timestamp: BridgeOption(bool, "Add timestamp", required=False) = False,
+    ):
+        """Send a formatted embed. At least one of title or description is required."""
+        if not title and not description:
+            await ctx.respond("Provide at least a title or description.", ephemeral=True)
+            return
+
+        color_map = {
+            "blue": discord.Color.blue(),
+            "green": discord.Color.green(),
+            "red": discord.Color.red(),
+            "orange": discord.Color.orange(),
+            "yellow": discord.Color.yellow(),
+            "blurple": discord.Color.blurple(),
+        }
+        embed_color = discord.Color.blue()
+        if color:
+            color_lower = color.strip().lower()
+            if color_lower in color_map:
+                embed_color = color_map[color_lower]
+            elif color_lower.startswith("#") and len(color_lower) == 7:
+                try:
+                    embed_color = discord.Color(int(color_lower[1:], 16))
+                except ValueError:
+                    pass
+            elif color_lower.startswith("0x") and len(color_lower) <= 10:
+                try:
+                    embed_color = discord.Color(int(color_lower, 16))
+                except ValueError:
+                    pass
+
+        def _nl(s: str) -> str:
+            """Convert \\n in user input to actual newlines."""
+            return s.replace("\\n", "\n") if s else s
+
+        embed = discord.Embed(color=embed_color)
+        if title:
+            embed.title = _nl(title)
+        if description:
+            embed.description = _nl(description)
+        if url:
+            embed.url = url
+        if footer:
+            embed.set_footer(text=_nl(footer))
+        if image:
+            embed.set_image(url=image)
+        if thumbnail:
+            embed.set_thumbnail(url=thumbnail)
+        if author:
+            embed.set_author(name=author)
+        if timestamp:
+            embed.timestamp = discord.utils.utcnow()
+
+        await ctx.respond(embed=embed)
+
     @command_with_perms(name="nnidwarning", help="Warning message for NNIDTransfers")
     async def nnidwarning(self, ctx):
         embed = discord.Embed(
