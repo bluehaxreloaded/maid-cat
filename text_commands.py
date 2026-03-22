@@ -279,6 +279,26 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         )
         await ctx.respond(embed=embed)
 
+    @command_with_perms(
+        name="homebrewtransfer",
+        aliases=["hbapptransfer", "keephomebrewapps"],
+        help="How to keep Homebrew apps after system transfer",
+    )
+    async def homebrewaftertransfer(self, ctx):
+        embed = discord.Embed(
+            title="Keeping Homebrew Apps after System Transfer",
+            description=(
+                "**1.** Install CFW on the new console using [3ds.hacks.guide](<https://3ds.hacks.guide/>)\n"
+                "**2.** Do a system transfer normally. Choose \"Don't use the guide\" then \"PC-based transfer\" if asked.\n"
+                "**3.** On the new console, download faketik and place faketik.3dsx in the `/3ds` folder on your SD root.\n"
+                "**4.** To access the Homebrew Launcher on the new console, follow [Manually entering Homebrew Launcher](<https://wiki.hacks.guide/wiki/3DS:Troubleshooting/manually_entering_homebrew_launcher>) under Other troubleshooting on the troubleshooting page.\n"
+                "**5.** Once you are in the Homebrew Launcher, run faketik.\n"
+                "**6.** Your Homebrew apps should appear on the homescreen!"
+            ),
+            color=discord.Color.red(),
+        )
+        await ctx.respond(embed=embed)
+
     @command_with_perms(name="cleaninty", help="Sends link to cleaninty article")
     async def cleaninty(self, ctx):
         embed = discord.Embed(
