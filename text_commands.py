@@ -258,6 +258,27 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         embed.set_footer(text="Always create a NAND backup before making significant changes to your console.")
         await ctx.respond(embed=embed)
 
+    @command_with_perms(
+        name="freshinstall",
+        aliases=["minty", "mintyfresh", "fresh", "cleaninstall"],
+        help="Instructions for a fresh CFW install",
+    )
+    async def freshinstall(self, ctx):
+        embed = discord.Embed(
+            title="🌿 Minty-Fresh CFW Install",
+            description=(
+                "Follow the steps below to make your console feel like new (with the latest CFW)!\n\n"
+                "**1.** Verify your Luma version and [follow these directions to properly upgrade your CFW install.](<https://3ds.hacks.guide/checking-for-cfw>)\n"
+                "**2.** [Format your SD card](<https://wiki.hacks.guide/wiki/Formatting_an_SD_card>).\n"
+                "**3.** System format your 3DS: System Settings → Other Settings → Format System Memory\n"
+                "**4.** Go through the console's initial setup process again.\n"
+                "**5.** [Restore/upgrade your Luma installation](<https://3ds.hacks.guide/restoring-updating-cfw>).\n"
+                "**6.** Complete the instructions in [Finalizing Setup](<https://3ds.hacks.guide/finalizing-setup>)."
+            ),
+            color=discord.Color.green(),
+        )
+        await ctx.respond(embed=embed)
+
     @command_with_perms(name="cleaninty", help="Sends link to cleaninty article")
     async def cleaninty(self, ctx):
         embed = discord.Embed(
