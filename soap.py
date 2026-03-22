@@ -164,7 +164,7 @@ class ArchiveConfirmView(discord.ui.View):
             await channel.delete()
         except discord.NotFound:
             pass
-        await _try_log_soap(interaction, "Deleted archived channel (early)")
+        await log_to_soaper_log(ctx, "Deleted archived channel (early)")
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -588,6 +588,39 @@ class SoapCog(commands.Cog):  # SOAP commands
                 await ctx.respond(msg, ephemeral=True)
             else:
                 await ctx.send(msg)
+    
+    @command_with_perms(
+        allowed_roles=["Staff"],
+        name="deletearchive",
+        aliases=["ocean", "clearaep", "megaboom", "gigaboom", "archiveboom"],
+        help="Clears the AEP archive",
+    )
+    async def deletearchive(
+        self,
+        ctx
+    ):
+        deleted = 0
+        if not TEMP_ARCHIVE_CATEGORY_ID:
+            await ctx.respond("The temp archive category is not set!", ephemeral=True)
+        for guild in self.bot.guilds:
+            temp_cat = discord.utils.get(guild.categories, id=TEMP_ARCHIVE_CATEGORY_ID)
+            if not temp_cat:
+                continue
+            for channel in temp_cat.channels:
+                if not isinstance(channel, discord.TextChannel):
+                    continue
+                topic = await _get_channel_topic(channel)
+                match = ARCHIVE_DELETION_REGEX.search(topic)
+                if not match:
+                    continue
+                deletion_str = match.group(1)
+                try:
+                    await channel.delete()
+                    deleted += 1
+                except (ValueError, TypeError) as e:
+                    print("test")
+        await ctx.respond("Successfully deleted all existing temporarily archived channels!", ephemeral=True)  
+        await log_to_soaper_log(ctx, f"Mass Deleted Channels Early (x{deleted})")
 
     @command_with_perms(
         min_role="Soaper",
