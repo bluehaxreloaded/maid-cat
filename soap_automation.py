@@ -198,7 +198,7 @@ class SerialNumberModal(discord.ui.Modal):
         self.prompt_view_class = prompt_view_class or SerialNumberCheckView
         self.serial_input = discord.ui.InputText(
             label="Please enter your console's serial number.",
-            placeholder="e.g. CWH123456789 or QW12345678",
+            placeholder="e.g. YJM123456789 or QW12345678",
             required=True,
             max_length=12,
         )
