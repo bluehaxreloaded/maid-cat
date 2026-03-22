@@ -468,6 +468,23 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             await ctx.respond("Could not get essentialsubmit QR code.")
 
     @command_with_perms(
+        name="cfwupdate",
+        aliases=["cfwrestore", "updatecfw"],
+        help="Restoring or updating CFW / lost SD card contents",
+    )
+    async def cfwupdate(self, ctx):
+        embed = discord.Embed(
+            title="🔄 Restoring / Updating CFW",
+            description=(
+                "If you need to update your 3DS CFW installation, or you have lost the contents of your SD card, "
+                "please follow the directions on the 3DS Hacks Guide "
+                "[Restoring / Updating CFW](<https://3ds.hacks.guide/restoring-updating-cfw.html>) page."
+            ),
+            color=discord.Color.blue(),
+        )
+        await ctx.respond(embed=embed)
+
+    @command_with_perms(
         name="macaddress",
         aliases=["mac", "3dsmac"],
         help="Instructions to find the 3DS MAC address",
