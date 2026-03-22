@@ -18,6 +18,7 @@ from constants import (
     ARCHIVE_CHANNEL_SUFFIX,
     SOAP_LOG_ID,
     ERROR_LOG_ID,
+    HELPEE_ROLE_ID,
 )
 from perms import _has_role_or_higher
 
@@ -336,7 +337,7 @@ class SoapCog(commands.Cog):  # SOAP commands
         return False
 
     async def _update_archive_category_name(self):
-        """Rename TEMP_ARCHIVE_CATEGORY to 'AEP Archive [X]' where X = channel count - 1 (archive-info)."""
+        """Rename TEMP_ARCHIVE_CATEGORY to 'AEP Archive [X]' where X = channel count."""
         if not TEMP_ARCHIVE_CATEGORY_ID:
             return
         for guild in self.bot.guilds:
@@ -344,8 +345,7 @@ class SoapCog(commands.Cog):  # SOAP commands
             if not temp_cat:
                 continue
             text_channels = [c for c in temp_cat.channels if isinstance(c, discord.TextChannel)]
-            count = len(text_channels) - 1  # Exclude #archive-info
-            count = max(0, count)
+            count = len(text_channels)
             new_name = f"AEP Archive [{count}]"
             if temp_cat.name != new_name:
                 try:
@@ -438,6 +438,17 @@ class SoapCog(commands.Cog):  # SOAP commands
             await channel.set_permissions(target, overwrite=None)
         except Exception:
             pass  # e.g. no override to remove; continue with move
+
+        # Revoke helpee role when channel is closed
+        if HELPEE_ROLE_ID:
+            try:
+                member = channel.guild.get_member(user_id)
+                if member and isinstance(member, discord.Member):
+                    role = channel.guild.get_role(HELPEE_ROLE_ID)
+                    if role and role in member.roles:
+                        await member.remove_roles(role)
+            except Exception:
+                pass
 
         # Move channel and set topic
         # Append archive suffix: e.g. aidenkt-soap🧼 -> aidenkt-soap🧼-aep
@@ -583,6 +594,15 @@ class SoapCog(commands.Cog):  # SOAP commands
             if ctx:
                 try:
                     await log_to_soaper_log(ctx, "Created SOAP Channel")
+                except Exception:
+                    pass
+
+            # Grant helpee role when channel is opened
+            if HELPEE_ROLE_ID:
+                try:
+                    role = guild.get_role(HELPEE_ROLE_ID)
+                    if role and role not in user.roles:
+                        await user.add_roles(role)
                 except Exception:
                     pass
 
@@ -806,6 +826,13 @@ class SoapCog(commands.Cog):  # SOAP commands
                 )
             await ctx.respond(new.jump_url)
             await log_to_soaper_log(ctx, "Created SOAP Channel")
+            if HELPEE_ROLE_ID:
+                try:
+                    role = ctx.guild.get_role(HELPEE_ROLE_ID)
+                    if role and role not in user.roles:
+                        await user.add_roles(role)
+                except Exception:
+                    pass
 
     @command_with_perms(
         min_role="Soaper",

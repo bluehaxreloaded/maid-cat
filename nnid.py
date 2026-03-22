@@ -5,11 +5,13 @@ from exceptions import CategoryNotFound
 from log import log_to_soaper_log
 from discord.ext import commands
 from discord.ext.bridge import BridgeOption
+import re
 from constants import (
     NNID_CHANNEL_SUFFIX,
     BOOM_EMOTE_ID,
     NNID_CHANNEL_CATEGORY_ID,
     TEMP_ARCHIVE_CATEGORY_ID,
+    HELPEE_ROLE_ID,
     is_late_night_hours,
 )
 
@@ -107,6 +109,14 @@ class NNIDCog(commands.Cog):  # NNID commands
                 except Exception:
                     pass
 
+            if HELPEE_ROLE_ID:
+                try:
+                    role = guild.get_role(HELPEE_ROLE_ID)
+                    if role and role not in user.roles:
+                        await user.add_roles(role)
+                except Exception:
+                    pass
+
             return True, new_channel, "Channel created successfully"
 
         except Exception as e:
@@ -123,6 +133,19 @@ class NNIDCog(commands.Cog):  # NNID commands
             await soap_cog.archive_channel(channel, ctx, is_soap=False)
         else:
             # Fallback: delete immediately if SoapCog not available
+            if HELPEE_ROLE_ID:
+                try:
+                    topic = (channel.topic or "").strip()
+                    m = re.search(r"<@!?(\d+)>", topic)
+                    if m:
+                        user_id = int(m.group(1))
+                        member = channel.guild.get_member(user_id)
+                        if member and isinstance(member, discord.Member):
+                            role = channel.guild.get_role(HELPEE_ROLE_ID)
+                            if role and role in member.roles:
+                                await member.remove_roles(role)
+                except Exception:
+                    pass
             await channel.send("Self-destruct sequence initiated!")
             await channel.send(f"<a:boomparrot:{BOOM_EMOTE_ID}>")
             await asyncio.sleep(2.75)
@@ -173,6 +196,13 @@ class NNIDCog(commands.Cog):  # NNID commands
             await self.create_nnid_interface(new, user)
             await ctx.respond(new.jump_url)
             await log_to_soaper_log(ctx, "Created NNID Channel")
+            if HELPEE_ROLE_ID:
+                try:
+                    role = ctx.guild.get_role(HELPEE_ROLE_ID)
+                    if role and role not in user.roles:
+                        await user.add_roles(role)
+                except Exception:
+                    pass
 
 
 def setup(bot):

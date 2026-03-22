@@ -33,6 +33,7 @@ SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, MANUAL_SO
 # role IDs
 SOAPER_ROLE_ID = # role ID for Soapers who assist with SOAP requests
 RESTRICTED_ROLE_ID = # role ID for users who are restricted from requesting a SOAP/NNID transfer
+HELPEE_ROLE_ID = # role ID granted when user opens SOAP/NNID channel, revoked when closed
 
 # SOAP completion auto-close behavior
 SOAP_COMPLETION_AUTO_CLOSE_MINUTES = 20  # minutes after completion prompt before channel auto-closes
