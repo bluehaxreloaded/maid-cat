@@ -391,28 +391,31 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     )
     @soap_channels_only()
     async def nocomputer(self, ctx):
-        file = None
         try:
             path = Path(__file__).parent / "assets" / "essential-3dsx.webp"
             file = discord.File(fp=path, filename="essential-3dsx.webp")
-            await ctx.respond(file=file)
-            await ctx.respond(
-                "## Submitting essential.exefs without a computer\n"
-                "1. Open FBI and navigate to `Remote Install` → `Scan QR Code`\n"
-                "2. Scan the QR code provided with the camera and press A to install.\n"
-                "3. After it is installed, close FBI.\n"
-                "4. Open the Homebrew Launcher.\n"
-                "5. Select essentialsubmit from the list of applications.\n"
-                "6. Press Y and type in your Discord username, then press OK.\n"
-                "7. Select the large :soap: icon.\n"
-                "8. Let us know when it has been submitted.\n"
-                "\nIf you have any questions or issues, let us know.\n"
-                "\nAfter we confirm that it submitted properly, you can safely delete `essentialsubmit.3dsx` from the `3ds` folder on your SD card (this is not required)."
+            embed = discord.Embed(
+                title="💻 Submitting essential.exefs without a computer",
+                description=(
+                    "**1.** Open FBI and navigate to `Remote Install` → `Scan QR Code`\n"
+                    "**2.** Scan the QR code below with the camera and press A to install.\n"
+                    "**3.** After it is installed, close FBI.\n"
+                    "**4.** Open the Homebrew Launcher.\n"
+                    "**5.** Select essentialsubmit from the list of applications.\n"
+                    "**6.** Press Y and type in your Discord username, then press OK.\n"
+                    "**7.** Select the large :soap: icon.\n"
+                    "**8.** Let us know when it has been submitted."
+                ),
+                color=discord.Color.blue(),
             )
+            embed.set_image(url="attachment://essential-3dsx.webp")
+            embed.set_footer(
+                text="If you have questions or issues, let us know. After we confirm it submitted properly, you can safely delete essentialsubmit.3dsx from the 3ds folder on your SD card (optional)."
+            )
+            await ctx.respond(file=file, embed=embed)
         except FileNotFoundError as e:
             print(f"Error: Could not find assets/essential-3dsx.webp - {e}")
             await ctx.respond("Could not get essentialsubmit QR code.")
-            pass
 
     @command_with_perms(
         name="formatsd", aliases=["format", "sdformat"], help="SD formatting guide"

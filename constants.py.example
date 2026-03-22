@@ -28,7 +28,7 @@ SPAM_BOT_CHANNEL_ID =  # channel where spam bot feature is active
 ERROR_LOG_ID =  # channel that any error not dealt with gets logged to
 SOAP_TRACKER_ID =  # voice channel that displays SOAP count
 NNID_TRACKER_ID =  # voice channel that displays NNID count
-SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, ] # where soap channel specific commands can be used
+SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID, ] # where soap channel specific commands can be used
 
 # role IDs
 SOAPER_ROLE_ID = # role ID for Soapers who assist with SOAP requests
