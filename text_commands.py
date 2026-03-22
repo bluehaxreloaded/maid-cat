@@ -282,7 +282,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     @command_with_perms(
         name="homebrewtransfer",
         aliases=["hbapptransfer", "keephomebrewapps"],
-        help="How to keep Homebrew apps after system transfer",
+        help="Instructions to keep Homebrew apps after system transfer",
     )
     async def homebrewaftertransfer(self, ctx):
         embed = discord.Embed(
@@ -296,6 +296,36 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
                 "**6.** Your Homebrew apps should appear on the homescreen!"
             ),
             color=discord.Color.red(),
+        )
+        await ctx.respond(embed=embed)
+
+    @command_with_perms(
+        name="movesd",
+        aliases=["movesdcard", "sdtransfer", "newsd"],
+        help="Instructions to move data to a new SD card",
+    )
+    async def movesd(self, ctx):
+        embed = discord.Embed(
+            title="💾 Moving SD Cards",
+            description="Moving SD cards on a 3DS is easy.",
+            color=discord.Color.blue(),
+        )
+        embed.add_field(
+            name="1. Format the new SD card",
+            value=(
+                "First, ensure the new SD card is in the **FAT32** format.\n"
+                "If it is not, follow the instructions here to format it:\n"
+                "[Formatting an SD card](<https://wiki.hacks.guide/wiki/Formatting_an_SD_card>)"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="2. Move your data",
+            value=(
+                "Once the new card is FAT32, move **all** your content from the old SD to the new SD.\n\n"
+                "⚠️ **IMPORTANT:** Do not put the new SD card in the console before moving all your data to it."
+            ),
+            inline=False,
         )
         await ctx.respond(embed=embed)
 
