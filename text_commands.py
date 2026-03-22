@@ -286,7 +286,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     )
     async def homebrewaftertransfer(self, ctx):
         embed = discord.Embed(
-            title="Keeping Homebrew Apps after System Transfer",
+            title="📱 Keeping Homebrew Apps after System Transfer",
             description=(
                 "**1.** Install CFW on the new console using [3ds.hacks.guide](<https://3ds.hacks.guide/>)\n"
                 "**2.** Do a system transfer normally. Choose \"Don't use the guide\" then \"PC-based transfer\" if asked.\n"
@@ -413,13 +413,6 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             print(f"Error: Could not find assets/essential-3dsx.webp - {e}")
             await ctx.respond("Could not get essentialsubmit QR code.")
             pass
-    
-    @command_with_perms(name="newsd", help="New SD guide")
-    async def newsd(self, ctx):
-        await ctx.respond(
-            "How to restore CFW on a new SD card:\n\n"
-            "<https://3ds.hacks.guide/restoring-updating-cfw.html>"
-        )
 
     @command_with_perms(
         name="formatsd", aliases=["format", "sdformat"], help="SD formatting guide"
