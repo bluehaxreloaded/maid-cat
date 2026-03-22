@@ -468,6 +468,21 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             await ctx.respond("Could not get essentialsubmit QR code.")
 
     @command_with_perms(
+        name="macaddress",
+        aliases=["mac", "3dsmac"],
+        help="Instructions to find the 3DS MAC address",
+    )
+    async def mac(self, ctx):
+        embed = discord.Embed(
+            title="📶 3DS MAC Address Location",
+            description=(
+                "**System Settings** → **Internet Settings** → **Other Information** → **Confirm MAC Address**"
+            ),
+            color=discord.Color.blue(),
+        )
+        await ctx.respond(embed=embed)
+
+    @command_with_perms(
         name="formatsd", aliases=["format", "sdformat"], help="SD formatting guide"
     )
     async def formatsd(self, ctx):
