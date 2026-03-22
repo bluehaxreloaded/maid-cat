@@ -405,12 +405,13 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
                     "**6.** Press Y and type in your Discord username, then press OK.\n"
                     "**7.** Select the large :soap: icon.\n"
                     "**8.** Let us know when it has been submitted."
+                    "**9.** After we confirm you submitted properly, you can safely delete essentialsubmit.3dsx from the 3ds folder on your SD card."
                 ),
                 color=discord.Color.blue(),
             )
             embed.set_image(url="attachment://essential-3dsx.webp")
             embed.set_footer(
-                text="If you have questions or issues, let us know. After we confirm it submitted properly, you can safely delete essentialsubmit.3dsx from the 3ds folder on your SD card (optional)."
+                text="If you have questions or issues, let us know. "
             )
             await ctx.respond(file=file, embed=embed)
         except FileNotFoundError as e:
