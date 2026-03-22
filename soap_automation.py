@@ -2,6 +2,7 @@ import discord
 import re
 import asyncio
 from discord.ext import commands
+from perms import command_with_perms
 from log import log_to_soaper_log
 from constants import (
     BOTS_ONLY_CHANNEL_ID,
@@ -9,6 +10,7 @@ from constants import (
     MANUAL_SOAP_CATEGORY_ID,
     LOADING_EMOTE_ID,
     SOAP_COMPLETION_AUTO_CLOSE_MINUTES,
+    SOAPER_ROLE_ID,
     is_late_night_hours,
 )
 from soap_helper import SoapHelperView
@@ -185,6 +187,196 @@ class CompletionFollowUpView(discord.ui.View):
             embed.set_footer(text="Select an option from the dropdown menu below")
             view = SoapHelperView(context="other_questions")
             await channel.send(content=interaction.user.mention, embed=embed, view=view)
+
+
+class SerialNumberModal(discord.ui.Modal):
+    """Modal for submitting serial number (2–3 letters + 8-9 digits)."""
+
+    def __init__(self, prompt_message_id: int = None, prompt_view_class=None):
+        super().__init__(title="🔢 Serial Number")
+        self.prompt_message_id = prompt_message_id
+        self.prompt_view_class = prompt_view_class or SerialNumberCheckView
+        self.serial_input = discord.ui.InputText(
+            label="Please enter your console's serial number.",
+            placeholder="e.g. CWH123456789 or CWH12345678",
+            required=True,
+            max_length=12,
+        )
+        self.add_item(self.serial_input)
+
+    async def callback(self, interaction: discord.Interaction):
+        serial_raw = self.serial_input.value.strip().upper()
+        serial = re.sub(r"\s+", "", serial_raw)  # Remove spaces (e.g. "CWH12345678 9")
+        if not re.match(r"^[A-Z]{2,3}\d{8,9}$", serial):
+            await interaction.response.send_message(
+                "Invalid format. Serial numbers have 2-3 letters followed by 8 or 9 digits (e.g. CWH123456789 or CWH12345678). Please try again.",
+                ephemeral=True,
+            )
+            return
+        serial_embed = discord.Embed(
+            title="✅ Serial number received",
+            description=f"{interaction.user.mention} submitted: **{serial}**",
+            color=discord.Color.green(),
+        )
+        await interaction.response.send_message(embed=serial_embed)
+
+        # Disable buttons on the serial prompt message
+        if self.prompt_message_id and interaction.channel:
+            try:
+                prompt_msg = await interaction.channel.fetch_message(self.prompt_message_id)
+                view = self.prompt_view_class()
+                for item in view.children:
+                    item.disabled = True
+                await prompt_msg.edit(view=view)
+            except Exception:
+                pass
+
+        # Step 2: Ask for essential.exefs
+        exefs_embed = discord.Embed(
+            title="2️⃣ Upload your essential.exefs file",
+            description=(
+                "**To get your essential.exefs file:**\n"
+                "1. Ensure your SD card is in your console\n"
+                "2. Hold **START** while powering on → this will boot you into GodMode9\n"
+                "3. Navigate to `[S:] SYSNAND Virtual`\n"
+                "4. Select `essential.exefs`\n"
+                "5. Select `Copy to 0:/gm9/out` (select Overwrite if prompted)\n"
+                "6. Power off your console\n"
+                "7. Insert your SD card into your PC or connect via FTPD\n"
+                "8. Navigate to `/gm9/out/` on your SD, where `essential.exefs` should be located\n"
+                "9. **Upload the file to this channel**\n\n"
+                "Please wait for a Soaper to assist you once you've uploaded the file."
+            ),
+            color=discord.Color.blue(),
+        )
+        await interaction.followup.send(embed=exefs_embed)
+
+
+class SerialNumberCheckView(discord.ui.View):
+    """View for serial number prompt buttons in new SOAP channels"""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Yes, I have my serial number.",
+        style=discord.ButtonStyle.success,
+        emoji="🔢",
+        custom_id="serial_yes",
+    )
+    async def serial_yes_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        modal = SerialNumberModal(prompt_message_id=interaction.message.id)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(
+        label="I need help.",
+        style=discord.ButtonStyle.red,
+        emoji="❔",
+        custom_id="serial_help",
+    )
+    async def serial_help_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        # Disable the original buttons
+        for item in self.children:
+            item.disabled = True
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            await interaction.response.defer()
+
+        # Send findserial instructions
+        instructions_embed = discord.Embed(
+            title="📂 Finding Your Serial Number",
+            description=(
+                "Follow these instructions to find your console's serial number.\n\n"
+                "**To find your console's serial number:**\n"
+                "- Hold START while powering on your console. This will boot you into GodMode9.\n"
+                "- Go to `[2:] SYSNAND TWLN` -> `sys` -> `log` -> `inspect.log`\n"
+                "- Select `Open in Textviewer`.\n\n"
+                "The correct serial number (three-letter prefix followed by nine numbers) should be in the file."
+            ),
+            color=discord.Color.blue(),
+        )
+        instructions_embed.set_footer(text="You may also send us a picture if you're unsure.")
+        await interaction.followup.send(embed=instructions_embed)
+
+        # Send follow-up with Yes / No, I need further assistance
+        followup_embed = discord.Embed(
+            title="Were you able to find your serial number?",
+            description="**After following the instructions above,** please select an option below.",
+            color=discord.Color.blue(),
+        )
+        await interaction.followup.send(
+            embed=followup_embed,
+            view=SerialNumberFollowUpView(),
+        )
+
+
+class SerialNumberFollowUpView(discord.ui.View):
+    """View for follow-up after serial number instructions"""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Yes, I have my serial number",
+        style=discord.ButtonStyle.success,
+        emoji="🔢",
+        custom_id="serial_followup_yes",
+    )
+    async def serial_followup_yes_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        modal = SerialNumberModal(
+            prompt_message_id=interaction.message.id,
+            prompt_view_class=SerialNumberFollowUpView,
+        )
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(
+        label="No, I need more help",
+        style=discord.ButtonStyle.danger,
+        emoji="❔",
+        custom_id="serial_followup_assistance",
+    )
+    async def serial_followup_assistance_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        for item in self.children:
+            item.disabled = True
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            await interaction.response.defer()
+
+        soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
+        embed = discord.Embed(
+            title="🆘 Assistance Requested",
+            description=(
+                f"{interaction.user.mention} has requested additional help. "
+                "Please wait for a Soaper to assist you."
+            ),
+            color=discord.Color.yellow(),
+        )
+        embed.set_footer(
+            text="Describe in detail what's happening and please include error codes if possible."
+        )
+
+        if interaction.response.is_done():
+            await interaction.followup.send(
+                content=soaper_ping,
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions(roles=True),
+            )
+        else:
+            await interaction.response.send_message(
+                content=soaper_ping,
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions(roles=True),
+            )
 
 
 class EshopVerificationView(discord.ui.View):
@@ -379,22 +571,32 @@ class SOAPAutomationCog(commands.Cog):
 
         # Step-by-step instructions in a separate embed
         steps_embed = discord.Embed(
-            title="📁 Step-by-Step Instructions",
+            title="1️⃣ Please provide your serial number",
             description=(
-                "1. Ensure your SD card is in your console\n"
-                "2. Hold **START** while powering on → this will boot you into GodMode9\n"
-                "3. Navigate to `SysNAND Virtual`\n"
-                "4. Select `essential.exefs`\n"
-                "5. Select `Copy to 0:/gm9/out` (select Overwrite field(s) if prompted)\n"
-                "6. Power off your console\n"
-                "7. Insert your SD card into your PC or connect to your console via FTPD\n"
-                "8. Navigate to `/gm9/out/`, where essential.exefs should be located\n"
-                "9. Upload the `essential.exefs` file and provide your serial number below\n"
-                "10. Please wait for a Soaper to assist you"
+                "To find your console's serial number, refer to the sticker on the back of your console. The serial number has a three-letter prefix followed by nine numbers.\n\n"
+                "Were you able to find your serial number?"
             ),
             color=discord.Color.blue(),
         )
-        await channel.send(embed=steps_embed)
+        await channel.send(embed=steps_embed, view=SerialNumberCheckView())
+
+        # steps_embed = discord.Embed(
+        #     title="📁 Step-by-Step Instructions",
+        #     description=(
+        #         "1. Ensure your SD card is in your console\n"
+        #         "2. Hold **START** while powering on → this will boot you into GodMode9\n"
+        #         "3. Navigate to `SysNAND Virtual`\n"
+        #         "4. Select `essential.exefs`\n"
+        #         "5. Select `Copy to 0:/gm9/out` (select Overwrite field(s) if prompted)\n"
+        #         "6. Power off your console\n"
+        #         "7. Insert your SD card into your PC or connect to your console via FTPD\n"
+        #         "8. Navigate to `/gm9/out/`, where essential.exefs should be located\n"
+        #         "9. Upload the `essential.exefs` file and provide your serial number below\n"
+        #         "10. Please wait for a Soaper to assist you"
+        #     ),
+        #     color=discord.Color.blue(),
+        # )
+        # await channel.send(embed=steps_embed)
 
         # Send late night delay warning if applicable
         if is_late_night_hours():
@@ -406,10 +608,27 @@ class SOAPAutomationCog(commands.Cog):
             late_night_embed.set_footer(text="Thank you for your patience!"),
             await channel.send(embed=late_night_embed)
 
+    @command_with_perms(
+        min_role="Developer",
+        name="testsoap",
+        aliases=["testsoapflow"],
+        help="Test the full SOAP channel setup in the current channel (Developer only)",
+    )
+    async def testserial(self, ctx):
+        """Run create_soap_interface in the current channel for testing."""
+        member = ctx.author if hasattr(ctx, "author") else getattr(ctx, "user", None)
+        if not isinstance(member, discord.Member):
+            await ctx.respond("Could not get user.", ephemeral=True)
+            return
+        await ctx.respond("Running full channel setup here...", ephemeral=True)
+        await self.create_soap_interface(ctx.channel, member)
+
     @commands.Cog.listener()
     async def on_ready(self):
         """Register persistent views on bot startup"""
         self.bot.add_view(EshopVerificationView())
+        self.bot.add_view(SerialNumberCheckView())
+        self.bot.add_view(SerialNumberFollowUpView())
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
