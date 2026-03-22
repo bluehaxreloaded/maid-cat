@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands, bridge
-from constants import SOAP_USABLE_IDS
+from constants import SOAP_USABLE_IDS, NNID_CHANNEL_CATEGORY_ID, NNID_CHANNEL_SUFFIX
 
 
 def _get_member(ctx) -> discord.Member | None:
@@ -87,5 +87,24 @@ def soap_channels_only():  # lock command to SOAP, NNID and dev channels only
             raise WrongChannel(ctx.command.name, ctx.channel.mention)
 
         return commands.check(soap_chan)(func)
+
+    return decorator
+
+
+def nnid_channels_only():
+    """Lock command to NNID channels only."""
+    def decorator(func):
+        async def nnid_chan(ctx):
+            category = getattr(ctx.channel, "category", None)
+            is_nnid = (
+                category
+                and category.id == NNID_CHANNEL_CATEGORY_ID
+                and getattr(ctx.channel, "name", "").endswith(NNID_CHANNEL_SUFFIX)
+            )
+            if is_nnid:
+                return True
+            raise WrongChannel(ctx.command.name, ctx.channel.mention)
+
+        return commands.check(nnid_chan)(func)
 
     return decorator

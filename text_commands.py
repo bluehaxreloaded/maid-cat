@@ -1,7 +1,7 @@
 from pathlib import Path
 import discord
 import re
-from perms import command_with_perms, soap_channels_only
+from perms import command_with_perms, soap_channels_only, nnid_channels_only
 from discord.ext import commands
 from functools import wraps
 from constants import (
@@ -198,6 +198,55 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         sticker = discord.utils.get(ctx.guild.stickers, id=SOAP_LOADING_ID)
         if sticker:
             await ctx.channel.send(content="", stickers=[sticker])
+
+    @command_with_perms(
+        min_role="Soaper",
+        name="nnidcomplete",
+        aliases=["nniddone", "nnidtransfercomplete"],
+        help="Displays NNID transfer completion message",
+    )
+    @nnid_channels_only()
+    async def nnidcomplete(self, ctx):
+        member_obj = None
+        topic = getattr(ctx.channel, "topic", None)
+        if isinstance(ctx.channel, discord.TextChannel) and topic:
+            m = MENTION_RE.search(topic)
+            if m:
+                uid = int(m.group(1))
+                member_obj = ctx.guild.get_member(uid)
+                if member_obj is None:
+                    try:
+                        member_obj = await ctx.guild.fetch_member(uid)
+                    except discord.NotFound:
+                        member_obj = None
+        if not member_obj:
+            member_name = ctx.channel.name.removesuffix(NNID_CHANNEL_SUFFIX)
+            member_obj = ctx.guild.get_member_named(member_name)
+
+        embed = discord.Embed(
+            title="🔄 NNID Transfer Complete",
+            description=(
+                "Your Nintendo Network ID has been successfully transferred to your target console. "
+                "Please follow these steps to verify everything is working:\n\n"
+                "**1.** Boot the target console normally\n"
+                "**2.** Go to System Settings → Nintendo Network ID Settings\n"
+                "**3.** Let us know if you can log into your Nintendo Network ID.\n"
+                "**4.** Try opening the eShop and confirm your titles are available in Redownloadable Software."
+                "**5.** If everything is working correctly, you're done!"
+            ),
+            color=discord.Color.orange(),
+        )
+        embed.set_footer(text="Let a Soaper know if you're all set or if you have any questions.")
+        if member_obj:
+            await ctx.respond(content=member_obj.mention, embed=embed)
+        else:
+            await ctx.respond(embed=embed)
+
+        # Increment NNID counter
+        tracker_cog = self.bot.get_cog("TrackerCog")
+        if tracker_cog:
+            tracker_cog.increment_nnid_count()
+            await tracker_cog.update_trackers(ctx.guild)
 
     @command_with_perms(
         name="removennid", aliases=["nnidremove"], help="NNID Removal instructions"

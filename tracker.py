@@ -5,12 +5,7 @@ from pathlib import Path
 from discord.ext import commands
 from discord.ext.bridge import BridgeOption
 from perms import command_with_perms
-from constants import (
-    NNID_CHANNEL_CATEGORY_ID,
-    NNID_CHANNEL_SUFFIX,
-    SOAP_TRACKER_ID,
-    NNID_TRACKER_ID,
-)
+from constants import SOAP_TRACKER_ID, NNID_TRACKER_ID
 
 TRACKER_COUNTS_FILE = Path(__file__).parent / "tracker_counts.json"
 
@@ -125,14 +120,6 @@ class TrackerCog(commands.Cog):
             
             # Wait 5 minutes (300 seconds)
             await asyncio.sleep(300)
-
-    @commands.Cog.listener()
-    async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
-        """Count NNID when channel is deleted (only updates JSON, not voice channels)"""
-        if isinstance(channel, discord.TextChannel):
-            if channel.category and channel.category.id == NNID_CHANNEL_CATEGORY_ID:
-                if channel.name.endswith(NNID_CHANNEL_SUFFIX):
-                    self.increment_nnid_count()
 
     @command_with_perms(
         allowed_roles=["Developer", "Staff"],
