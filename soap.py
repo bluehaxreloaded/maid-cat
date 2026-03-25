@@ -167,7 +167,7 @@ class ArchiveConfirmView(discord.ui.View):
             await channel.delete()
         except discord.NotFound:
             pass
-        await _try_log_soap(interaction, "Deleted archived channel (early)")
+        await log_to_soaper_log(interaction, "Deleted archived channel (early)")
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -666,6 +666,56 @@ class SoapCog(commands.Cog):  # SOAP commands
                 await ctx.respond(msg, ephemeral=True)
             else:
                 await ctx.send(msg)
+    
+    @command_with_perms(
+        allowed_roles=["Staff"],
+        name="deletearchive",
+        aliases=["ocean", "clearaep", "megaboom", "gigaboom", "archiveboom"],
+        help="Clears the AEP archive",
+    )
+    async def deletearchive(self, ctx):
+        if not TEMP_ARCHIVE_CATEGORY_ID:
+            await ctx.respond("The temp archive category is not set!", ephemeral=True)
+            return
+
+        deferred = False
+        if hasattr(ctx, "defer"):
+            try:
+                await ctx.defer(ephemeral=True)
+                deferred = True
+            except Exception:
+                pass
+
+        deleted = 0
+        failed = 0
+        for guild in self.bot.guilds:
+            temp_cat = discord.utils.get(guild.categories, id=TEMP_ARCHIVE_CATEGORY_ID)
+            if not temp_cat:
+                continue
+            # Snapshot: deleting mutates the category's channel list
+            for channel in list(temp_cat.channels):
+                if not isinstance(channel, discord.TextChannel):
+                    continue
+                topic = await _get_channel_topic(channel)
+                if not ARCHIVE_DELETION_REGEX.search(topic):
+                    continue
+                try:
+                    await channel.delete()
+                    deleted += 1
+                except (discord.Forbidden, discord.HTTPException, discord.NotFound) as e:
+                    failed += 1
+                    print(f"deletearchive: could not delete #{channel.name}: {e}")
+
+        await self._update_archive_category_name()
+
+        summary = f"Deleted **{deleted}** archived channel(s)."
+        if failed:
+            summary += f" ({failed} failed.)"
+        if deferred:
+            await ctx.followup.send(summary, ephemeral=True)
+        else:
+            await ctx.respond(summary, ephemeral=True)
+        await log_to_soaper_log(ctx, f"Mass deleted archived channels early (deleted={deleted}, failed={failed})")
 
     @command_with_perms(
         min_role="Soaper",
