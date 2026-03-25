@@ -678,8 +678,9 @@ class SoapCog(commands.Cog):  # SOAP commands
             await ctx.respond("The temp archive category is not set!", ephemeral=True)
             return
 
+        # Only defer for slash: prefix BridgeExtContext may have defer but no followup.
         deferred = False
-        if hasattr(ctx, "defer"):
+        if hasattr(ctx, "defer") and hasattr(ctx, "followup"):
             try:
                 await ctx.defer(ephemeral=True)
                 deferred = True
