@@ -470,7 +470,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
 
     @command_with_perms(
         name="cfwupdate",
-        aliases=["cfwrestore", "updatecfw"],
+        aliases=["cfwrestore", "update", "emptysd"],
         help="Restoring or updating CFW / lost SD card contents",
     )
     async def cfwupdate(self, ctx):
