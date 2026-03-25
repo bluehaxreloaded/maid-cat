@@ -330,8 +330,8 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         await ctx.respond(embed=embed)
 
     @command_with_perms(
-        name="homebrewtransfer",
-        aliases=["hbapptransfer", "keephomebrewapps"],
+        name="transfer",
+        aliases=["homebrewtransfer", "keephomebrewapps"],
         help="Instructions to keep Homebrew apps after system transfer",
     )
     async def homebrewaftertransfer(self, ctx):
