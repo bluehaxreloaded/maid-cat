@@ -340,7 +340,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             description=(
                 "**1.** Install CFW on the new console using [3ds.hacks.guide](<https://3ds.hacks.guide/>)\n"
                 "**2.** Do a system transfer normally. Choose \"Don't use the guide\" then \"PC-based transfer\" if asked.\n"
-                "**3.** On the new console, download faketik and place faketik.3dsx in the `/3ds` folder on your SD root.\n"
+                "**3.** On the new console, download [faketik](https://github.com/ihaveamac/faketik/releases) and place faketik.3dsx in the `/3ds` folder on your SD root.\n"
                 "**4.** To access the Homebrew Launcher on the new console, follow [Manually entering Homebrew Launcher](<https://wiki.hacks.guide/wiki/3DS:Troubleshooting/manually_entering_homebrew_launcher>) under Other troubleshooting on the troubleshooting page.\n"
                 "**5.** Once you are in the Homebrew Launcher, run faketik.\n"
                 "**6.** Your Homebrew apps should appear on the homescreen!"
