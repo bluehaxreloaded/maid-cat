@@ -603,11 +603,16 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         if timestamp:
             embed.timestamp = discord.utils.utcnow()
 
-        try:
-            await ctx.defer(ephemeral=True)
-        except Exception:
-            pass
+        deferred = False
+        if hasattr(ctx, "defer") and hasattr(ctx, "followup"):
+            try:
+                await ctx.defer(ephemeral=True)
+                deferred = True
+            except Exception:
+                pass
         await ctx.channel.send(embed=embed)
+        if deferred:
+            await ctx.followup.send("Sent!", ephemeral=True)
 
     @command_with_perms(name="nnidwarning", help="Warning message for NNIDTransfers")
     async def nnidwarning(self, ctx):
