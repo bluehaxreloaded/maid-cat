@@ -21,6 +21,7 @@ bot.load_extension("nnid_request")
 bot.load_extension("tracker")
 bot.load_extension("soap_helper")
 bot.load_extension("inactivity")
+bot.load_extension("serial")
 
 
 @bot.event  # actually show things on error
