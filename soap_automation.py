@@ -205,12 +205,17 @@ class CopySerialView(discord.ui.View):
     async def copy_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
-        serial = self.serial
-        if not serial and interaction.message.embeds:
-            # Fallback: parse from embed description (e.g. "**CWH123456789**")
+        serial = None
+        if interaction.message and interaction.message.embeds:
+            # Always derive from the clicked message to avoid stale serials
+            # from persistent view instances.
             desc = interaction.message.embeds[0].description or ""
-            match = re.search(r"\*\*([A-Z0-9]+)\*\*", desc)
+            match = re.search(r"\b([A-Z]{2,3}\d{8,9})\b", desc)
             serial = match.group(1) if match else None
+
+        # Backward-compatible fallback for older message formats.
+        if not serial and self.serial:
+            serial = self.serial
         if serial:
             await interaction.response.send_message(serial, ephemeral=True)
         else:
@@ -245,7 +250,7 @@ class SerialNumberModal(discord.ui.Modal):
             return
         serial_embed = discord.Embed(
             title="✅ Serial number received",
-            description=f"{interaction.user.mention} submitted: **{serial}**",
+            description=f"**{serial}**",
             color=discord.Color.green(),
         )
         copy_view = CopySerialView(serial=serial)
