@@ -386,7 +386,9 @@ class SOAPRequestCog(commands.Cog):
         self.bot.add_view(SOAPRequestView())
 
     @command_with_perms(
-        name="requestsoap", help="Creates an embed with a button for SOAP requests"
+        name="requestsoap",
+        min_role="Soaper",
+        help="Creates an embed with a button for SOAP requests"
     )
     async def requestsoap(self, ctx):
         if ctx.channel.id == REQUEST_SOAP_CHANNEL_ID:
