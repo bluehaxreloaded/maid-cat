@@ -470,7 +470,9 @@ class NNIDRequestCog(commands.Cog):
         self.bot.add_view(NNIDRequestView())
 
     @command_with_perms(
-        name="requestnnid", help="Creates an embed with a button for NNID transfer requests"
+        name="requestnnid", 
+        min_role="Soaper",
+        help="Creates an embed with a button for NNID transfer requests"
     )
     async def requestnnid(self, ctx):
         if ctx.channel.id == REQUEST_NNID_CHANNEL_ID:
