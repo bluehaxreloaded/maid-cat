@@ -250,7 +250,7 @@ class SerialNumberModal(discord.ui.Modal):
             return
         serial_embed = discord.Embed(
             title="✅ Serial number received",
-            description=f"**{serial}**",
+            description=serial,
             color=discord.Color.green(),
         )
         copy_view = CopySerialView(serial=serial)
