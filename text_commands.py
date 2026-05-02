@@ -232,7 +232,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
                 "**1.** Boot the target console normally\n"
                 "**2.** Go to System Settings → Nintendo Network ID Settings\n"
                 "**3.** Let us know if you can log into your Nintendo Network ID.\n"
-                "**4.** Try opening the eShop and confirm your titles are available in Redownloadable Software."
+                "**4.** Try opening the eShop and confirm your titles are available in Redownloadable Software.\n"
                 "**5.** If everything is working correctly, you're done!"
             ),
             color=discord.Color.orange(),
