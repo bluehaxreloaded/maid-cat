@@ -150,10 +150,10 @@
     "service": "eShop"
   },
   "011-6433": {
-    "title": "eShopDelete Required (NNIDer)",
-    "description": "The NNIDer needs to run eShopDelete to resolve this. Please ask an NNIDer for help.",
+    "title": "EShopDelete Required (NNIDer)",
+    "description": "The NNIDer needs to run EShopDelete to resolve this. Please ask an NNIDer for help.",
     "steps": [
-      "**NNIDer:** Run eShopDelete in cleaninty."
+      "**NNIDer:** Run EShopDelete on the source console in cleaninty."
     ],
     "service": "eShop"
   },
