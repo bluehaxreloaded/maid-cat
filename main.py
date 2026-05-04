@@ -22,46 +22,6 @@ bot.load_extension("tracker")
 bot.load_extension("soap_helper")
 
 
-@bot.event  # variadic command count. unnecessary? maybe. cool? absolutely
-async def on_message(message: discord.Message):
-    if message.author.bot:
-        return
-
-    message.content = message.content.rsplit("|", 1)[
-        0
-    ].strip()  # trash everything not command related
-
-    if (
-        message.content.startswith(".") and not message.content[1] == "."
-    ):  # literally just so "..." doesn't flair up the bot lol
-        if message.content[1].isdigit():  # variadic commands (.#)
-            count = int(message.content[1])
-            if count > 5:
-                return await message.channel.send(
-                    "A maximum of 5 commands are allowed at a time"
-                )
-
-            cmds = message.content[2:].split(sep="|")
-            cmds = [cmd.strip() for cmd in cmds]
-
-            if not cmds:
-                return
-
-            while cmds:
-                cmd = bot.get_command(cmds[0].split()[0])
-
-                if cmd is None:
-                    await on_command_error(
-                        await bot.get_context(message), commands.CommandNotFound()
-                    )
-                else:
-                    message.content = f".{cmds[0].strip()}"
-                    await bot.process_commands(message)
-                cmds = cmds[1:]
-        else:
-            await bot.process_commands(message)
-
-
 @bot.event  # actually show things on error
 async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     try:
