@@ -11,7 +11,7 @@
       "service": "Pokémon Bank"
     },
     "internet_after_soap": {
-      "codes": ["022-5515", "005-4305", "005-4040", "007-2920", "007-2100", "014-0062", "007-2720", "003-2101"],
+      "codes": ["022-5515", "005-4305", "005-4040", "007-2920", "007-2100", "014-0062", "007-2720", "003-2101", "007-2701"],
       "title": "Internet / Network Error After SOAP",
       "description": "This error occurs after a SOAP transfer when your Nintendo 3DS has trouble connecting to Nintendo Network or downloading from the eShop.",
       "steps": [
