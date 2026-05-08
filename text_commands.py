@@ -383,7 +383,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     async def cleaninty(self, ctx):
         embed = discord.Embed(
             title="🧼 SOAP Transfers Overview",
-            description="Learn about how SOAP Transfers work:\n\n"
+            description="This article explains how SOAP Transfers work. Note: You do *not* need to set up Cleaninty yourself! Bluehax, Reloaded does SOAP Transfers for you, so head over to #request-soap to get started. But, if you'd like to learn more about how SOAP Transfers work reference this article:\n\n"
             "[**Cleaninty Article**](<https://wiki.hacks.guide/wiki/3DS:Cleaninty>)",
             color=discord.Color.blue(),
         )
