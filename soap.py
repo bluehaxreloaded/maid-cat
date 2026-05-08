@@ -337,7 +337,7 @@ class SoapCog(commands.Cog):  # SOAP commands
         return False
 
     async def _update_archive_category_name(self):
-        """Rename TEMP_ARCHIVE_CATEGORY to 'AEP Archive [X]' where X = channel count."""
+        """Rename TEMP_ARCHIVE_CATEGORY to 'CYA Archive [X]' where X = channel count."""
         if not TEMP_ARCHIVE_CATEGORY_ID:
             return
         for guild in self.bot.guilds:
@@ -346,7 +346,7 @@ class SoapCog(commands.Cog):  # SOAP commands
                 continue
             text_channels = [c for c in temp_cat.channels if isinstance(c, discord.TextChannel)]
             count = len(text_channels)
-            new_name = f"AEP Archive [{count}]"
+            new_name = f"CYA Archive [{count}]"
             if temp_cat.name != new_name:
                 try:
                     await temp_cat.edit(name=new_name)
@@ -451,7 +451,7 @@ class SoapCog(commands.Cog):  # SOAP commands
                 pass
 
         # Move channel and set topic
-        # Append archive suffix: e.g. aidenkt-soap🧼 -> aidenkt-soap🧼-aep
+        # Append archive suffix: e.g. aidenkt-soap🧼 -> aidenkt-soap🧼-cya
         suffix = ARCHIVE_CHANNEL_SUFFIX if ARCHIVE_CHANNEL_SUFFIX.startswith("-") else "-" + ARCHIVE_CHANNEL_SUFFIX
         archive_name = channel.name.rstrip("-") + suffix
 
@@ -670,8 +670,8 @@ class SoapCog(commands.Cog):  # SOAP commands
     @command_with_perms(
         allowed_roles=["Staff"],
         name="deletearchive",
-        aliases=["ocean", "clearaep", "megaboom", "gigaboom", "archiveboom"],
-        help="Clears the AEP archive",
+        aliases=["ocean", "clearcya", "megaboom", "gigaboom", "archiveboom"],
+        help="Clears the CYA archive",
     )
     async def deletearchive(self, ctx):
         if not TEMP_ARCHIVE_CATEGORY_ID:

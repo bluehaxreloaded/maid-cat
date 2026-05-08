@@ -4,7 +4,7 @@ KEY = "" # i shouldn't have to explain this one
 
 SOAP_CHANNEL_SUFFIX = "-soap🧼" # what each soap channel ends with
 NNID_CHANNEL_SUFFIX = "-nnid🔑" # what each nnid channel ends with
-ARCHIVE_CHANNEL_SUFFIX = "-aep"  # suffix when renaming to archive
+ARCHIVE_CHANNEL_SUFFIX = "-cya"  # suffix when renaming to archive
 BOOM_EMOTE_ID = "boomparrot" # emoji shown on boom (deletesoap)
 BLOBSOAP_EMOTE_ID = # SOAP loading emote ID
 SOAP_LOADING_ID =  # SOAP loading sticker ID
