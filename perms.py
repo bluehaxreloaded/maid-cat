@@ -20,7 +20,11 @@ def _has_role_or_higher(member: discord.Member, role: discord.Role) -> bool:
 
 
 def command_with_perms(
-    *, min_role: str = "Default", allowed_roles: list[str] | None = None, slash: bool = True, **kwargs
+    *,
+    min_role: str = "Default",
+    allowed_roles: list[str] | None = None,
+    slash: bool = True,
+    **kwargs,
 ):
     """Decorator for bridge/prefix commands with role-based permission checking.
     Use min_role for a single role (or hierarchy). Use allowed_roles for "any of these roles"."""
@@ -63,9 +67,13 @@ def command_with_perms(
 
         # Create the command
         if slash:
-            cmd = bridge.bridge_command(extras={"min_role": extras_role}, **cmd_kwargs)(checked_func)
+            cmd = bridge.bridge_command(extras={"min_role": extras_role}, **cmd_kwargs)(
+                checked_func
+            )
         else:
-            cmd = commands.command(extras={"min_role": extras_role}, **cmd_kwargs)(checked_func)
+            cmd = commands.command(extras={"min_role": extras_role}, **cmd_kwargs)(
+                checked_func
+            )
 
         return cmd
 
@@ -93,6 +101,7 @@ def soap_channels_only():  # lock command to SOAP, NNID and dev channels only
 
 def nnid_channels_only():
     """Lock command to NNID channels only."""
+
     def decorator(func):
         async def nnid_chan(ctx):
             category = getattr(ctx.channel, "category", None)

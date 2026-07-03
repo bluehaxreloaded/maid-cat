@@ -213,7 +213,9 @@ class RegionChangeView(discord.ui.View):
                 ),
                 color=discord.Color.blue(),
             )
-            embed.set_footer(text="When you’re ready, click the button below to create your SOAP channel.")
+            embed.set_footer(
+                text="When you’re ready, click the button below to create your SOAP channel."
+            )
             view = SOAPConfirmView(self.user)
             await interaction.response.edit_message(embed=embed, view=view)
 
@@ -322,14 +324,18 @@ class SOAPRequestView(discord.ui.View):
             return
 
         # check if user has the restricted role (set role in constants.py)
-        restricted_role = discord.utils.get(interaction.guild.roles, id=RESTRICTED_ROLE_ID)
+        restricted_role = discord.utils.get(
+            interaction.guild.roles, id=RESTRICTED_ROLE_ID
+        )
         if restricted_role in interaction.user.roles:
             embed = discord.Embed(
                 title="⛔ Restricted from Bluehax Services",
                 description="You are unable to request a new SOAP transfer. This restriction may be temporary or permanent, depending on the reason.\n\nYou may still receive help with previously completed SOAP transfers in #soap-help.",
                 color=discord.Color.red(),
             )
-            embed.set_footer(text="If you believe this is a mistake, please contact a Soaper or Staff Member.")
+            embed.set_footer(
+                text="If you believe this is a mistake, please contact a Soaper or Staff Member."
+            )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -367,7 +373,7 @@ class SOAPRequestCog(commands.Cog):
         )
         embed.set_footer(text="Click the button below to request a SOAP transfer.")
         view = SOAPRequestView()
-        
+
         # Try to load the image file
         file = None
         try:
@@ -377,7 +383,7 @@ class SOAPRequestCog(commands.Cog):
         except FileNotFoundError as e:
             print(f"Error: Could not find assets/SOAPTransfer.webp - {e}")
             pass
-        
+
         return embed, view, file
 
     # This fixes broken embeds if the bot stops.
@@ -388,7 +394,7 @@ class SOAPRequestCog(commands.Cog):
     @command_with_perms(
         name="requestsoap",
         min_role="Soaper",
-        help="Creates an embed with a button for SOAP requests"
+        help="Creates an embed with a button for SOAP requests",
     )
     async def requestsoap(self, ctx):
         if ctx.channel.id == REQUEST_SOAP_CHANNEL_ID:

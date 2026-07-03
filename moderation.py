@@ -42,7 +42,7 @@ def _format_pst_time() -> str:
     """Format current time in PST as 'Today at 4:04PM' or '12/7/2025 at 4:04PM'."""
     pst = timezone(timedelta(hours=-8))  # PST is UTC-8
     now_pst = datetime.now(pst)
-    
+
     # Format time (12-hour format with AM/PM)
     hour = now_pst.hour
     minute = now_pst.minute
@@ -51,7 +51,7 @@ def _format_pst_time() -> str:
     if hour_12 == 0:
         hour_12 = 12
     time_str = f"{hour_12}:{minute:02d}{period}"
-    
+
     return f"Today at {time_str}"
 
 
@@ -107,9 +107,9 @@ class HelpeeLeftView(discord.ui.View):
             return
 
         is_soap = (
-            (channel.category.id == SOAP_CHANNEL_CATEGORY_ID and channel.name.endswith(SOAP_CHANNEL_SUFFIX))
-            or channel.category.id == MANUAL_SOAP_CATEGORY_ID
-        )
+            channel.category.id == SOAP_CHANNEL_CATEGORY_ID
+            and channel.name.endswith(SOAP_CHANNEL_SUFFIX)
+        ) or channel.category.id == MANUAL_SOAP_CATEGORY_ID
         is_nnid = (
             channel.category.id == NNID_CHANNEL_CATEGORY_ID
             and channel.name.endswith(NNID_CHANNEL_SUFFIX)
@@ -220,7 +220,7 @@ class ModerationCog(commands.Cog):
 
         embed.set_author(name=author_name, icon_url=author_icon)
         embed.set_thumbnail(url=user.display_avatar.url)
-        
+
         # User mention and username
         embed.add_field(
             name="",
@@ -236,12 +236,12 @@ class ModerationCog(commands.Cog):
                 value=length_str,
                 inline=False,
             )
-        
+
         # Footer with ID and timestamp (PST)
         timestamp = _format_pst_time()
         embed.set_footer(text=f"ID: {user.id} • {timestamp}")
 
-         # Reason, if available
+        # Reason, if available
         if reason:
             embed.add_field(
                 name="Reason",
@@ -334,7 +334,9 @@ class ModerationCog(commands.Cog):
         reason = None
 
         try:
-            async for entry in guild.audit_logs(action=discord.AuditLogAction.ban, limit=5):
+            async for entry in guild.audit_logs(
+                action=discord.AuditLogAction.ban, limit=5
+            ):
                 if entry.target.id == user.id:
                     moderator = entry.user
                     reason = entry.reason
@@ -365,7 +367,9 @@ class ModerationCog(commands.Cog):
         reason = None
 
         try:
-            async for entry in guild.audit_logs(action=discord.AuditLogAction.unban, limit=5):
+            async for entry in guild.audit_logs(
+                action=discord.AuditLogAction.unban, limit=5
+            ):
                 if entry.target.id == user.id:
                     moderator = entry.user
                     reason = entry.reason
@@ -403,8 +407,10 @@ class ModerationCog(commands.Cog):
                 ):
                     if (
                         entry.target.id == after.id
-                        and getattr(entry.after, "communication_disabled_until", None) is not None
-                        and getattr(entry.before, "communication_disabled_until", None) is None
+                        and getattr(entry.after, "communication_disabled_until", None)
+                        is not None
+                        and getattr(entry.before, "communication_disabled_until", None)
+                        is None
                     ):
                         moderator = entry.user
                         reason = entry.reason
@@ -432,7 +438,8 @@ class ModerationCog(commands.Cog):
                 ):
                     if (
                         entry.target.id == after.id
-                        and getattr(entry.after, "communication_disabled_until", None) is None
+                        and getattr(entry.after, "communication_disabled_until", None)
+                        is None
                         and getattr(entry.before, "communication_disabled_until", None)
                     ):
                         moderator = entry.user
@@ -453,7 +460,9 @@ class ModerationCog(commands.Cog):
 
     # Message edit/delete logs
 
-    def _get_message_log_channel(self, guild: discord.Guild) -> discord.TextChannel | None:
+    def _get_message_log_channel(
+        self, guild: discord.Guild
+    ) -> discord.TextChannel | None:
         """Return the message log channel, if configured."""
         if not MESSAGE_LOG_ID:
             return None
@@ -535,9 +544,7 @@ class ModerationCog(commands.Cog):
         if len(content) > 1024:
             content = content[:1021] + "..."
 
-        first_line = (
-            f"**Message sent by {message.author.mention} • Deleted in {message.channel.mention}**"
-        )
+        first_line = f"**Message sent by {message.author.mention} • Deleted in {message.channel.mention}**"
         embed.description = f"{first_line}\n{content}"
 
         timestamp = _format_pst_time()
@@ -576,7 +583,8 @@ class ModerationCog(commands.Cog):
             await channel.purge()
         except Exception:
             return await ctx.respond(
-                "Failed to clear the spam bot channel. Check my permissions.", ephemeral=True
+                "Failed to clear the spam bot channel. Check my permissions.",
+                ephemeral=True,
             )
 
         # Ensure info message is resent
@@ -615,7 +623,10 @@ class ModerationCog(commands.Cog):
             return await ctx.respond(embed=embed, ephemeral=True)
 
         # Check role hierarchy - can't restrict users with equal or higher roles
-        if ctx.author.top_role.position <= user.top_role.position and ctx.author != ctx.guild.owner:
+        if (
+            ctx.author.top_role.position <= user.top_role.position
+            and ctx.author != ctx.guild.owner
+        ):
             embed = discord.Embed(
                 title="❌ Permission Denied",
                 description=f"You cannot restrict {user.mention} because they have an equal or higher role than you.",
@@ -634,7 +645,9 @@ class ModerationCog(commands.Cog):
 
         # Add the role
         try:
-            await user.add_roles(restricted_role, reason=reason or f"Restricted by {ctx.author}")
+            await user.add_roles(
+                restricted_role, reason=reason or f"Restricted by {ctx.author}"
+            )
         except discord.Forbidden:
             embed = discord.Embed(
                 title="❌ Permission Error",
@@ -711,7 +724,10 @@ class ModerationCog(commands.Cog):
 
         # Check role hierarchy - can't unrestrict users with equal or higher roles (unless they're already restricted)
         # But we still check hierarchy to prevent abuse
-        if ctx.author.top_role.position <= user.top_role.position and ctx.author != ctx.guild.owner:
+        if (
+            ctx.author.top_role.position <= user.top_role.position
+            and ctx.author != ctx.guild.owner
+        ):
             embed = discord.Embed(
                 title="❌ Permission Denied",
                 description=f"You cannot modify restrictions for {user.mention} because they have an equal or higher role than you.",
@@ -730,7 +746,9 @@ class ModerationCog(commands.Cog):
 
         # Remove the role
         try:
-            await user.remove_roles(restricted_role, reason=reason or f"Unrestricted by {ctx.author}")
+            await user.remove_roles(
+                restricted_role, reason=reason or f"Unrestricted by {ctx.author}"
+            )
         except discord.Forbidden:
             embed = discord.Embed(
                 title="❌ Permission Error",
@@ -784,10 +802,14 @@ class ModerationCog(commands.Cog):
 
         guild = member.guild
         try:
-            async for entry in guild.audit_logs(action=discord.AuditLogAction.kick, limit=5):
+            async for entry in guild.audit_logs(
+                action=discord.AuditLogAction.kick, limit=5
+            ):
                 if entry.target.id == member.id:
                     # Only log if the kick is recent (within ~10 seconds)
-                    if (datetime.now(timezone.utc) - entry.created_at).total_seconds() <= 10:
+                    if (
+                        datetime.now(timezone.utc) - entry.created_at
+                    ).total_seconds() <= 10:
                         await self._log_mod_action(
                             guild=guild,
                             user=member,
@@ -814,12 +836,11 @@ class ModerationCog(commands.Cog):
                 continue
             # Channel belongs to this member - check if it's SOAP or NNID
             is_soap = (
-                (ch.category.id == SOAP_CHANNEL_CATEGORY_ID and ch.name.endswith(SOAP_CHANNEL_SUFFIX))
-                or ch.category.id == MANUAL_SOAP_CATEGORY_ID
-            )
-            is_nnid = (
-                ch.category.id == NNID_CHANNEL_CATEGORY_ID
-                and ch.name.endswith(NNID_CHANNEL_SUFFIX)
+                ch.category.id == SOAP_CHANNEL_CATEGORY_ID
+                and ch.name.endswith(SOAP_CHANNEL_SUFFIX)
+            ) or ch.category.id == MANUAL_SOAP_CATEGORY_ID
+            is_nnid = ch.category.id == NNID_CHANNEL_CATEGORY_ID and ch.name.endswith(
+                NNID_CHANNEL_SUFFIX
             )
             if not (is_soap or is_nnid):
                 continue
@@ -842,7 +863,7 @@ class ModerationCog(commands.Cog):
         # Only process messages in the spam bot channel
         if not message.guild or message.channel.id != SPAM_BOT_CHANNEL_ID:
             return
-        
+
         # Ignore bot messages
         if message.author.bot:
             return
@@ -864,10 +885,12 @@ class ModerationCog(commands.Cog):
             if ch is None or not isinstance(ch, discord.TextChannel):
                 return
             try:
+
                 def keep_info_embed(m: discord.Message) -> bool:
                     if m.author != self.bot.user or not m.embeds:
                         return False
                     return m.embeds[0].title == "🍯 Honeypot"
+
                 await ch.purge(limit=50, check=lambda m: not keep_info_embed(m))
             except Exception:
                 pass
@@ -921,4 +944,3 @@ class ModerationCog(commands.Cog):
 
 def setup(bot: commands.Bot):
     bot.add_cog(ModerationCog(bot))
-

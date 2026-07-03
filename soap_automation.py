@@ -40,6 +40,7 @@ class CompletionFollowUpView(discord.ui.View):
 
     def _start_auto_close(self, bot, guild, channel_id):
         """Start the auto-close timer for this channel."""
+
         async def auto_close():
             try:
                 await asyncio.sleep(SOAP_COMPLETION_AUTO_CLOSE_MINUTES * 60)
@@ -55,7 +56,7 @@ class CompletionFollowUpView(discord.ui.View):
                 # Extract user ID from channel topic for logging
                 user_id = None
                 if channel.topic:
-                    match = re.search(r'<@!?(\d+)>', channel.topic)
+                    match = re.search(r"<@!?(\d+)>", channel.topic)
                     if match:
                         user_id = int(match.group(1))
 
@@ -67,13 +68,21 @@ class CompletionFollowUpView(discord.ui.View):
                         try:
                             user = guild.get_member(user_id)
                             if user:
-                                ctx = type('Context', (), {
-                                    'guild': guild,
-                                    'message': type('Message', (), {
-                                        'author': user,
-                                        'content': 'Completion timeout'
-                                    })()
-                                })()
+                                ctx = type(
+                                    "Context",
+                                    (),
+                                    {
+                                        "guild": guild,
+                                        "message": type(
+                                            "Message",
+                                            (),
+                                            {
+                                                "author": user,
+                                                "content": "Completion timeout",
+                                            },
+                                        )(),
+                                    },
+                                )()
                                 await log_to_soaper_log(ctx, "Removed SOAP Channel")
                         except Exception:
                             pass
@@ -259,7 +268,9 @@ class SerialNumberModal(discord.ui.Modal):
         # Disable buttons on the serial prompt message
         if self.prompt_message_id and interaction.channel:
             try:
-                prompt_msg = await interaction.channel.fetch_message(self.prompt_message_id)
+                prompt_msg = await interaction.channel.fetch_message(
+                    self.prompt_message_id
+                )
                 view = self.prompt_view_class()
                 for item in view.children:
                     item.disabled = True
@@ -332,11 +343,13 @@ class SerialNumberCheckView(discord.ui.View):
                 "- Hold START while powering on your console. This will boot you into GodMode9.\n"
                 "- Go to `[2:] SYSNAND TWLN` -> `sys` -> `log` -> `inspect.log`\n"
                 "- Select `Open in Textviewer`.\n\n"
-                "The correct serial number (three-letter prefix followed by nine numbers) should be in the file."
+                "The correct serial number (two or three-letter prefix followed by eight numbers) should be in the file."
             ),
             color=discord.Color.blue(),
         )
-        instructions_embed.set_footer(text="You may also send us a picture if you're unsure.")
+        instructions_embed.set_footer(
+            text="You may also send us a picture if you're unsure."
+        )
         await interaction.followup.send(embed=instructions_embed)
 
         # Send follow-up with Yes / No, I need further assistance
@@ -444,7 +457,11 @@ class EshopVerificationView(discord.ui.View):
         channel = interaction.channel
 
         # Check if channel is in manual SOAP category
-        is_manual_soap = channel and channel.category and channel.category.id == MANUAL_SOAP_CATEGORY_ID
+        is_manual_soap = (
+            channel
+            and channel.category
+            and channel.category.id == MANUAL_SOAP_CATEGORY_ID
+        )
 
         if is_manual_soap:
             completion_embed = discord.Embed(
@@ -576,14 +593,14 @@ class SOAPAutomationCog(commands.Cog):
             if msg.author == self.bot.user and msg.embeds:
                 if (
                     msg.embeds[0].author
-                    and msg.embeds[0].author.name
-                    == "🧼 SOAP Transfer - In Progress"
+                    and msg.embeds[0].author.name == "🧼 SOAP Transfer - In Progress"
                 ):
                     return msg
         return None
 
     async def _delete_progress_message(self, target_channel: discord.TextChannel):
         """Delete the progress message from the channel asynchronously."""
+
         async def delete_progress():
             progress_message = await self._find_progress_message(target_channel)
             if progress_message:
@@ -609,7 +626,7 @@ class SOAPAutomationCog(commands.Cog):
         steps_embed = discord.Embed(
             title="1️⃣ Please provide your serial number",
             description=(
-                "To find your console's serial number, refer to the sticker on the back of your console. The serial number has a three-letter prefix followed by nine numbers.\n\n"
+                "To find your console's serial number, refer to the sticker on the back of your console. The serial number has a two or three-letter prefix followed by nine numbers.\n\n"
                 "Were you able to find your serial number?"
             ),
             color=discord.Color.blue(),
@@ -641,7 +658,7 @@ class SOAPAutomationCog(commands.Cog):
                 description="It's currently late at night in North America, so most of our Soapers are offline. Response times may be slower than usual. Please follow the instructions above and we'll assist you as soon as possible.\n\n",
                 color=discord.Color(0xD50032),
             )
-            late_night_embed.set_footer(text="Thank you for your patience!"),
+            (late_night_embed.set_footer(text="Thank you for your patience!"),)
             await channel.send(embed=late_night_embed)
 
     @command_with_perms(
@@ -791,7 +808,6 @@ class SOAPAutomationCog(commands.Cog):
                 "**3.** If using Pretendo, switch to Nintendo Network with Nimbus.\n"
                 "**4.** Then try opening the eShop.\n"
                 "**5.** Does the eShop launch successfully?",
-
                 color=discord.Color.green(),
             )
             embed.set_footer(
@@ -799,9 +815,7 @@ class SOAPAutomationCog(commands.Cog):
             )
             view = EshopVerificationView()
             user_mention = f"<@{user_id}>" if user_id else None
-            await target_channel.send(
-                content=user_mention, embed=embed, view=view
-            )
+            await target_channel.send(content=user_mention, embed=embed, view=view)
 
             # Delete progress message asynchronously after sending success message
             await self._delete_progress_message(target_channel)
@@ -840,9 +854,7 @@ class SOAPAutomationCog(commands.Cog):
             )
             view = EshopVerificationView()
             user_mention = f"<@{user_id}>" if user_id else None
-            await target_channel.send(
-                content=user_mention, embed=embed, view=view
-            )
+            await target_channel.send(content=user_mention, embed=embed, view=view)
 
             # Update progress to 100% and delete asynchronously after sending lottery message
             async def update_and_delete_progress():
@@ -868,7 +880,9 @@ class SOAPAutomationCog(commands.Cog):
             await self._delete_progress_message(target_channel)
 
             # Check if it's a serial mismatch error
-            is_serial_error = status_detail and "SERIAL_MISMATCH" in status_detail.upper()
+            is_serial_error = (
+                status_detail and "SERIAL_MISMATCH" in status_detail.upper()
+            )
 
             if is_serial_error:
                 # Try to recover the user ID from the channel topic so we can mention them.
@@ -891,13 +905,15 @@ class SOAPAutomationCog(commands.Cog):
                         "- Hold START while powering on your console. This will boot you into GodMode9.\n"
                         "- Go to `[2:] SYSNAND TWLN` -> `sys` -> `log` -> `inspect.log`\n"
                         "- Select `Open in Textviewer`.\n\n"
-                        "The correct serial number (three-letter prefix followed by nine numbers) should be in the file. "
+                        "The correct serial number (two or three-letter prefix followed by eight numbers) should be in the file. "
                         "You may also send us a picture if you're unsure."
                     ),
                     color=discord.Color.yellow(),
                 )
                 user_mention = f"<@{user_id}>" if user_id else None
-                embed.set_footer(text="Once you've found the serial number and send it here, we will resume your SOAP Transfer.")
+                embed.set_footer(
+                    text="Once you've found the serial number and send it here, we will resume your SOAP Transfer."
+                )
                 await target_channel.send(content=user_mention, embed=embed)
 
             else:

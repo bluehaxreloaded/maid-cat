@@ -47,7 +47,7 @@ class NNIDCog(commands.Cog):  # NNID commands
         )
         # Send with mention
         await channel.send(content=user.mention, embed=embed)
-        
+
         # Send late night delay warning if applicable
         if is_late_night_hours():
             late_night_embed = discord.Embed(
@@ -55,7 +55,7 @@ class NNIDCog(commands.Cog):  # NNID commands
                 description="It's currently late at night in North America, so most of our Soapers are offline. Response times may be slower than usual. Please follow the instructions above and we'll assist you as soon as possible.\n\n",
                 color=discord.Color(0xD50032),
             )
-            late_night_embed.set_footer(text="Thank you for your patience!"),
+            (late_night_embed.set_footer(text="Thank you for your patience!"),)
             await channel.send(embed=late_night_embed)
 
     async def create_nnid_channel_for_user(
@@ -172,7 +172,12 @@ class NNIDCog(commands.Cog):  # NNID commands
         )  # channels can't have periods
         channel = discord.utils.get(ctx.guild.channels, name=channel_name)
         # Don't count archived channels as existing
-        if channel and TEMP_ARCHIVE_CATEGORY_ID and channel.category and channel.category.id == TEMP_ARCHIVE_CATEGORY_ID:
+        if (
+            channel
+            and TEMP_ARCHIVE_CATEGORY_ID
+            and channel.category
+            and channel.category.id == TEMP_ARCHIVE_CATEGORY_ID
+        ):
             channel = None
 
         if channel:

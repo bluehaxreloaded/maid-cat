@@ -9,6 +9,7 @@ from constants import SOAP_TRACKER_ID, NNID_TRACKER_ID
 
 TRACKER_COUNTS_FILE = Path(__file__).parent / "tracker_counts.json"
 
+
 class TrackerCog(commands.Cog):
     """Cog to track and update SOAP and NNID channel counts in voice channel names"""
 
@@ -74,7 +75,9 @@ class TrackerCog(commands.Cog):
                     if soap_tracker.name != new_name:
                         await soap_tracker.edit(name=new_name)
                 elif not soap_tracker:
-                    print(f"SOAP tracker channel {SOAP_TRACKER_ID} not found in guild {guild.id}")
+                    print(
+                        f"SOAP tracker channel {SOAP_TRACKER_ID} not found in guild {guild.id}"
+                    )
             except discord.Forbidden:
                 print("No permission to edit SOAP tracker channel")
             except Exception as e:
@@ -92,7 +95,9 @@ class TrackerCog(commands.Cog):
                     if nnid_tracker.name != new_name:
                         await nnid_tracker.edit(name=new_name)
                 elif not nnid_tracker:
-                    print(f"NNID tracker channel {NNID_TRACKER_ID} not found in guild {guild.id}")
+                    print(
+                        f"NNID tracker channel {NNID_TRACKER_ID} not found in guild {guild.id}"
+                    )
             except discord.Forbidden:
                 print("No permission to edit NNID tracker channel")
             except Exception as e:
@@ -104,7 +109,7 @@ class TrackerCog(commands.Cog):
         # Update immediately on startup
         for guild in self.bot.guilds:
             await self.update_trackers(guild)
-        
+
         # Start background task to update every 5 minutes
         self.bot.loop.create_task(self._periodic_update())
 
@@ -117,7 +122,7 @@ class TrackerCog(commands.Cog):
                     await self.update_trackers(guild)
             except Exception as e:
                 print(f"Error in periodic tracker update: {e}")
-            
+
             # Wait 5 minutes (300 seconds)
             await asyncio.sleep(300)
 
@@ -131,7 +136,9 @@ class TrackerCog(commands.Cog):
         """Force synchronize voice channels with JSON counts"""
         soap_count, nnid_count = self._read_counts()
 
-        await ctx.respond(f"🔄 Synchronizing trackers... (SOAP: {soap_count}, NNID: {nnid_count})")
+        await ctx.respond(
+            f"🔄 Synchronizing trackers... (SOAP: {soap_count}, NNID: {nnid_count})"
+        )
 
         for guild in self.bot.guilds:
             await self.update_trackers(guild)
@@ -172,9 +179,10 @@ class TrackerCog(commands.Cog):
         for guild in self.bot.guilds:
             await self.update_trackers(guild)
 
-        await ctx.respond(f"✅ **{counter_lower.upper()}** count set to {value}. (SOAP: {soap_count}, NNID: {nnid_count})")
+        await ctx.respond(
+            f"✅ **{counter_lower.upper()}** count set to {value}. (SOAP: {soap_count}, NNID: {nnid_count})"
+        )
 
 
 def setup(bot):
     return bot.add_cog(TrackerCog(bot))
-

@@ -35,6 +35,7 @@ def _load_error_info(error_code: str) -> dict | None:
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
+
 def _format_steps(steps: list, level: int = 0) -> str:
     """Formats the list of steps so it can be sent within Discord."""
     output = []
@@ -45,16 +46,16 @@ def _format_steps(steps: list, level: int = 0) -> str:
             output.append(_format_steps(step, level + 1))
         else:
             output.append(("  " * level) + str(stepNum) + ". " + step)
-    
+
     return "\n".join(output)
 
 
 class ErrorResolutionView(discord.ui.View):
     """View with buttons to confirm if error was resolved"""
-    
+
     def __init__(self):
         super().__init__(timeout=None)
-    
+
     @discord.ui.button(
         label="Yes, my issue is resolved",
         style=discord.ButtonStyle.success,
@@ -68,9 +69,9 @@ class ErrorResolutionView(discord.ui.View):
         # Disable all buttons
         for item in self.children:
             item.disabled = True
-        
+
         await interaction.response.edit_message(view=self)
-    
+
     @discord.ui.button(
         label="No, I still need help",
         style=discord.ButtonStyle.danger,
@@ -84,9 +85,9 @@ class ErrorResolutionView(discord.ui.View):
         # Disable all buttons
         for item in self.children:
             item.disabled = True
-        
+
         await interaction.response.edit_message(view=self)
-        
+
         # Show SOAP helper again
         embed = discord.Embed(
             title="🔍 SOAP Helper",
@@ -303,7 +304,9 @@ class ErrorCodeModal(discord.ui.Modal):
             )
 
             target_message = getattr(self, "target_message", None)
-            view = InvalidErrorCodeView(target_message=target_message, context=self.context)
+            view = InvalidErrorCodeView(
+                target_message=target_message, context=self.context
+            )
 
             if target_message is not None:
                 # Edit the existing awaiting message
@@ -323,10 +326,10 @@ class ErrorCodeModal(discord.ui.Modal):
 
         # Load error definition from database
         error_info = _load_error_info(error_code)
-        
+
         if error_info:
             steps_text = _format_steps(error_info["steps"])
-            
+
             embed = discord.Embed(
                 title=f"{error_code} - {error_info['title']}",
                 description=(
@@ -335,12 +338,16 @@ class ErrorCodeModal(discord.ui.Modal):
                 ),
                 color=discord.Color.blue(),
             )
-            
-            embed.set_footer(text="Try these steps and let us know if the issue is resolved.")
+
+            embed.set_footer(
+                text="Try these steps and let us know if the issue is resolved."
+            )
 
             target_message = getattr(self, "target_message", None)
 
-            followup_embed, followup_view = self._get_followup_embed_and_view(interaction)
+            followup_embed, followup_view = self._get_followup_embed_and_view(
+                interaction
+            )
 
             if target_message is not None:
                 # Edit the original 'Awaiting' message with the resolution embed
@@ -350,18 +357,24 @@ class ErrorCodeModal(discord.ui.Modal):
                     # Fallback to normal behavior if editing fails
                     await interaction.response.send_message(embed=embed)
                     if followup_embed and followup_view:
-                        await interaction.followup.send(embed=followup_embed, view=followup_view)
+                        await interaction.followup.send(
+                            embed=followup_embed, view=followup_view
+                        )
                 else:
                     # Use the modal response for the follow-up question
                     if followup_embed and followup_view:
-                        await interaction.response.send_message(embed=followup_embed, view=followup_view)
+                        await interaction.response.send_message(
+                            embed=followup_embed, view=followup_view
+                        )
                     else:
                         await interaction.response.defer()
             else:
                 # No target message, behave like the original flow
                 await interaction.response.send_message(embed=embed)
                 if followup_embed and followup_view:
-                    await interaction.followup.send(embed=followup_embed, view=followup_view)
+                    await interaction.followup.send(
+                        embed=followup_embed, view=followup_view
+                    )
         else:
             # Error code not found in our database
             unknown_embed = discord.Embed(
@@ -719,7 +732,7 @@ class SoapHelperDropdown(discord.ui.Select):
                 color=discord.Color.blue(),
             )
             embed.set_footer(text="You may also send us a picture if you're unsure.")
-            
+
         elif value == "region_settings":  # "What is a SOAP lottery?"
             embed = discord.Embed(
                 title="❓ What is a SOAP Lottery?",
@@ -737,8 +750,10 @@ class SoapHelperDropdown(discord.ui.Select):
                 ),
                 color=discord.Color.green(),
             )
-            embed.set_footer(text="Winning the lottery is random and depends on your console's state.")
-            
+            embed.set_footer(
+                text="Winning the lottery is random and depends on your console's state."
+            )
+
         elif value == "nand_backup":  # "Do I have to wait 7 days?"
             embed = discord.Embed(
                 title="⏳ Post-SOAP System Transfer",
@@ -756,7 +771,9 @@ class SoapHelperDropdown(discord.ui.Select):
                 ),
                 color=discord.Color.blue(),
             )
-            embed.set_footer(text="Again, if you don't want to system transfer from your old console to this one, you're free to use your console as normal.")
+            embed.set_footer(
+                text="Again, if you don't want to system transfer from your old console to this one, you're free to use your console as normal."
+            )
 
         elif value == "additional_steps":
             embed = discord.Embed(
@@ -768,7 +785,7 @@ class SoapHelperDropdown(discord.ui.Select):
                 ),
                 color=discord.Color.blue(),
             )
-        
+
         elif value == "another_soap":
             embed = discord.Embed(
                 title="🧼 Can I request a SOAP for another 3DS?",
@@ -813,7 +830,7 @@ class SoapHelperDropdown(discord.ui.Select):
                 allowed_mentions=discord.AllowedMentions(roles=True),
             )
             return
-        
+
         # Send response
         await interaction.response.send_message(embed=embed)
 
@@ -875,7 +892,7 @@ class SoapHelperCog(commands.Cog):
             color=discord.Color.red(),
         )
         embed.set_footer(text="Select an option from the dropdown menu below.")
-        
+
         view = SoapHelperView()
         await ctx.respond(embed=embed, view=view)
 
@@ -913,8 +930,7 @@ class SoapHelperCog(commands.Cog):
         embed = discord.Embed(
             title=f"{raw} - {error_info['title']}",
             description=(
-                f"{error_info['description']}\n\n"
-                f"**Steps to resolve:**\n{steps_text}"
+                f"{error_info['description']}\n\n**Steps to resolve:**\n{steps_text}"
             ),
             color=discord.Color.blue(),
         )

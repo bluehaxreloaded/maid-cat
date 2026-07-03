@@ -1,7 +1,10 @@
 {
   "groups": {
     "pokemon_bank_region_changed": {
-      "codes": ["009-2001", "005-5958"],
+      "codes": [
+        "009-2001",
+        "005-5958"
+      ],
       "title": "Pokémon Bank Authentication/Connection Error",
       "description": "This error occurs when opening Pokémon Bank on a region changed console, which typically requires a SOAP transfer to resolve.",
       "steps": [
@@ -11,7 +14,17 @@
       "service": "Pokémon Bank"
     },
     "internet_after_soap": {
-      "codes": ["022-5515", "005-4305", "005-4040", "007-2920", "007-2100", "014-0062", "007-2720", "003-2101", "007-2701"],
+      "codes": [
+        "022-5515",
+        "005-4305",
+        "005-4040",
+        "007-2920",
+        "007-2100",
+        "014-0062",
+        "007-2720",
+        "003-2101",
+        "007-2701"
+      ],
       "title": "Internet / Network Error After SOAP",
       "description": "This error occurs after a SOAP transfer when your Nintendo 3DS has trouble connecting to Nintendo Network or downloading from the eShop.",
       "steps": [
@@ -26,7 +39,11 @@
       "service": "eShop"
     },
     "pretendo_enabled": {
-      "codes": ["007-2670", "022-5432", "022-2482"],
+      "codes": [
+        "007-2670",
+        "022-5432",
+        "022-2482"
+      ],
       "title": "Network Error - Pretendo Enabled",
       "description": "This error occurs when Pretendo is enabled and you're trying to access Nintendo services.",
       "steps": [
@@ -39,7 +56,10 @@
       "service": "eShop"
     },
     "eshop_region_changed": {
-      "codes": ["007-2001", "005-5602"],
+      "codes": [
+        "007-2001",
+        "005-5602"
+      ],
       "title": "eShop Region-Changed Console Error",
       "description": "This error occurs when opening the eShop on a region changed console, which typically requires a SOAP transfer to resolve.",
       "steps": [
@@ -49,7 +69,10 @@
       "service": "eShop"
     },
     "network_connection_error": {
-      "codes": ["022-5540", "011-3051"],
+      "codes": [
+        "022-5540",
+        "011-3051"
+      ],
       "title": "Network Connection Error",
       "description": "This error can occur due to server maintenance, poor internet connection, or Pretendo being enabled.",
       "steps": [
@@ -61,7 +84,9 @@
       "service": "eShop"
     },
     "eshop_maintenance_or_region": {
-      "codes": ["011-3136"],
+      "codes": [
+        "011-3136"
+      ],
       "title": "eShop Maintenance or Not Available in Region",
       "description": "This error usually means eShop maintenance is in progress, or the eShop is not available in your region. Try the steps below to narrow it down.",
       "steps": [
@@ -77,7 +102,9 @@
       "service": "eShop"
     },
     "removing_nnid": {
-      "codes": ["022-2634"],
+      "codes": [
+        "022-2634"
+      ],
       "title": "Removing Nintendo Network ID",
       "description": "You need to remove the old out-of-region Nintendo Network ID from your system.",
       "steps": [
@@ -107,13 +134,13 @@
     "title": "Out of Region NNID",
     "description": "This error occurs when opening the eShop on a SOAP'd console with an out-of-region Nintendo Network ID. You must remove your old Nintendo Network ID from your system.",
     "steps": [
-        "To resolve, you must remove your old Nintendo Network ID from your system.",
-        [
-          "[Make a new NAND backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) and save it somewhere safe.",
-          "Use GodMode9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>) without having to format your console.",
-          "Create a new Nintendo Network ID on your console in System Settings."
-        ],
-        "After creating the new NNID, try opening either the Nintendo eShop or Pokémon Bank again."
+      "To resolve, you must remove your old Nintendo Network ID from your system.",
+      [
+        "[Make a new NAND backup](<https://3ds.hacks.guide/godmode9-usage.html#creating-a-nand-backup>) and save it somewhere safe.",
+        "Use GodMode9 to [remove your NNID](<https://3ds.hacks.guide/godmode9-usage.html#removing-an-nnid-without-formatting-your-console>) without having to format your console.",
+        "Create a new Nintendo Network ID on your console in System Settings."
+      ],
+      "After creating the new NNID, try opening either the Nintendo eShop or Pokémon Bank again."
     ],
     "service": "eShop"
   },
@@ -187,5 +214,18 @@
       "If you do not have the old console or any of its files, you will need to create a new Nintendo Network ID (NNID) on your console in System Settings."
     ],
     "service": "eShop"
+  },
+  "004-6007": {
+    "title": "NetPass patches issue",
+    "description": "This error means some patches NetPass uses are interfering with SpotPass services.",
+    "steps": [
+      "Open NetPass",
+      "Go to `Settings`",
+      "Go to `Miscellaneous`",
+      "Go to `Update Patches",
+      "Press `Remove`",
+      "Reboot and try again."
+    ],
+    "service": "SpotPass"
   }
 }

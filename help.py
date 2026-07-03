@@ -33,7 +33,9 @@ class HelpView(discord.ui.View):
                     item.disabled = self.index == max_index
         await interaction.response.edit_message(embed=self.current_page, view=self)
 
-    @discord.ui.button(emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="help_prev")
+    @discord.ui.button(
+        emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="help_prev"
+    )
     async def previous_page(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
@@ -41,7 +43,9 @@ class HelpView(discord.ui.View):
             self.index -= 1
         await self._update_message(interaction)
 
-    @discord.ui.button(emoji="➡️", style=discord.ButtonStyle.secondary, custom_id="help_next")
+    @discord.ui.button(
+        emoji="➡️", style=discord.ButtonStyle.secondary, custom_id="help_next"
+    )
     async def next_page(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
@@ -76,15 +80,17 @@ class HelpCog(commands.Cog):
         for page_index in range(0, len(commands_list), page_size):
             chunk = commands_list[page_index : page_index + page_size]
             embed = discord.Embed(
-                title=f"Help (Page {len(pages)+1})",
+                title=f"Help (Page {len(pages) + 1})",
                 color=discord.Color.blue(),
             )
 
             for cmd in chunk:
                 # Prefer the command's help text; fall back to description, then a default.
-                description = getattr(cmd, "help", None) or getattr(
-                    cmd, "description", None
-                ) or "description not provided"
+                description = (
+                    getattr(cmd, "help", None)
+                    or getattr(cmd, "description", None)
+                    or "description not provided"
+                )
                 embed.add_field(
                     name=cmd.name,
                     value=description,
@@ -113,9 +119,11 @@ class HelpCog(commands.Cog):
 
     async def _send_command_help(self, ctx, command: commands.Command):
         """Send detailed help for a single command."""
-        help_text = getattr(command, "help", None) or getattr(
-            command, "description", None
-        ) or "description not provided"
+        help_text = (
+            getattr(command, "help", None)
+            or getattr(command, "description", None)
+            or "description not provided"
+        )
         embed = discord.Embed(
             title=f"{command.name}:",
             color=discord.Color.blue(),
@@ -138,11 +146,15 @@ class HelpCog(commands.Cog):
         else:
             await self._send_all_help(ctx)
 
-    @bridge.bridge_command(name="help", description="Show help information for commands")
+    @bridge.bridge_command(
+        name="help", description="Show help information for commands"
+    )
     async def help_command(
         self,
         ctx,
-        command: BridgeOption(str, "Specific command to get detailed help for", required=False) = None,
+        command: BridgeOption(
+            str, "Specific command to get detailed help for", required=False
+        ) = None,
     ):
         """Help command: works as both prefix (.help) and slash (/help)."""
         await self._handle_help(ctx, command)

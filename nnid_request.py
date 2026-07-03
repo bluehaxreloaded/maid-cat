@@ -2,7 +2,12 @@ from pathlib import Path
 import discord
 from discord.ext import commands
 from perms import command_with_perms
-from constants import REQUEST_NNID_CHANNEL_ID, NNID_CHANNEL_SUFFIX, NNID_CHANNEL_CATEGORY_ID, RESTRICTED_ROLE_ID
+from constants import (
+    REQUEST_NNID_CHANNEL_ID,
+    NNID_CHANNEL_SUFFIX,
+    NNID_CHANNEL_CATEGORY_ID,
+    RESTRICTED_ROLE_ID,
+)
 
 
 class FilesCheckView(discord.ui.View):
@@ -13,7 +18,9 @@ class FilesCheckView(discord.ui.View):
         placeholder="Do you have one of the required files?",
         options=[
             discord.SelectOption(
-                label="Yes, I have one of the three files listed above", value="yes", emoji="✅"
+                label="Yes, I have one of the three files listed above",
+                value="yes",
+                emoji="✅",
             ),
             discord.SelectOption(
                 label="No, I don't have any files", value="no", emoji="❌"
@@ -36,7 +43,9 @@ class FilesCheckView(discord.ui.View):
                 "Please locate one of these files from your previous console before requesting.",
                 color=discord.Color.red(),
             )
-            embed.set_footer(text="If you modded your console, try locating the NAND backup you originally made.")
+            embed.set_footer(
+                text="If you modded your console, try locating the NAND backup you originally made."
+            )
             await interaction.response.edit_message(embed=embed, view=None)
 
         elif files_answer == "unsure":
@@ -47,9 +56,7 @@ class FilesCheckView(discord.ui.View):
             )
             embed.add_field(
                 name="You must have one of the following files from your source console:",
-                value="- `essential.exefs`\n"
-                "- a NAND backup\n"
-                "- `OTP.bin`",
+                value="- `essential.exefs`\n- a NAND backup\n- `OTP.bin`",
                 inline=False,
             )
             await interaction.response.edit_message(embed=embed, view=None)
@@ -82,10 +89,14 @@ class BrokenConsoleCheckView(discord.ui.View):
         placeholder="Do either of the following apply to you?",
         options=[
             discord.SelectOption(
-                label="My source console is broken/inaccessible", value="broken", emoji="✅"
+                label="My source console is broken/inaccessible",
+                value="broken",
+                emoji="✅",
             ),
             discord.SelectOption(
-                label="I'm transferring from a New 3DS/2DS to an Old 3DS/2DS", value="new_to_old", emoji="✅"
+                label="I'm transferring from a New 3DS/2DS to an Old 3DS/2DS",
+                value="new_to_old",
+                emoji="✅",
             ),
             discord.SelectOption(
                 label="No, neither applies to me", value="no", emoji="❌"
@@ -143,7 +154,9 @@ class BrokenConsoleCheckView(discord.ui.View):
                 "3. Follow the on-screen instructions",
                 color=discord.Color.red(),
             )
-            embed.set_footer(text="If anything happens to your console, you can request a transfer here.")
+            embed.set_footer(
+                text="If anything happens to your console, you can request a transfer here."
+            )
             await interaction.response.edit_message(embed=embed, view=None)
 
         elif broken_answer == "unsure":
@@ -228,7 +241,9 @@ class BrokenReasonView(discord.ui.View):
                 ),
                 color=discord.Color.red(),
             )
-            embed.set_footer(text="If you believe this is a mistake, please contact a Soaper or Staff Member.")
+            embed.set_footer(
+                text="If you believe this is a mistake, please contact a Soaper or Staff Member."
+            )
             await interaction.response.edit_message(embed=embed, view=None)
 
         else:  # broken, lost, stolen
@@ -256,10 +271,14 @@ class CFWCheckView(discord.ui.View):
         placeholder="Is your target console on custom firmware?",
         options=[
             discord.SelectOption(
-                label="Yes, my target console is on custom firmware", value="yes", emoji="✅"
+                label="Yes, my target console is on custom firmware",
+                value="yes",
+                emoji="✅",
             ),
             discord.SelectOption(
-                label="No, my target console is not on custom firmware", value="no", emoji="❌"
+                label="No, my target console is not on custom firmware",
+                value="no",
+                emoji="❌",
             ),
             discord.SelectOption(label="I'm not sure", value="unsure", emoji="❓"),
         ],
@@ -403,14 +422,18 @@ class NNIDRequestView(discord.ui.View):
             return
 
         # check if user has the restricted role (set role in constants.py)
-        restricted_role = discord.utils.get(interaction.guild.roles, id=RESTRICTED_ROLE_ID)
+        restricted_role = discord.utils.get(
+            interaction.guild.roles, id=RESTRICTED_ROLE_ID
+        )
         if restricted_role in interaction.user.roles:
             embed = discord.Embed(
                 title="⛔ Restricted from Bluehax Services",
                 description="You are unable to request a new NNID transfer. This restriction may be temporary or permanent, depending on the reason.\n\nYou may still receive help with previously completed NNID transfers in #soap-help.",
                 color=discord.Color.red(),
             )
-            embed.set_footer(text="If you believe this is a mistake, please contact a Soaper or Staff Member.")
+            embed.set_footer(
+                text="If you believe this is a mistake, please contact a Soaper or Staff Member."
+            )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -451,7 +474,7 @@ class NNIDRequestCog(commands.Cog):
         )
         embed.set_footer(text="Click the button below to request a NNID transfer.")
         view = NNIDRequestView()
-        
+
         # Try to load the image file
         file = None
         try:
@@ -461,7 +484,7 @@ class NNIDRequestCog(commands.Cog):
         except FileNotFoundError as e:
             print(f"Error: Could not find assets/NNIDTransfer.webp - {e}")
             pass
-        
+
         return embed, view, file
 
     # This fixes broken embeds if the bot stops.
@@ -470,9 +493,9 @@ class NNIDRequestCog(commands.Cog):
         self.bot.add_view(NNIDRequestView())
 
     @command_with_perms(
-        name="requestnnid", 
+        name="requestnnid",
         min_role="Soaper",
-        help="Creates an embed with a button for NNID transfer requests"
+        help="Creates an embed with a button for NNID transfer requests",
     )
     async def requestnnid(self, ctx):
         if ctx.channel.id == REQUEST_NNID_CHANNEL_ID:
@@ -491,4 +514,3 @@ class NNIDRequestCog(commands.Cog):
 
 def setup(bot):
     return bot.add_cog(NNIDRequestCog(bot))
-

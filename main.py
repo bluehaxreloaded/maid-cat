@@ -73,6 +73,7 @@ async def on_application_command_error(ctx, error: commands.CommandError):
     except Exception as unknown:
         print(f"Error while handling application command error: {unknown}")
 
+
 @bot.event
 async def on_ready():
     print(f"Logged-in as {bot.user}")
@@ -84,12 +85,15 @@ async def on_ready():
             description=f"{bot.user.name} has just restarted.",
             color=discord.Color.blue(),
         )
-        embed.set_footer(text="Button interactions created before the restart might be broken now.")
+        embed.set_footer(
+            text="Button interactions created before the restart might be broken now."
+        )
         await log_channel.send(embed=embed)
     else:
         raise ErrorLogChannelNotFound(SOAP_LOG_ID)
-        
+
     # dynamic_setup = bot.get_cog("DynamicCommandsCog").setup_commands()
     # print(f"Loaded dynamic commands: {dynamic_setup}")
+
 
 bot.run(KEY)
