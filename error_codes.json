@@ -145,8 +145,8 @@
     "service": "eShop"
   },
   "022-2571": {
-    "title": "Pretendo Network ID Handle Already In Use",
-    "description": "This error occurs when the Pretendo Network ID you are trying to create is already taken, or it matches your existing Nintendo Network ID.",
+    "title": "Network ID Handle Already In Use",
+    "description": "This error occurs when the Pretendo Network ID you are trying to create is already taken, or it matches your existing Nintendo Network ID.\nThis also works in reverse if the PNID is linked first.",
     "steps": [
       "If the handle is already taken, simply choose a different Pretendo Network ID handle and try again.",
       "If the handle matches your NNID, **do not delete your NNID**. Just choose a different Pretendo Network ID handle and you are done.",
