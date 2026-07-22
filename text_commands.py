@@ -652,6 +652,24 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             color=discord.Color.blue(),
         )
         await ctx.respond(embed=embed)
+    
+    @command_with_perms(
+        name="nandsaves",
+        aliases=["nandtransfer"],
+        help="Instructions on how to transfer",
+    )
+    async def nandsavegametransfer(self, ctx):
+        embed = discord.Embed(
+            title="➡️ NAND Savegame Transfer Guide",
+            description="To transfer NAND savegames (Miis, Activity Log, Face Raiders, etc.) as well as SD data (via a Movable Moveover), you need:\n"
+            "* The working source console (does not need to be fully functional, just needs to power on) **OR** a NAND backup of the source console\n"
+            "* Custom firmware installed on the target console\n\n"
+            "To complete the transfer, follow this guide:\n"
+            "[**NAND Savegame Transfer Guide**](<https://wiki.hacks.guide/wiki/3DS:NAND_Savegame_Transfer>)",
+            color=discord.Color.blue(),
+        )
+        embed.set_footer(text="Feel free to ping @_themaniac with any questions.")
+        await ctx.respond(embed=embed)
 
 
 def setup(bot):
