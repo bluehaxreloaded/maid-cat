@@ -585,7 +585,7 @@ class SoapCog(commands.Cog):  # SOAP commands
                     "4. Select `essential.exefs`\n"
                     "5. Select `copy to 0:/gm9/out` (select `Overwrite file(s)` if prompted)\n"
                     "6. Power off your console\n"
-                    "7. Insert your SD card into your PC or connect to your console via FTPD\n"
+                    "7. Insert your SD card into your PC or connect to your console via [FTPD](<https://wiki.hacks.guide/wiki/3DS:FTP>). If you do not have a PC available, ask us about a solution\n"
                     "8. Navigate to `/gm9/out` on your SD, where `essential.exefs` should be located\n"
                     "9. Send the `essential.exefs` file to this chat as well as your serial number from your console. The serial number should be a two or three-letter prefix followed by nine numbers.\n"
                     "10. Please wait for a Soaper to assist you\n"

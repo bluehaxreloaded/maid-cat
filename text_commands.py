@@ -335,6 +335,27 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help="Instructions to keep Homebrew apps after system transfer",
     )
     async def homebrewaftertransfer(self, ctx):
+        # Get the user from the channel topic or name for mention
+        member_obj = None
+        topic = getattr(ctx.channel, "topic", None)
+        if isinstance(ctx.channel, discord.TextChannel) and topic:
+            m = MENTION_RE.search(topic)
+            if m:
+                uid = int(m.group(1))
+                member_obj = ctx.guild.get_member(uid)
+                if member_obj is None:
+                    try:
+                        member_obj = await ctx.guild.fetch_member(uid)
+                    except discord.NotFound:
+                        member_obj = None
+
+        # Get the user from the channel name if topic failed
+        if not member_obj:
+            member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
+            if member_name == ctx.channel.name:  # SOAP suffix didn't match, try NNID
+                member_name = ctx.channel.name.removesuffix(NNID_CHANNEL_SUFFIX)
+            member_obj = ctx.guild.get_member_named(member_name)
+
         embed = discord.Embed(
             title="📱 Keeping Homebrew Apps after System Transfer",
             description=(
@@ -347,7 +368,11 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             ),
             color=discord.Color.red(),
         )
-        await ctx.respond(embed=embed)
+        # Send with user mention if found
+        if member_obj:
+            await ctx.respond(content=member_obj.mention, embed=embed)
+        else:
+            await ctx.respond(embed=embed)
 
     @command_with_perms(
         name="movesd",
@@ -520,8 +545,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             description=(
                 "**Ideal donor consoles should:**\n"
                 "• Be in a state where they won't be used anymore (won't turn on, bad screens, bad RAM, etc.), or\n"
-                "• Have a bad WiFi card, or\n"
-                "• Have had the eShop apps (`tiger`, `mint`) deleted off the NAND so it can't connect to the eShop\n\n"
+                "• Have a bad WiFi card\n\n"
                 "⚠️ **Note:** Connecting a console to the eShop while it is also being used as a donor is known to cause various issues.\n\n"
                 "**To donate a console for SOAPs, we need either:**\n"
                 "• `essential.exefs` + serial, or\n"
@@ -644,7 +668,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
                 "4. Navigate to `[S:] SYSNAND VIRTUAL`, press A on `nand.bin` and select `NAND image options...` -> `Update embedded backup`\n"
                 "5. Then go back to `[S:] SYSNAND VIRTUAL`, press A on `essential.exefs` and select `Copy to 0:/gm9/out`\n"
                 "6. Power off your console\n"
-                "7. Insert your SD card into your PC or connect to your console via FTPD\n"
+                "7. Insert your SD card into your PC or connect to your console via [FTPD](<https://wiki.hacks.guide/wiki/3DS:FTP>). If you do not have a PC available, ask us about a solution\n"
                 "8. Navigate to /gm9/out/, where essential.exefs should be located\n"
                 "9. Upload the essential.exefs file and provide your serial number below\n"
                 "10. Please wait for a Soaper to assist you"

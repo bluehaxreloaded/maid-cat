@@ -33,7 +33,7 @@ class NNIDCog(commands.Cog):  # NNID commands
             "   - If you reach the HOME menu or GodMode9 is not listed in the chainloader, GodMode9 is not installed. Please redo [Finalizing Setup](https://3ds.hacks.guide/finalizing-setup)\n"
             "3. Navigate to `[S:] SYSNAND Virtual` → `essential.exefs` → `Copy to 0:/gm9/out` (select `Overwrite file(s)` if prompted)\n"
             "4. Power off your console\n"
-            "5. Insert your SD card into your PC or connect to your console via FTPD\n"
+            "5. Insert your SD card into your PC or connect to your console via [FTPD](<https://wiki.hacks.guide/wiki/3DS:FTP>). If you do not have a PC available, ask us about a solution\n"
             "6. Navigate to `/gm9/out/`, where `essential.exefs` should be located\n"
             "7. Rename the `essential.exefs` file to `TARGET_essential.exefs` and upload it to this channel\n"
             "8. Provide your source console's serial number below if possible\n"
@@ -52,10 +52,10 @@ class NNIDCog(commands.Cog):  # NNID commands
         if is_late_night_hours():
             late_night_embed = discord.Embed(
                 title="🌕 After Hours Notice",
-                description="It's currently late at night in North America, so most of our Soapers are offline. Response times may be slower than usual. Please follow the instructions above and we'll assist you as soon as possible.\n\n",
+                description="It is currently after-hours for most of the staff members of this server, therefore response times may be longer than usual for initiating NNID transfers, providing help, or answering questions.\n\nIn the meantime, please follow all the instructions provided above. We'll assist you as soon as possible.",
                 color=discord.Color(0xD50032),
             )
-            (late_night_embed.set_footer(text="Thank you for your patience!"),)
+            (late_night_embed.set_footer(text="We appreciate your patience and understanding!"),)
             await channel.send(embed=late_night_embed)
 
     async def create_nnid_channel_for_user(

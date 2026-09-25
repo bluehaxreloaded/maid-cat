@@ -289,7 +289,7 @@ class SerialNumberModal(discord.ui.Modal):
                 "4. Select `essential.exefs`\n"
                 "5. Select `Copy to 0:/gm9/out` (select Overwrite if prompted)\n"
                 "6. Power off your console\n"
-                "7. Insert your SD card into your PC or connect via FTPD\n"
+                "7. Insert your SD card into your PC or connect to your console via [FTPD](<https://wiki.hacks.guide/wiki/3DS:FTP>). If you do not have a PC available, ask us about a solution\n"
                 "8. Navigate to `/gm9/out/` on your SD, where `essential.exefs` should be located\n"
                 "9. **Upload the file to this channel**\n\n"
                 "Please wait for a Soaper to assist you once you've uploaded the file."
@@ -626,7 +626,7 @@ class SOAPAutomationCog(commands.Cog):
         steps_embed = discord.Embed(
             title="1️⃣ Please provide your serial number",
             description=(
-                "To find your console's serial number, refer to the sticker on the back of your console. The serial number has a two or three-letter prefix followed by nine numbers.\n\n"
+                "To find your console's serial number, refer to the sticker on the back of your console. On a New 3DS, the sticker is on the front of the console underneath the faceplate. The serial number has a two or three-letter prefix followed by nine numbers.\n\n"
                 "Were you able to find your serial number?"
             ),
             color=discord.Color.blue(),
@@ -655,10 +655,10 @@ class SOAPAutomationCog(commands.Cog):
         if is_late_night_hours():
             late_night_embed = discord.Embed(
                 title="🌕 After Hours Notice",
-                description="It's currently late at night in North America, so most of our Soapers are offline. Response times may be slower than usual. Please follow the instructions above and we'll assist you as soon as possible.\n\n",
+                description="It is currently after-hours for most of the staff members of this server, therefore response times may be longer than usual for initiating SOAP transfers, providing help, or answering questions.\n\nIn the meantime, please follow all the instructions provided above. We'll assist you as soon as possible.",
                 color=discord.Color(0xD50032),
             )
-            (late_night_embed.set_footer(text="Thank you for your patience!"),)
+            (late_night_embed.set_footer(text="We appreciate your patience and understanding!"),)
             await channel.send(embed=late_night_embed)
 
     @command_with_perms(
