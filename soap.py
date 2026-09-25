@@ -23,6 +23,9 @@ from constants import (
 )
 from perms import _has_role_or_higher
 from helpee import (
+    append_case_notes,
+    clear_case_notes,
+    pending_case_notes,
     channel_name_for,
     find_open_channel,
     restore_helpee_access,
@@ -376,6 +379,10 @@ class SoapCog(commands.Cog):  # SOAP commands
                 topic = await _get_channel_topic(channel)
                 match = ARCHIVE_DELETION_REGEX.search(topic)
                 if not match:
+                    # Archived while Discord's rate limit blocked the timer, so try setting it again
+                    deletion_time = await self._set_archive_timer(channel, topic)
+                    if deletion_time:
+                        asyncio.create_task(self._send_archive_message(channel, deletion_time))
                     continue
                 try:
                     deletion_dt = datetime.strptime(
@@ -400,6 +407,50 @@ class SoapCog(commands.Cog):  # SOAP commands
                 except (ValueError, TypeError):
                     continue
         await self._update_archive_category_name()
+
+    async def _set_archive_timer(self, channel: discord.TextChannel, topic: str) -> datetime | None:
+        """Rename an archived channel to -cya and set its deletion time in the topic.
+        Returns the deletion time, or None if Discord's rate limit blocked it (the archive checker retries)."""
+        deletion_time = datetime.now(timezone.utc) + timedelta(days=3)
+        deletion_str = deletion_time.strftime("%Y-%m-%d %H:%M:%S")
+        # Case notes still waiting to be written go into this same edit
+        notes = pending_case_notes(channel.id)
+        new_topic = f"{ARCHIVE_PREFIX}{deletion_str} UTC. {append_case_notes(topic, notes)}"
+        if len(new_topic) > 1024:
+            new_topic = new_topic[:1021] + "..."
+        suffix = ARCHIVE_CHANNEL_SUFFIX if ARCHIVE_CHANNEL_SUFFIX.startswith("-") else "-" + ARCHIVE_CHANNEL_SUFFIX
+        name = channel.name if channel.name.endswith(suffix) else channel.name.rstrip("-") + suffix
+        try:
+            # Don't wait out a long rate limit here; the archive checker tries again every few minutes
+            await asyncio.wait_for(channel.edit(name=name, topic=new_topic), timeout=10)
+        except (asyncio.TimeoutError, discord.HTTPException):
+            return None
+        clear_case_notes(channel.id)
+        return deletion_time
+
+    async def _send_archive_message(self, channel: discord.TextChannel, deletion_time: datetime):
+        await asyncio.sleep(2.5)  # Let category/topic edit propagate
+        embed = discord.Embed(
+            title=ARCHIVE_EMBED_TITLE,
+            description=f"This channel has been archived and is scheduled for deletion.\n\nIt will be permanently deleted <t:{int(deletion_time.timestamp())}:R>.",
+            color=discord.Color.orange(),
+        )
+        view = ArchiveView(channel.id, channel.guild.id, self.bot, timeout=None)
+        for attempt in range(3):
+            try:
+                ch = await self.bot.fetch_channel(channel.id)
+                await ch.send(embed=embed, view=view)
+                return
+            except discord.NotFound:
+                return
+            except (discord.HTTPException, discord.Forbidden) as e:
+                if attempt < 2:
+                    await asyncio.sleep(2 ** attempt)
+                else:
+                    await _send_to_log(
+                        channel.guild, ERROR_LOG_ID,
+                        f"Failed to send archive message to #{channel.name}: {e}",
+                    )
 
     async def archive_channel(
         self,
@@ -426,10 +477,6 @@ class SoapCog(commands.Cog):  # SOAP commands
             await _notify_and_delete(channel, "Could not find user in channel topic. Deleting channel.")
             return
 
-        deletion_time = datetime.now(timezone.utc) + timedelta(days=3)
-        deletion_str = deletion_time.strftime("%Y-%m-%d %H:%M:%S")
-        new_topic = f"{ARCHIVE_PREFIX}{deletion_str} UTC. {topic}"
-
         temp_category = (
             discord.utils.get(channel.guild.categories, id=TEMP_ARCHIVE_CATEGORY_ID)
             if TEMP_ARCHIVE_CATEGORY_ID
@@ -452,17 +499,9 @@ class SoapCog(commands.Cog):  # SOAP commands
         if member:
             await sync_helpee_role(member, moved={channel.id: TEMP_ARCHIVE_CATEGORY_ID})
 
-        # Move channel and set topic
-        # Append archive suffix: e.g. aidenkt-soap🧼 -> aidenkt-soap🧼-cya
-        suffix = ARCHIVE_CHANNEL_SUFFIX if ARCHIVE_CHANNEL_SUFFIX.startswith("-") else "-" + ARCHIVE_CHANNEL_SUFFIX
-        archive_name = channel.name.rstrip("-") + suffix
-
+        # Move first: category moves aren't rate limited, so the channel is archived right away
         try:
-            if len(new_topic) > 1024:
-                new_topic = new_topic[:1021] + "..."
-            await _edit_channel_with_retry(
-                channel, category=temp_category, topic=new_topic, name=archive_name
-            )
+            await _edit_channel_with_retry(channel, category=temp_category)
         except discord.NotFound:
             return
         except Exception as e:
@@ -472,15 +511,12 @@ class SoapCog(commands.Cog):  # SOAP commands
             if "Maximum number of channels" in err_str or "50035" in err_str:
                 if await self._delete_oldest_archived_channel(channel.guild):
                     try:
-                        await _edit_channel_with_retry(
-                            channel, category=temp_category, topic=new_topic, name=archive_name
-                        )
+                        await _edit_channel_with_retry(channel, category=temp_category)
                         retry_succeeded = True
                     except discord.NotFound:
                         return
                     except Exception as retry_err:
                         e = retry_err
-                        err_str = str(e)
             if not retry_succeeded:
                 err_msg = f"Failed to move channel to archive: {e}"
                 try:
@@ -498,31 +534,23 @@ class SoapCog(commands.Cog):  # SOAP commands
                     await _send_to_log(channel.guild, ERROR_LOG_ID, embed=err_embed)
                 return
 
-        async def send_archive_message():
-            await asyncio.sleep(2.5)  # Let category/topic edit propagate
+        # Then the -cya name and deletion timer, which Discord rate limits (about 2 per 10 minutes)
+        deletion_time = await self._set_archive_timer(channel, topic)
+        if deletion_time:
+            asyncio.create_task(self._send_archive_message(channel, deletion_time))
+        else:
             embed = discord.Embed(
-                title=ARCHIVE_EMBED_TITLE,
-                description=f"This channel has been archived and is scheduled for deletion.\n\nIt will be permanently deleted <t:{int(deletion_time.timestamp())}:R>.",
+                title="⚠️ Deletion Timer Not Set",
+                description=(
+                    "This channel was archived, but Discord is limiting how often its name and topic can change, "
+                    "so the deletion timer couldn't be set yet. It will be set automatically within the next few minutes."
+                ),
                 color=discord.Color.orange(),
             )
-            view = ArchiveView(channel.id, channel.guild.id, self.bot, timeout=None)
-            for attempt in range(3):
-                try:
-                    ch = await self.bot.fetch_channel(channel.id)
-                    await ch.send(embed=embed, view=view)
-                    return
-                except discord.NotFound:
-                    return
-                except (discord.HTTPException, discord.Forbidden) as e:
-                    if attempt < 2:
-                        await asyncio.sleep(2 ** attempt)
-                    else:
-                        await _send_to_log(
-                            channel.guild, ERROR_LOG_ID,
-                            f"Failed to send archive message to #{channel.name}: {e}",
-                        )
-
-        asyncio.create_task(send_archive_message())
+            try:
+                await channel.send(embed=embed)
+            except discord.HTTPException:
+                pass
 
         await self._update_archive_category_name()
         await _try_log_soap(ctx, "Archived SOAP Channel" if is_soap else "Archived NNID Channel")
