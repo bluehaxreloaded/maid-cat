@@ -125,15 +125,13 @@
           "004-6007"
         ]
       ],
-      "title": "NetPass patches issue",
-      "description": "This error means some patches NetPass uses are interfering with SpotPass services.",
+      "title": "SpotPass Error - NetPass Patches",
+      "description": "This error occurs when using a SpotPass feature (such as Pokémon Bank) while NetPass update patches are applied.",
       "steps": [
-        "Open NetPass",
-        "Go to `Settings`",
-        "Go to `Miscellaneous`",
-        "Go to `Update Patches`",
-        "Press `Remove`",
-        "Reboot and try again."
+        "Open **NetPass** on your 3DS.",
+        "Go to **Settings → Miscellaneous → Update patches** and select **Remove**.",
+        "Restart your console and try again.",
+        "If you're not using NetPass, please ask a Soaper for help."
       ],
       "service": "SpotPass"
     },
