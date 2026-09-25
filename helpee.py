@@ -38,8 +38,14 @@ def find_open_channel(
     return by_name
 
 
-async def restore_helpee_access(channel: discord.TextChannel, member: discord.Member):
-    """Give a helpee access to their open channel again, e.g. after they left and rejoined the server."""
+REOPENED_TITLE = "🔄 Channel Reopened"  # also marks where the inactivity timer starts over
+
+
+async def restore_helpee_access(
+    channel: discord.TextChannel, member: discord.Member, moved: dict[int, int] | None = None
+):
+    """Give a helpee access to their open channel again, e.g. after they left and rejoined the server.
+    moved: channels just moved to another category (see sync_helpee_role)."""
     if not isinstance(member, discord.Member) or not _topic_mentions(channel, member.id):
         return  # only the helpee named in the channel topic gets access
     try:
@@ -47,7 +53,7 @@ async def restore_helpee_access(channel: discord.TextChannel, member: discord.Me
             await channel.set_permissions(member, read_messages=True)
     except Exception:
         pass
-    await sync_helpee_role(member)
+    await sync_helpee_role(member, moved=moved)
 
 
 async def member_from_topic(channel: discord.TextChannel) -> discord.Member | None:

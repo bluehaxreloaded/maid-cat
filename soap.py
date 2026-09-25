@@ -31,10 +31,12 @@ from helpee import (
     restore_helpee_access,
     member_from_topic,
     sync_helpee_role,
+    REOPENED_TITLE,
 )
 
 # Topic format for archived channels: "Archived. Deletion scheduled: YYYY-MM-DD HH:MM:SS UTC. " + original
 ARCHIVE_PREFIX = "Archived. Deletion scheduled: "
+ARCHIVE_DAYS = 3  # archived channels are deleted this long after being archived
 ARCHIVE_CHECK_INTERVAL = 300  # 5 minutes
 ARCHIVE_EMBED_TITLE = "🗑️Archived Channel"
 ARCHIVE_DELETION_REGEX = re.compile(
@@ -408,10 +410,79 @@ class SoapCog(commands.Cog):  # SOAP commands
                     continue
         await self._update_archive_category_name()
 
+    def find_reopenable_channel(
+        self, guild: discord.Guild, member: discord.Member, is_soap: bool
+    ) -> discord.TextChannel | None:
+        """An archived SOAP/NNID channel of a helpee who left and rejoined after it was archived."""
+        temp_cat = (
+            discord.utils.get(guild.categories, id=TEMP_ARCHIVE_CATEGORY_ID)
+            if TEMP_ARCHIVE_CATEGORY_ID
+            else None
+        )
+        if not temp_cat or not isinstance(member, discord.Member) or not member.joined_at:
+            return None
+        channel_suffix = SOAP_CHANNEL_SUFFIX if is_soap else NNID_CHANNEL_SUFFIX
+        suffix = ARCHIVE_CHANNEL_SUFFIX if ARCHIVE_CHANNEL_SUFFIX.startswith("-") else "-" + ARCHIVE_CHANNEL_SUFFIX
+        for channel in temp_cat.text_channels:
+            topic = channel.topic or ""
+            if _get_user_id_from_topic(ARCHIVE_DELETION_REGEX.sub("", topic, count=1)) != member.id:
+                continue
+            if not channel.name.removesuffix(suffix).endswith(channel_suffix):
+                continue
+            # Only if they rejoined after it was archived, not someone whose finished channel is waiting to be deleted
+            match = ARCHIVE_DELETION_REGEX.search(topic)
+            if not match:
+                continue
+            archived_at = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S").replace(
+                tzinfo=timezone.utc
+            ) - timedelta(days=ARCHIVE_DAYS)
+            if member.joined_at > archived_at:
+                return channel
+        return None
+
+    async def reopen_channel(self, channel: discord.TextChannel, member: discord.Member, is_soap: bool):
+        """Move an archived channel back for a helpee who rejoined, cancelling its deletion."""
+        category_id = SOAP_CHANNEL_CATEGORY_ID if is_soap else NNID_CHANNEL_CATEGORY_ID
+        category = discord.utils.get(channel.guild.categories, id=category_id)
+        if not category:
+            raise CategoryNotFound(category_id)
+        # Moving it out of the archive cancels the deletion, since only the archive category is checked
+        await _edit_channel_with_retry(channel, category=category)
+        await restore_helpee_access(channel, member, moved={channel.id: category_id})
+
+        embed = discord.Embed(
+            title=REOPENED_TITLE,
+            description=f"{member.mention} rejoined the server, so this channel has been reopened and will no longer be deleted.",
+            color=discord.Color.green(),
+        )
+        try:
+            await channel.send(content=member.mention, embed=embed)
+        except discord.HTTPException:
+            pass
+        embed_log = discord.Embed(title="Reopened SOAP Channel" if is_soap else "Reopened NNID Channel")
+        embed_log.add_field(name="Action made by:", value=f"{member.name} - {member.id}", inline=False)
+        embed_log.add_field(name="Action: ", value=f"Rejoined and pressed Request, reopened #{channel.name}", inline=False)
+        await _send_to_log(channel.guild, SOAP_LOG_ID, embed=embed_log)
+
+        # Remove -cya and the deletion time; Discord rate limits this, so let it finish in the background
+        asyncio.create_task(self._clear_archive_marks(channel))
+        await self._update_archive_category_name()
+
+    async def _clear_archive_marks(self, channel: discord.TextChannel):
+        try:
+            channel = await channel.guild.fetch_channel(channel.id)
+            suffix = ARCHIVE_CHANNEL_SUFFIX if ARCHIVE_CHANNEL_SUFFIX.startswith("-") else "-" + ARCHIVE_CHANNEL_SUFFIX
+            await channel.edit(
+                name=channel.name.removesuffix(suffix),
+                topic=ARCHIVE_DELETION_REGEX.sub("", channel.topic or "", count=1),
+            )
+        except discord.HTTPException:
+            pass
+
     async def _set_archive_timer(self, channel: discord.TextChannel, topic: str) -> datetime | None:
         """Rename an archived channel to -cya and set its deletion time in the topic.
         Returns the deletion time, or None if Discord's rate limit blocked it (the archive checker retries)."""
-        deletion_time = datetime.now(timezone.utc) + timedelta(days=3)
+        deletion_time = datetime.now(timezone.utc) + timedelta(days=ARCHIVE_DAYS)
         deletion_str = deletion_time.strftime("%Y-%m-%d %H:%M:%S")
         # Case notes still waiting to be written go into this same edit
         notes = pending_case_notes(channel.id)

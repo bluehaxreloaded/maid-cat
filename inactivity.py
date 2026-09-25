@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from discord.ext import commands
 from perms import command_with_perms, soap_channels_only
 from log import log_to_soaper_log
+from helpee import REOPENED_TITLE
 from constants import (
     SOAP_CHANNEL_SUFFIX,
     SOAP_CHANNEL_CATEGORY_ID,
@@ -107,7 +108,15 @@ class InactivityCog(commands.Cog):
         if soaper and channel.overwrites_for(soaper).send_messages is False:
             return  # .lock is on, so the helpee can't reply
         reminders = []  # send times of reminders already posted, newest first
+        started = channel.created_at
         async for message in channel.history(limit=None):
+            if (
+                message.author.id == self.bot.user.id
+                and message.embeds
+                and message.embeds[0].title == REOPENED_TITLE
+            ):
+                started = message.created_at  # reopened for a helpee who rejoined, so start over from here
+                break
             if not message.author.bot:
                 return  # someone replied, so the timer is cancelled
             # Bot replies to a button or form keep who pressed it, which covers presses from before a restart
@@ -121,7 +130,7 @@ class InactivityCog(commands.Cog):
                 if footer and footer.startswith(REMINDER_FOOTER_PREFIX):
                     reminders.append(message.created_at)
 
-        last_step = reminders[0] if reminders else channel.created_at
+        last_step = reminders[0] if reminders else started
         if now - last_step < INACTIVITY_STEP:
             return
 

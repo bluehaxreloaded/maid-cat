@@ -2,7 +2,7 @@ from pathlib import Path
 import discord
 from discord.ext import commands, bridge
 from perms import command_with_perms
-from helpee import find_open_channel, restore_helpee_access
+from helpee import find_open_channel, restore_helpee_access, REOPENED_TITLE
 from constants import REQUEST_SOAP_CHANNEL_ID, RESTRICTED_ROLE_ID
 
 
@@ -318,6 +318,25 @@ class SOAPRequestView(discord.ui.View):
             await interaction.response.send_message(embed=embed, ephemeral=True)
             # they may have lost access by leaving and rejoining the server
             await restore_helpee_access(existing_channel, interaction.user)
+            return
+
+        # a helpee who left and rejoined gets their archived channel back instead of a new one
+        soap_cog = interaction.client.get_cog("SoapCog")
+        archived_channel = (
+            soap_cog.find_reopenable_channel(interaction.guild, interaction.user, is_soap=True)
+            if soap_cog
+            else None
+        )
+        if archived_channel:
+            await interaction.response.defer(ephemeral=True)
+            await soap_cog.reopen_channel(archived_channel, interaction.user, is_soap=True)
+            embed = discord.Embed(
+                title=REOPENED_TITLE,
+                description=f"Welcome back! We've reopened your SOAP channel.\n\n"
+                f"Please go to: {archived_channel.mention}",
+                color=discord.Color.green(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         # check if user has the restricted role (set role in constants.py)
