@@ -38,6 +38,11 @@ HELPEE_ROLE_ID = # role ID granted when user opens SOAP/NNID channel, revoked wh
 # SOAP completion auto-close behavior
 SOAP_COMPLETION_AUTO_CLOSE_MINUTES = 20  # minutes after completion prompt before channel auto-closes
 
+# inactivity behavior for SOAP/NNID channels nobody has replied in
+INACTIVITY_REMINDER_HOURS = 8  # hours between each reminder, and between the last reminder and closing
+INACTIVITY_REMINDERS = 2  # reminders sent before the channel is closed
+INACTIVITY_CHECK_MINUTES = 10  # how often open channels are checked
+
 # late night hours configuration (24-hour format, PST timezone)
 LATE_NIGHT_START_HOUR = 24  # 12 PM PST
 LATE_NIGHT_END_HOUR = 6  # 6 AM PST
