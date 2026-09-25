@@ -1,4 +1,5 @@
 import discord
+import io
 import re
 import asyncio
 from discord.ext import commands
@@ -7,6 +8,7 @@ from log import log_to_soaper_log
 from constants import (
     BOTS_ONLY_CHANNEL_ID,
     SOAP_CHANNEL_CATEGORY_ID,
+    SOAP_CHANNEL_SUFFIX,
     MANUAL_SOAP_CATEGORY_ID,
     LOADING_EMOTE_ID,
     SOAP_COMPLETION_AUTO_CLOSE_MINUTES,
@@ -14,6 +16,78 @@ from constants import (
     is_late_night_hours,
 )
 from soap_helper import SoapHelperView
+from exefs import InvalidEssential, read_essential, serial_from_secinfo, serials_match
+from helpee import add_case_note, safe_note_text
+
+
+SERIAL_RECEIVED_TITLE = "✅ Serial number received"
+STEP2_TITLE = "2️⃣ Upload your essential.exefs file"
+
+
+def serial_mismatch_embed() -> discord.Embed:
+    """Sent when the serial the helpee entered doesn't match the one in their essential.exefs."""
+    embed = discord.Embed(
+        title="⚠️ Serial Number Mismatch",
+        description=(
+            "The serial number you provided does not match the serial number in your `essential.exefs` file. Please ensure you have entered the serial number correctly. If you're still having trouble, follow these instructions to find your console's serial number.\n"
+            "To find your console's serial number:\n"
+            "- Hold START while powering on your console. This will boot you into GodMode9.\n"
+            "- Go to `[2:] SYSNAND TWLN` -> `sys` -> `log` -> `inspect.log`\n"
+            "- Select `Open in Textviewer`.\n\n"
+            "The correct serial number (two or three-letter prefix followed by eight numbers) should be in the file. "
+            "You may also send us a picture if you're unsure."
+        ),
+        color=discord.Color.yellow(),
+    )
+    embed.set_footer(
+        text="Once you've found your serial number, press the button below to enter it."
+    )
+    return embed
+
+
+async def _entered_serial(channel: discord.TextChannel) -> str | None:
+    """The serial the helpee entered in step 1, read back from the "Serial number received" message."""
+    async for message in channel.history(limit=100):
+        if message.embeds and message.embeds[0].title == SERIAL_RECEIVED_TITLE:
+            return (message.embeds[0].description or "").strip() or None
+    return None
+
+
+async def _uploaded_essential_serial(channel: discord.TextChannel) -> str | None:
+    """Serial inside the most recent essential.exefs posted in the channel, if there is a valid one."""
+    async for message in channel.history(limit=100):
+        for attachment in message.attachments:
+            if not attachment.filename.lower().endswith(".exefs"):
+                continue
+            try:
+                essential = read_essential(await attachment.read())
+            except (discord.HTTPException, InvalidEssential):
+                continue
+            return serial_from_secinfo(essential["secinfo"])
+    return None
+
+
+class SerialMismatchView(discord.ui.View):
+    """Button on the serial mismatch message to enter the serial number again"""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Enter serial number",
+        style=discord.ButtonStyle.success,
+        emoji="🔢",
+        custom_id="serial_mismatch_enter",
+    )
+    async def serial_mismatch_enter_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        modal = SerialNumberModal(
+            prompt_message_id=interaction.message.id,
+            prompt_view_class=SerialMismatchView,
+            correction=True,
+        )
+        await interaction.response.send_modal(modal)
 
 
 class CompletionFollowUpView(discord.ui.View):
@@ -236,10 +310,12 @@ class CopySerialView(discord.ui.View):
 class SerialNumberModal(discord.ui.Modal):
     """Modal for submitting serial number (2–3 letters + 8-9 digits)."""
 
-    def __init__(self, prompt_message_id: int = None, prompt_view_class=None):
-        super().__init__(title="🔢 Serial Number")
+    def __init__(self, prompt_message_id: int = None, prompt_view_class=None, correction: bool = False):
+        super().__init__(title="🔢 Serial Number", timeout=None)
         self.prompt_message_id = prompt_message_id
         self.prompt_view_class = prompt_view_class or SerialNumberCheckView
+        # correction: re-entering the serial after a mismatch, so check it against the file instead of asking for it
+        self.correction = correction
         self.serial_input = discord.ui.InputText(
             label="Please enter your console's serial number.",
             placeholder="e.g. YJM123456789 or QW12345678",
@@ -252,18 +328,38 @@ class SerialNumberModal(discord.ui.Modal):
         serial_raw = self.serial_input.value.strip().upper()
         serial = re.sub(r"\s+", "", serial_raw)  # Remove spaces (e.g. "CWH12345678 9")
         if not re.match(r"^[A-Z]{2,3}\d{8,9}$", serial):
+            add_case_note(
+                interaction.channel,
+                f"Entered a serial number in the wrong format: `{safe_note_text(serial_raw, 20)}`",
+            )
             await interaction.response.send_message(
                 "Invalid format. Serial numbers have 2-3 letters followed by 8 or 9 digits (e.g. CWH123456789 or CWH12345678). Please try again.",
                 ephemeral=True,
             )
             return
+
+        await interaction.response.defer()
+        if self.correction and interaction.channel:
+            file_serial = await _uploaded_essential_serial(interaction.channel)
+            if file_serial and not serials_match(serial, file_serial):
+                add_case_note(
+                    interaction.channel,
+                    f"Re-entered serial number still didn't match their essential.exefs: `{serial}`",
+                )
+                await interaction.followup.send(
+                    "That serial number still doesn't match the one in your `essential.exefs`. "
+                    "Please check it again, or send us a picture if you're unsure.",
+                    ephemeral=True,
+                )
+                return
+
         serial_embed = discord.Embed(
-            title="✅ Serial number received",
+            title=SERIAL_RECEIVED_TITLE,
             description=serial,
             color=discord.Color.green(),
         )
         copy_view = CopySerialView(serial=serial)
-        await interaction.response.send_message(embed=serial_embed, view=copy_view)
+        await interaction.followup.send(embed=serial_embed, view=copy_view)
 
         # Disable buttons on the serial prompt message
         if self.prompt_message_id and interaction.channel:
@@ -278,9 +374,19 @@ class SerialNumberModal(discord.ui.Modal):
             except Exception:
                 pass
 
+        if self.correction:
+            # The file is already in, so there's no step 2 this time
+            wait_embed = discord.Embed(
+                title="✅ Serial number updated",
+                description="Please wait for a Soaper to assist you.",
+                color=discord.Color.green(),
+            )
+            await interaction.followup.send(embed=wait_embed)
+            return
+
         # Step 2: Ask for essential.exefs
         exefs_embed = discord.Embed(
-            title="2️⃣ Upload your essential.exefs file",
+            title=STEP2_TITLE,
             description=(
                 "**To get your essential.exefs file:**\n"
                 "1. Ensure your SD card is in your console\n"
@@ -290,13 +396,12 @@ class SerialNumberModal(discord.ui.Modal):
                 "5. Select `Copy to 0:/gm9/out` (select Overwrite if prompted)\n"
                 "6. Power off your console\n"
                 "7. Insert your SD card into your PC or connect to your console via [FTPD](<https://wiki.hacks.guide/wiki/3DS:FTP>). If you do not have a PC available, ask us about a solution\n"
-                "8. Navigate to `/gm9/out/` on your SD, where `essential.exefs` should be located\n"
-                "9. **Upload the file to this channel**\n\n"
-                "Please wait for a Soaper to assist you once you've uploaded the file."
+                "8. Navigate to `/gm9/out/` on your SD, where `essential.exefs` should be located\n\n"
+                "Were you able to get your essential.exefs file?"
             ),
             color=discord.Color.blue(),
         )
-        await interaction.followup.send(embed=exefs_embed)
+        await interaction.followup.send(embed=exefs_embed, view=EssentialUploadView())
 
 
 class SerialNumberCheckView(discord.ui.View):
@@ -426,6 +531,217 @@ class SerialNumberFollowUpView(discord.ui.View):
                 embed=embed,
                 allowed_mentions=discord.AllowedMentions(roles=True),
             )
+
+
+class EssentialUploadModal(discord.ui.DesignerModal):
+    """Modal for uploading essential.exefs."""
+
+    def __init__(self, prompt_message_id: int = None, prompt_view_class=None):
+        self.prompt_message_id = prompt_message_id
+        self.prompt_view_class = prompt_view_class or EssentialUploadView
+        self.file_upload = discord.ui.FileUpload(
+            custom_id="essential_file",
+            max_values=1,
+            required=True,
+        )
+        super().__init__(
+            discord.ui.Label(
+                "essential.exefs",
+                self.file_upload,
+                description="The essential.exefs file from /gm9/out/ on your SD card.",
+            ),
+            title="📁 Upload essential.exefs",
+            timeout=None,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        files = self.file_upload.values or []
+        if not files or not files[0].filename.lower().endswith(".exefs"):
+            name = safe_note_text(files[0].filename) if files else "no file"
+            add_case_note(interaction.channel, f"Uploaded a file that isn't an .exefs: `{name}`")
+            await interaction.response.send_message(
+                "That isn't an `.exefs` file. Please upload the `essential.exefs` file from `/gm9/out/` on your SD card.",
+                ephemeral=True,
+            )
+            return
+        attachment = files[0]
+
+        # Files uploaded through a modal aren't posted anywhere, so repost it in the channel
+        await interaction.response.defer()
+        try:
+            data = await attachment.read()
+        except discord.HTTPException:
+            await interaction.followup.send(
+                "Could not read your file. Please try uploading it again.", ephemeral=True
+            )
+            return
+
+        # Make sure it's a real essential.exefs and not just a file with that name
+        try:
+            essential = read_essential(data)
+        except InvalidEssential as e:
+            add_case_note(interaction.channel, f"Uploaded an invalid essential.exefs ({e})")
+            await interaction.followup.send(
+                "That file isn't a valid `essential.exefs`. It may be damaged or incomplete. "
+                "Please copy `essential.exefs` from your console again and upload the new file.",
+                ephemeral=True,
+            )
+            return
+
+        file = discord.File(io.BytesIO(data), filename=attachment.filename)
+        entered = await _entered_serial(interaction.channel) if interaction.channel else None
+        if entered and not serials_match(entered, serial_from_secinfo(essential["secinfo"])):
+            add_case_note(
+                interaction.channel,
+                f"Serial number didn't match their essential.exefs: entered `{safe_note_text(entered, 20)}`",
+            )
+            # Post the file anyway so Soapers have it, along with the mismatch instructions
+            await interaction.followup.send(
+                content=interaction.user.mention,
+                embed=serial_mismatch_embed(),
+                file=file,
+                view=SerialMismatchView(),
+            )
+        else:
+            received_embed = discord.Embed(
+                title="✅ essential.exefs received",
+                description="Please wait for a Soaper to assist you.",
+                color=discord.Color.green(),
+            )
+            await interaction.followup.send(embed=received_embed, file=file)
+
+        # Disable buttons on the upload prompt message
+        if self.prompt_message_id and interaction.channel:
+            try:
+                prompt_msg = await interaction.channel.fetch_message(
+                    self.prompt_message_id
+                )
+                view = self.prompt_view_class()
+                for item in view.children:
+                    item.disabled = True
+                await prompt_msg.edit(view=view)
+            except Exception:
+                pass
+
+
+class EssentialUploadView(discord.ui.View):
+    """View for essential.exefs upload prompt buttons"""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Yes, upload my essential.exefs.",
+        style=discord.ButtonStyle.success,
+        emoji="📁",
+        custom_id="essential_upload",
+    )
+    async def essential_upload_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        modal = EssentialUploadModal(prompt_message_id=interaction.message.id)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(
+        label="I need help.",
+        style=discord.ButtonStyle.red,
+        emoji="❔",
+        custom_id="essential_help",
+    )
+    async def essential_help_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        # Disable the original buttons
+        for item in self.children:
+            item.disabled = True
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            await interaction.response.defer()
+
+        # Send essential.exefs troubleshooting
+        instructions_embed = discord.Embed(
+            title="📂 Finding Your essential.exefs",
+            description=(
+                "If you're having trouble getting your `essential.exefs` file, check the following.\n\n"
+                "- If you reach the Luma3DS chainloader when holding START, select GodMode9 to continue (the red text is the selected option).\n"
+                "- If you reach the HOME menu or GodMode9 is not listed in the chainloader, GodMode9 is not installed. Please redo [Finalizing Setup](<https://3ds.hacks.guide/finalizing-setup>).\n"
+                "- The file is copied to the `gm9/out` folder on the root of your SD card.\n"
+                "- If there is more than one `essential.exefs` in `gm9/out`, delete all of them and copy it again."
+            ),
+            color=discord.Color.blue(),
+        )
+        instructions_embed.set_footer(
+            text="You may also send us a picture if you're unsure."
+        )
+        await interaction.followup.send(embed=instructions_embed)
+
+        # Send follow-up with Yes / No, I need further assistance
+        followup_embed = discord.Embed(
+            title="Were you able to get your essential.exefs file?",
+            description="**After following the instructions above,** please select an option below.",
+            color=discord.Color.blue(),
+        )
+        await interaction.followup.send(
+            embed=followup_embed,
+            view=EssentialFollowUpView(),
+        )
+
+
+class EssentialFollowUpView(discord.ui.View):
+    """View for follow-up after essential.exefs troubleshooting"""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Yes, upload my essential.exefs",
+        style=discord.ButtonStyle.success,
+        emoji="📁",
+        custom_id="essential_followup_upload",
+    )
+    async def essential_followup_upload_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        modal = EssentialUploadModal(
+            prompt_message_id=interaction.message.id,
+            prompt_view_class=EssentialFollowUpView,
+        )
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(
+        label="No, I need more help",
+        style=discord.ButtonStyle.danger,
+        emoji="❔",
+        custom_id="essential_followup_assistance",
+    )
+    async def essential_followup_assistance_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        for item in self.children:
+            item.disabled = True
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:
+            await interaction.response.defer()
+
+        soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
+        embed = discord.Embed(
+            title="🆘 Assistance Requested",
+            description=(
+                f"{interaction.user.mention} has requested additional help. "
+                "Please wait for a Soaper to assist you."
+            ),
+            color=discord.Color.yellow(),
+        )
+        embed.set_footer(
+            text="Describe in detail what's happening and please include error codes if possible."
+        )
+        await interaction.followup.send(
+            content=soaper_ping,
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions(roles=True),
+        )
 
 
 class EshopVerificationView(discord.ui.View):
@@ -683,6 +999,58 @@ class SOAPAutomationCog(commands.Cog):
         self.bot.add_view(SerialNumberCheckView())
         self.bot.add_view(SerialNumberFollowUpView())
         self.bot.add_view(CopySerialView())
+        self.bot.add_view(EssentialUploadView())
+        self.bot.add_view(EssentialFollowUpView())
+        self.bot.add_view(SerialMismatchView())
+
+    @commands.Cog.listener("on_message")
+    async def block_chat_essential(self, message: discord.Message):
+        """Helpees must upload essential.exefs with the button, so remove any sent in the chat."""
+        channel = message.channel
+        if (
+            message.author.bot
+            or not isinstance(channel, discord.TextChannel)
+            or not channel.category
+            or channel.category.id != SOAP_CHANNEL_CATEGORY_ID
+            or not channel.name.endswith(SOAP_CHANNEL_SUFFIX)
+        ):
+            return
+        if not any(a.filename.lower().endswith(".exefs") for a in message.attachments):
+            return
+        # Only the helpee; Soapers can still share files
+        m = re.search(r"<@!?(\d+)>", channel.topic or "")
+        if not m or int(m.group(1)) != message.author.id:
+            return
+
+        try:
+            await message.delete()
+        except discord.HTTPException:
+            return
+        add_case_note(channel, "Sent essential.exefs in the chat instead of using the upload button")
+
+        # Only offer the button once step 2 has been reached
+        step2_reached = False
+        async for msg in channel.history(limit=100):
+            if msg.author.id == self.bot.user.id and msg.embeds and msg.embeds[0].title == STEP2_TITLE:
+                step2_reached = True
+                break
+
+        embed = discord.Embed(
+            title="📁 Please use the upload button",
+            color=discord.Color.orange(),
+        )
+        if step2_reached:
+            embed.description = (
+                "Please don't send your `essential.exefs` file in the chat. "
+                "Use the button below to upload it instead."
+            )
+            await channel.send(content=message.author.mention, embed=embed, view=EssentialUploadView())
+        else:
+            embed.description = (
+                "Please don't send your `essential.exefs` file in the chat. "
+                "Enter your serial number above first, and you'll be able to upload it after."
+            )
+            await channel.send(content=message.author.mention, embed=embed)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -896,25 +1264,14 @@ class SOAPAutomationCog(commands.Cog):
                         except ValueError:
                             user_id = None
 
+                add_case_note(
+                    target_channel, "Serial number didn't match their essential.exefs (found during the SOAP)"
+                )
                 # Send findserial instructions
-                embed = discord.Embed(
-                    title="⚠️ Serial Number Mismatch",
-                    description=(
-                        "The serial number you provided does not match the serial number in your `essential.exefs` file. Please ensure you have entered the serial number correctly. If you're still having trouble, follow these instructions to find your console's serial number.\n"
-                        "To find your console's serial number:\n"
-                        "- Hold START while powering on your console. This will boot you into GodMode9.\n"
-                        "- Go to `[2:] SYSNAND TWLN` -> `sys` -> `log` -> `inspect.log`\n"
-                        "- Select `Open in Textviewer`.\n\n"
-                        "The correct serial number (two or three-letter prefix followed by eight numbers) should be in the file. "
-                        "You may also send us a picture if you're unsure."
-                    ),
-                    color=discord.Color.yellow(),
-                )
                 user_mention = f"<@{user_id}>" if user_id else None
-                embed.set_footer(
-                    text="Once you've found the serial number and send it here, we will resume your SOAP Transfer."
+                await target_channel.send(
+                    content=user_mention, embed=serial_mismatch_embed(), view=SerialMismatchView()
                 )
-                await target_channel.send(content=user_mention, embed=embed)
 
             else:
                 # Error - requires Soaper intervention

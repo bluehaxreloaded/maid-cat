@@ -1,4 +1,5 @@
 import discord
+import asyncio
 import re
 from constants import (
     HELPEE_ROLE_ID,
@@ -88,3 +89,55 @@ async def sync_helpee_role(member: discord.Member, moved: dict[int, int] | None 
             await member.remove_roles(role)
     except Exception:
         pass
+
+
+# Case notes: user-caused errors recorded in the channel topic for Soapers.
+# Discord only allows about 2 topic edits per 10 minutes per channel, so notes are written in the
+# background and any that pile up while waiting are merged into one edit.
+CASE_NOTES_HEADER = "Case Notes:"
+TOPIC_LIMIT = 1024
+_pending_notes: dict[int, list[str]] = {}
+_note_locks: dict[int, asyncio.Lock] = {}
+_note_tasks: set[asyncio.Task] = set()  # keeps background writes alive until they finish
+
+
+def add_case_note(channel: discord.TextChannel | None, note: str):
+    """Record a user-caused error under Case Notes in a SOAP/NNID channel topic."""
+    if channel is None or not re.search(r"<@!?\d+>", getattr(channel, "topic", None) or ""):
+        return  # only helpee channels have case notes
+    note = " ".join(note.split())  # one line per note
+    _pending_notes.setdefault(channel.id, []).append(note)
+    task = asyncio.create_task(_write_case_notes(channel))
+    _note_tasks.add(task)
+    task.add_done_callback(_note_tasks.discard)
+
+
+async def _write_case_notes(channel: discord.TextChannel):
+    lock = _note_locks.setdefault(channel.id, asyncio.Lock())
+    async with lock:
+        notes = _pending_notes.pop(channel.id, [])
+        if not notes:
+            return  # an earlier write already included them
+        try:
+            fresh = await channel.guild.fetch_channel(channel.id)
+            topic = (fresh.topic or "").rstrip()
+            if CASE_NOTES_HEADER not in topic:
+                topic += f"\n\n{CASE_NOTES_HEADER}"
+            new_topic = topic
+            for note in notes:
+                line = f"- {note}"
+                if line in new_topic.split("\n"):
+                    continue
+                if len(new_topic) + 1 + len(line) > TOPIC_LIMIT:
+                    break
+                new_topic += f"\n{line}"
+            if new_topic != topic:
+                await fresh.edit(topic=new_topic)
+        except discord.HTTPException as e:
+            print(f"Could not add case note to #{channel.name}: {e}")
+
+
+def safe_note_text(text: str, limit: int = 60) -> str:
+    """User input shown inside a case note, without anything that would break the formatting."""
+    text = " ".join(str(text).replace("`", "'").split())
+    return text if len(text) <= limit else text[: limit - 3] + "..."
