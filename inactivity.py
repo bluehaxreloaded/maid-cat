@@ -11,6 +11,7 @@ from constants import (
     NNID_CHANNEL_SUFFIX,
     NNID_CHANNEL_CATEGORY_ID,
     SOAP_LOG_ID,
+    SOAPER_ROLE_ID,
     INACTIVITY_REMINDER_HOURS,
     INACTIVITY_REMINDERS,
     INACTIVITY_CHECK_MINUTES,
@@ -21,7 +22,8 @@ from constants import (
 # The timer is cancelled for good once anyone (not a bot) sends a message or presses a button in the channel.
 INACTIVITY_STEP = timedelta(hours=INACTIVITY_REMINDER_HOURS)
 REMINDER_FOOTER_PREFIX = "Inactivity reminder "  # used to find reminders the bot already sent
-KEEPOPEN_FOOTER = "Inactivity timer disabled"  # used to find .keepopen in the channel
+KEEPOPEN_TITLE = "🔓 Inactivity Timer Disabled"  # used to find .keepopen in the channel
+KEEPOPEN_FOOTER = "Inactivity timer disabled"  # older .keepopen messages used this footer instead
 
 MENTION_RE = re.compile(r"<@!?(\d+)>")
 
@@ -101,6 +103,9 @@ class InactivityCog(commands.Cog):
     async def _check_channel(self, channel: discord.TextChannel, is_soap: bool, now: datetime):
         if channel.id in self._pressed:
             return  # someone pressed a button, so the timer is cancelled
+        soaper = channel.guild.get_role(SOAPER_ROLE_ID)
+        if soaper and channel.overwrites_for(soaper).send_messages is False:
+            return  # .lock is on, so the helpee can't reply
         reminders = []  # send times of reminders already posted, newest first
         async for message in channel.history(limit=None):
             if not message.author.bot:
@@ -111,7 +116,7 @@ class InactivityCog(commands.Cog):
                 return
             if message.author.id == self.bot.user.id and message.embeds:
                 footer = message.embeds[0].footer.text if message.embeds[0].footer else None
-                if footer == KEEPOPEN_FOOTER:
+                if message.embeds[0].title == KEEPOPEN_TITLE or footer == KEEPOPEN_FOOTER:
                     return  # .keepopen was used, so the timer is off for good
                 if footer and footer.startswith(REMINDER_FOOTER_PREFIX):
                     reminders.append(message.created_at)
@@ -205,11 +210,10 @@ class InactivityCog(commands.Cog):
     @soap_channels_only()
     async def keepopen(self, ctx):
         embed = discord.Embed(
-            title="🔓 Inactivity Timer Disabled",
+            title=KEEPOPEN_TITLE,
             description="This channel will no longer be closed automatically for inactivity.",
             color=discord.Color.blue(),
         )
-        embed.set_footer(text=KEEPOPEN_FOOTER)
         await ctx.respond(embed=embed)
         try:
             await log_to_soaper_log(ctx, "Disabled Inactivity Timer")
