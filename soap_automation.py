@@ -1057,9 +1057,9 @@ class SOAPAutomationCog(commands.Cog):
         if step2_reached:
             embed.description = (
                 "Please don't send your `essential.exefs` file in the chat. "
-                "Use the button below to upload it instead."
+                "Use the button above to upload it instead."
             )
-            await channel.send(content=message.author.mention, embed=embed, view=EssentialUploadView())
+            await channel.send(content=message.author.mention, embed=embed)
         else:
             embed.description = (
                 "Please don't send your `essential.exefs` file in the chat. "
