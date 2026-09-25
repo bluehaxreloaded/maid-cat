@@ -150,7 +150,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     @command_with_perms(
         min_role="Soaper",
         name="findserial",
-        aliases=["serialmismatch"],
+        aliases=["serial", "serialmismatch"],
         help="Explains how to find a serial number in GM9",
     )
     async def findserial(self, ctx):

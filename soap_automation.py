@@ -17,6 +17,7 @@ from constants import (
 )
 from soap_helper import SoapHelperView
 from exefs import InvalidEssential, read_essential, serial_from_secinfo, serials_match
+from serial import read_serial
 from helpee import add_case_note, complete_case_setup, safe_note_text
 
 
@@ -318,7 +319,7 @@ class SerialNumberModal(discord.ui.Modal):
         self.correction = correction
         self.serial_input = discord.ui.InputText(
             label="Please enter your console's serial number.",
-            placeholder="e.g. YJM123456789 or QW12345678",
+            placeholder="e.g. YJM123456784 or QW12345678",
             required=True,
             max_length=12,
         )
@@ -326,17 +327,29 @@ class SerialNumberModal(discord.ui.Modal):
 
     async def callback(self, interaction: discord.Interaction):
         serial_raw = self.serial_input.value.strip().upper()
-        serial = re.sub(r"\s+", "", serial_raw)  # Remove spaces (e.g. "CWH12345678 9")
-        if not re.match(r"^[A-Z]{2,3}\d{8,9}$", serial):
+        info = read_serial(serial_raw)
+        if info is None:
             add_case_note(
                 interaction.channel,
                 f"Entered a serial number in the wrong format: `{safe_note_text(serial_raw, 20)}`",
             )
             await interaction.response.send_message(
-                "Invalid format. Serial numbers have 2-3 letters followed by 8 or 9 digits (e.g. CWH123456789 or CWH12345678). Please try again.",
+                "Invalid format. Serial numbers have 2-3 letters followed by 8 or 9 digits (e.g. YJM123456784 or QW12345678). Please try again.",
                 ephemeral=True,
             )
             return
+        # The 9th digit on the sticker is a check digit, so a wrong one means the serial was mistyped
+        if not info.check_digit_ok:
+            add_case_note(
+                interaction.channel,
+                f"Entered a serial number with the wrong check digit: `{info.serial}`",
+            )
+            await interaction.response.send_message(
+                "That serial number doesn't look right. Please check each character against the sticker on your console and try again.",
+                ephemeral=True,
+            )
+            return
+        serial = info.serial
 
         await interaction.response.defer()
         if self.correction and interaction.channel:
