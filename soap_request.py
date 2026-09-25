@@ -1,6 +1,6 @@
 from pathlib import Path
 import discord
-from discord.ext import commands
+from discord.ext import commands, bridge
 from perms import command_with_perms
 from helpee import find_open_channel, restore_helpee_access
 from constants import REQUEST_SOAP_CHANNEL_ID, RESTRICTED_ROLE_ID
@@ -394,6 +394,10 @@ class SOAPRequestCog(commands.Cog):
         help="Creates an embed with a button for SOAP requests",
     )
     async def requestsoap(self, ctx):
+        # Slash commands still need an answer, so acknowledge privately before the purge
+        is_slash = isinstance(ctx, bridge.BridgeApplicationContext)
+        if is_slash:
+            await ctx.defer(ephemeral=True)
         if ctx.channel.id == REQUEST_SOAP_CHANNEL_ID:
             try:
                 await ctx.channel.purge(limit=None)
@@ -401,11 +405,14 @@ class SOAPRequestCog(commands.Cog):
                 print("No permission to clear messages in request SOAP channel")
             except Exception as e:
                 print(f"Error clearing request SOAP channel: {e}")
+        # Send instead of reply, since the purge deletes the command message
         embed, view, file = self._create_soap_request_embed_and_view()
         if file:
-            await ctx.respond(embed=embed, view=view, file=file)
+            await ctx.channel.send(embed=embed, view=view, file=file)
         else:
-            await ctx.respond(embed=embed, view=view)
+            await ctx.channel.send(embed=embed, view=view)
+        if is_slash:
+            await ctx.respond("Posted.", ephemeral=True)
 
 
 def setup(bot):
