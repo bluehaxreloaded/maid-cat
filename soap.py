@@ -21,6 +21,7 @@ from constants import (
     HELPEE_ROLE_ID,
 )
 from perms import _has_role_or_higher
+from helpee import channel_name_for, find_open_channel, restore_helpee_access
 
 # Topic format for archived channels: "Archived. Deletion scheduled: YYYY-MM-DD HH:MM:SS UTC. " + original
 ARCHIVE_PREFIX = "Archived. Deletion scheduled: "
@@ -536,22 +537,16 @@ class SoapCog(commands.Cog):  # SOAP commands
         Helper function to create a manual SOAP channel.
         Returns tuple: (success: bool, channel: discord.TextChannel | None, message: str)
         """
-        # strip leading/trailing periods and then replace remaining periods with dashes
-        safe_user_name = user.name.lstrip(".").rstrip(".").lower().replace(".", "-")
-        channel_name = safe_user_name + SOAP_CHANNEL_SUFFIX
-        existing_channel = None
+        channel_name = channel_name_for(user, SOAP_CHANNEL_SUFFIX)
 
         # Only check channels in the SOAP categories (exclude archived)
-        for channel in guild.text_channels:
-            if channel.name == channel_name and channel.category:
-                if channel.category.id in [
-                    SOAP_CHANNEL_CATEGORY_ID,
-                    MANUAL_SOAP_CATEGORY_ID,
-                ]:
-                    existing_channel = channel
-                    break
+        existing_channel = find_open_channel(
+            guild, user, [SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID], SOAP_CHANNEL_SUFFIX
+        )
 
         if existing_channel:
+            # they may have lost access by leaving and rejoining the server
+            await restore_helpee_access(existing_channel, user)
             return (
                 False,
                 existing_channel,

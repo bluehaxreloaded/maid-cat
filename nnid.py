@@ -1,6 +1,7 @@
 import discord
 import asyncio
 from perms import command_with_perms
+from helpee import channel_name_for, find_open_channel, restore_helpee_access
 from exceptions import CategoryNotFound
 from log import log_to_soaper_log
 from discord.ext import commands
@@ -69,19 +70,16 @@ class NNIDCog(commands.Cog):  # NNID commands
         Helper function to create a NNID channel.
         Returns tuple: (success: bool, channel: discord.TextChannel | None, message: str)
         """
-        # strip leading/trailing periods and then replace remaining periods with dashes
-        safe_user_name = user.name.lstrip(".").rstrip(".").lower().replace(".", "-")
-        channel_name = safe_user_name + NNID_CHANNEL_SUFFIX
-        existing_channel = None
+        channel_name = channel_name_for(user, NNID_CHANNEL_SUFFIX)
 
         # Only check channels in the NNID category (exclude archived)
-        for channel in guild.text_channels:
-            if channel.name == channel_name and channel.category:
-                if channel.category.id == NNID_CHANNEL_CATEGORY_ID:
-                    existing_channel = channel
-                    break
+        existing_channel = find_open_channel(
+            guild, user, [NNID_CHANNEL_CATEGORY_ID], NNID_CHANNEL_SUFFIX
+        )
 
         if existing_channel:
+            # they may have lost access by leaving and rejoining the server
+            await restore_helpee_access(existing_channel, user)
             return (
                 False,
                 existing_channel,

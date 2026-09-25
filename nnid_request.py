@@ -2,6 +2,7 @@ from pathlib import Path
 import discord
 from discord.ext import commands
 from perms import command_with_perms
+from helpee import find_open_channel, restore_helpee_access
 from constants import (
     REQUEST_NNID_CHANNEL_ID,
     NNID_CHANNEL_SUFFIX,
@@ -398,18 +399,13 @@ class NNIDRequestView(discord.ui.View):
     async def request_nnid_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
-        # check if user already has a NNID channel
-        channel_name = (
-            interaction.user.name.lower().replace(".", "-") + NNID_CHANNEL_SUFFIX
+        # check if user already has a NNID channel (only in the NNID category)
+        existing_channel = find_open_channel(
+            interaction.guild,
+            interaction.user,
+            [NNID_CHANNEL_CATEGORY_ID],
+            NNID_CHANNEL_SUFFIX,
         )
-        existing_channel = None
-
-        # only check channels in the NNID category
-        for channel in interaction.guild.text_channels:
-            if channel.name == channel_name and channel.category:
-                if channel.category.id == NNID_CHANNEL_CATEGORY_ID:
-                    existing_channel = channel
-                    break
 
         if existing_channel:
             embed = discord.Embed(
@@ -419,6 +415,8 @@ class NNIDRequestView(discord.ui.View):
                 color=discord.Color.orange(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
+            # they may have lost access by leaving and rejoining the server
+            await restore_helpee_access(existing_channel, interaction.user)
             return
 
         # check if user has the restricted role (set role in constants.py)

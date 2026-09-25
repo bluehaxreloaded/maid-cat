@@ -2,6 +2,7 @@ from pathlib import Path
 import discord
 from discord.ext import commands
 from perms import command_with_perms
+from helpee import find_open_channel, restore_helpee_access
 from constants import REQUEST_SOAP_CHANNEL_ID, RESTRICTED_ROLE_ID
 
 
@@ -293,25 +294,19 @@ class SOAPRequestView(discord.ui.View):
     async def request_soap_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
-        from constants import SOAP_CHANNEL_SUFFIX
-
-        # check if user already has a SOAP channel
-        channel_name = (
-            interaction.user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
+        from constants import (
+            SOAP_CHANNEL_SUFFIX,
+            SOAP_CHANNEL_CATEGORY_ID,
+            MANUAL_SOAP_CATEGORY_ID,
         )
-        existing_channel = None
 
-        # only check channels in the SOAP categories
-        from constants import SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID
-
-        for channel in interaction.guild.text_channels:
-            if channel.name == channel_name and channel.category:
-                if channel.category.id in [
-                    SOAP_CHANNEL_CATEGORY_ID,
-                    MANUAL_SOAP_CATEGORY_ID,
-                ]:
-                    existing_channel = channel
-                    break
+        # check if user already has a SOAP channel (only in the SOAP categories)
+        existing_channel = find_open_channel(
+            interaction.guild,
+            interaction.user,
+            [SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID],
+            SOAP_CHANNEL_SUFFIX,
+        )
 
         if existing_channel:
             embed = discord.Embed(
@@ -321,6 +316,8 @@ class SOAPRequestView(discord.ui.View):
                 color=discord.Color.orange(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
+            # they may have lost access by leaving and rejoining the server
+            await restore_helpee_access(existing_channel, interaction.user)
             return
 
         # check if user has the restricted role (set role in constants.py)
