@@ -21,7 +21,13 @@ from constants import (
     HELPEE_ROLE_ID,
 )
 from perms import _has_role_or_higher
-from helpee import channel_name_for, find_open_channel, restore_helpee_access
+from helpee import (
+    channel_name_for,
+    find_open_channel,
+    restore_helpee_access,
+    member_from_topic,
+    sync_helpee_role,
+)
 
 # Topic format for archived channels: "Archived. Deletion scheduled: YYYY-MM-DD HH:MM:SS UTC. " + original
 ARCHIVE_PREFIX = "Archived. Deletion scheduled: "
@@ -440,16 +446,10 @@ class SoapCog(commands.Cog):  # SOAP commands
         except Exception:
             pass  # e.g. no override to remove; continue with move
 
-        # Revoke helpee role when channel is closed
-        if HELPEE_ROLE_ID:
-            try:
-                member = channel.guild.get_member(user_id)
-                if member and isinstance(member, discord.Member):
-                    role = channel.guild.get_role(HELPEE_ROLE_ID)
-                    if role and role in member.roles:
-                        await member.remove_roles(role)
-            except Exception:
-                pass
+        # Revoke helpee role when channel is closed, unless they still have another open SOAP/NNID channel
+        member = channel.guild.get_member(user_id)
+        if member:
+            await sync_helpee_role(member, moved={channel.id: TEMP_ARCHIVE_CATEGORY_ID})
 
         # Move channel and set topic
         # Append archive suffix: e.g. aidenkt-soap🧼 -> aidenkt-soap🧼-cya
@@ -770,8 +770,9 @@ class SoapCog(commands.Cog):  # SOAP commands
         """Move a SOAP channel to the given category."""
         target_channel = channel
         if target_channel is None and user is not None:
-            channel_name = user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
-            target_channel = discord.utils.get(ctx.guild.channels, name=channel_name)
+            target_channel = find_open_channel(
+                ctx.guild, user, [SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID], SOAP_CHANNEL_SUFFIX
+            )
         if target_channel is None:
             target_channel = ctx.channel
 
@@ -808,6 +809,12 @@ class SoapCog(commands.Cog):  # SOAP commands
             await ctx.respond(f"Moved {target_channel.mention} to {category_name} category.", ephemeral=True)
         except Exception as e:
             await ctx.respond(f"Failed to move channel: {e}", ephemeral=True)
+            return
+
+        # Manual channels don't restrict the rest of the server, so update the helpee role
+        member = await member_from_topic(target_channel)
+        if member:
+            await sync_helpee_role(member, moved={target_channel.id: target_category_id})
 
     # Leaving this for Manual SOAPs.
     @command_with_perms(
@@ -822,18 +829,18 @@ class SoapCog(commands.Cog):  # SOAP commands
         user: BridgeOption(discord.Member, "User to create a SOAP channel for"),
     ):  # Creates soup channel
 
-        channel_name = (
-            user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
-        )  # channels can't have periods
-        channel = discord.utils.get(ctx.guild.channels, name=channel_name)
-        # Don't count archived channels as existing
-        if channel and TEMP_ARCHIVE_CATEGORY_ID and channel.category and channel.category.id == TEMP_ARCHIVE_CATEGORY_ID:
-            channel = None
+        channel_name = channel_name_for(user, SOAP_CHANNEL_SUFFIX)
+        # Only open SOAP channels count as existing (archived ones don't)
+        channel = find_open_channel(
+            ctx.guild, user, [SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID], SOAP_CHANNEL_SUFFIX
+        )
 
         if channel:
             await ctx.respond(
                 f"Soap channel already made for `{user.name}` at {channel.jump_url}"
             )
+            # they may have lost access by leaving and rejoining the server
+            await restore_helpee_access(channel, user)
         else:
             category = discord.utils.get(
                 ctx.guild.categories, id=MANUAL_SOAP_CATEGORY_ID
@@ -872,13 +879,8 @@ class SoapCog(commands.Cog):  # SOAP commands
                 )
             await ctx.respond(new.jump_url)
             await log_to_soaper_log(ctx, "Created SOAP Channel")
-            if HELPEE_ROLE_ID:
-                try:
-                    role = ctx.guild.get_role(HELPEE_ROLE_ID)
-                    if role and role not in user.roles:
-                        await user.add_roles(role)
-                except Exception:
-                    pass
+            # Manual channels don't restrict the rest of the server
+            await sync_helpee_role(user)
 
     @command_with_perms(
         min_role="Soaper",
@@ -913,12 +915,10 @@ class SoapCog(commands.Cog):  # SOAP commands
         target_channel = channel
 
         if target_channel is None and user is not None:
-            # Try SOAP channel first based on user name
-            soap_channel_name = user.name.lower().replace(".", "-") + SOAP_CHANNEL_SUFFIX
-            nnid_channel_name = user.name.lower().replace(".", "-") + NNID_CHANNEL_SUFFIX
-            target_channel = discord.utils.get(ctx.guild.channels, name=soap_channel_name)
-            if not target_channel:
-                target_channel = discord.utils.get(ctx.guild.channels, name=nnid_channel_name)
+            # Try SOAP channel first, then NNID
+            target_channel = find_open_channel(
+                ctx.guild, user, [SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID], SOAP_CHANNEL_SUFFIX
+            ) or find_open_channel(ctx.guild, user, [NNID_CHANNEL_CATEGORY_ID], NNID_CHANNEL_SUFFIX)
 
         if target_channel is None:
             target_channel = ctx.channel

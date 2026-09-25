@@ -1,17 +1,21 @@
 import discord
 import asyncio
 from perms import command_with_perms
-from helpee import channel_name_for, find_open_channel, restore_helpee_access
+from helpee import (
+    channel_name_for,
+    find_open_channel,
+    restore_helpee_access,
+    member_from_topic,
+    sync_helpee_role,
+)
 from exceptions import CategoryNotFound
 from log import log_to_soaper_log
 from discord.ext import commands
 from discord.ext.bridge import BridgeOption
-import re
 from constants import (
     NNID_CHANNEL_SUFFIX,
     BOOM_EMOTE_ID,
     NNID_CHANNEL_CATEGORY_ID,
-    TEMP_ARCHIVE_CATEGORY_ID,
     HELPEE_ROLE_ID,
     is_late_night_hours,
 )
@@ -131,19 +135,10 @@ class NNIDCog(commands.Cog):  # NNID commands
             await soap_cog.archive_channel(channel, ctx, is_soap=False)
         else:
             # Fallback: delete immediately if SoapCog not available
-            if HELPEE_ROLE_ID:
-                try:
-                    topic = (channel.topic or "").strip()
-                    m = re.search(r"<@!?(\d+)>", topic)
-                    if m:
-                        user_id = int(m.group(1))
-                        member = channel.guild.get_member(user_id)
-                        if member and isinstance(member, discord.Member):
-                            role = channel.guild.get_role(HELPEE_ROLE_ID)
-                            if role and role in member.roles:
-                                await member.remove_roles(role)
-                except Exception:
-                    pass
+            # Revoke helpee role, unless they still have another open SOAP/NNID channel
+            member = await member_from_topic(channel)
+            if member:
+                await sync_helpee_role(member, moved={channel.id: None})
             await channel.send("Self-destruct sequence initiated!")
             await channel.send(f"<a:boomparrot:{BOOM_EMOTE_ID}>")
             await asyncio.sleep(2.75)
@@ -165,23 +160,18 @@ class NNIDCog(commands.Cog):  # NNID commands
         ctx,
         user: BridgeOption(discord.Member, "User to create an NNID channel for"),
     ):
-        channel_name = (
-            user.name.lower().replace(".", "-") + NNID_CHANNEL_SUFFIX
-        )  # channels can't have periods
-        channel = discord.utils.get(ctx.guild.channels, name=channel_name)
-        # Don't count archived channels as existing
-        if (
-            channel
-            and TEMP_ARCHIVE_CATEGORY_ID
-            and channel.category
-            and channel.category.id == TEMP_ARCHIVE_CATEGORY_ID
-        ):
-            channel = None
+        channel_name = channel_name_for(user, NNID_CHANNEL_SUFFIX)
+        # Only open NNID channels count as existing (archived ones don't)
+        channel = find_open_channel(
+            ctx.guild, user, [NNID_CHANNEL_CATEGORY_ID], NNID_CHANNEL_SUFFIX
+        )
 
         if channel:
             await ctx.respond(
                 f"NNID channel already made for `{user.name}` at {channel.jump_url}"
             )
+            # they may have lost access by leaving and rejoining the server
+            await restore_helpee_access(channel, user)
         else:
             category = discord.utils.get(
                 ctx.guild.categories, id=NNID_CHANNEL_CATEGORY_ID
