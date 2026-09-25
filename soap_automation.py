@@ -17,7 +17,7 @@ from constants import (
 )
 from soap_helper import SoapHelperView
 from exefs import InvalidEssential, read_essential, serial_from_secinfo, serials_match
-from helpee import add_case_note, safe_note_text
+from helpee import add_case_note, complete_case_setup, safe_note_text
 
 
 SERIAL_RECEIVED_TITLE = "✅ Serial number received"
@@ -382,6 +382,7 @@ class SerialNumberModal(discord.ui.Modal):
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=wait_embed)
+            complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
             return
 
         # Step 2: Ask for essential.exefs
@@ -609,6 +610,7 @@ class EssentialUploadModal(discord.ui.DesignerModal):
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=received_embed, file=file)
+            complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
 
         # Disable buttons on the upload prompt message
         if self.prompt_message_id and interaction.channel:

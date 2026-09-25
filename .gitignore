@@ -7,3 +7,5 @@ venv
 __pycache__
 .DS_Store
 tracker_counts.json
+case_notes.json
+case_notes.tmp
