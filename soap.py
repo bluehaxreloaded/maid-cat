@@ -2,7 +2,7 @@ import discord
 import asyncio
 import re
 from datetime import datetime, timezone, timedelta
-from perms import command_with_perms
+from perms import command_with_perms, soap_channels_only
 from exceptions import CategoryNotFound
 from log import log_to_soaper_log
 from discord.ext import commands
@@ -19,6 +19,7 @@ from constants import (
     SOAP_LOG_ID,
     ERROR_LOG_ID,
     HELPEE_ROLE_ID,
+    SOAPER_ROLE_ID,
 )
 from perms import _has_role_or_higher
 from helpee import (
@@ -758,6 +759,74 @@ class SoapCog(commands.Cog):  # SOAP commands
     ):
         """Move SOAP channel to auto category."""
         await self._move_soap_category(ctx, user, channel, SOAP_CHANNEL_CATEGORY_ID, "auto")
+
+    async def _set_send_messages(self, channel, lock: bool):
+        """Lock or unlock sending messages for the helpee and Soapers, keeping Developer and above able to talk."""
+        guild = channel.guild
+
+        async def set_send(target, value):
+            overwrite = channel.overwrites_for(target)
+            overwrite.send_messages = value
+            if overwrite.is_empty():
+                await channel.set_permissions(target, overwrite=None)
+            else:
+                await channel.set_permissions(target, overwrite=overwrite)
+
+        # Helpee (only if they're still in the server)
+        member = await member_from_topic(channel)
+        if member:
+            await set_send(member, False if lock else None)
+
+        soaper = guild.get_role(SOAPER_ROLE_ID)
+        if soaper:
+            await set_send(soaper, False if lock else None)
+
+        # Role allows win over the Soaper deny, so Developers who are also Soapers can still talk
+        developer = discord.utils.get(guild.roles, name="Developer")
+        if developer:
+            for role in guild.roles:
+                if role.position >= developer.position and not role.managed and not role.is_default():
+                    await set_send(role, True if lock else None)
+
+    @command_with_perms(
+        min_role="Developer",
+        name="lock",
+        help="Stops the helpee and Soapers from sending messages in this channel",
+    )
+    @soap_channels_only()
+    async def lock(self, ctx):
+        await ctx.defer()
+        try:
+            await self._set_send_messages(ctx.channel, lock=True)
+        except discord.Forbidden:
+            return await ctx.respond("I don't have permission to edit this channel's permissions.", ephemeral=True)
+        embed = discord.Embed(
+            title="🔒 Channel Locked",
+            description="Only Developers and above can send messages in this channel.",
+            color=discord.Color.red(),
+        )
+        await ctx.respond(embed=embed)
+        await _try_log_soap(ctx, "Locked Channel")
+
+    @command_with_perms(
+        min_role="Developer",
+        name="unlock",
+        help="Lets the helpee and Soapers send messages in this channel again",
+    )
+    @soap_channels_only()
+    async def unlock(self, ctx):
+        await ctx.defer()
+        try:
+            await self._set_send_messages(ctx.channel, lock=False)
+        except discord.Forbidden:
+            return await ctx.respond("I don't have permission to edit this channel's permissions.", ephemeral=True)
+        embed = discord.Embed(
+            title="🔓 Channel Unlocked",
+            description="The helpee and Soapers can send messages in this channel again.",
+            color=discord.Color.green(),
+        )
+        await ctx.respond(embed=embed)
+        await _try_log_soap(ctx, "Unlocked Channel")
 
     async def _move_soap_category(
         self,
