@@ -18,6 +18,28 @@ from constants import (
 MENTION_RE = re.compile(r"<@!?(\d{15,25})>")
 
 
+async def _find_helpee(ctx) -> discord.Member | None:
+    """Get the helpee of a SOAP/NNID channel from the channel topic, or the channel name if that fails."""
+    topic = getattr(ctx.channel, "topic", None)
+    if isinstance(ctx.channel, discord.TextChannel) and topic:
+        m = MENTION_RE.search(topic)
+        if m:
+            uid = int(m.group(1))
+            member_obj = ctx.guild.get_member(uid)
+            if member_obj is None:
+                try:
+                    member_obj = await ctx.guild.fetch_member(uid)
+                except discord.NotFound:
+                    member_obj = None
+            if member_obj:
+                return member_obj
+
+    member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
+    if member_name == ctx.channel.name:  # SOAP suffix didn't match, try NNID
+        member_name = ctx.channel.name.removesuffix(NNID_CHANNEL_SUFFIX)
+    return ctx.guild.get_member_named(member_name)
+
+
 def ping_before_mes():  # i didn't feel like writing the same line multiple times so i did the harder option of writing an entire decorator to write one single line
     def decorator(func):
         @wraps(func)
@@ -335,27 +357,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help="Instructions to keep Homebrew apps after system transfer",
     )
     async def homebrewaftertransfer(self, ctx):
-        # Get the user from the channel topic or name for mention
-        member_obj = None
-        topic = getattr(ctx.channel, "topic", None)
-        if isinstance(ctx.channel, discord.TextChannel) and topic:
-            m = MENTION_RE.search(topic)
-            if m:
-                uid = int(m.group(1))
-                member_obj = ctx.guild.get_member(uid)
-                if member_obj is None:
-                    try:
-                        member_obj = await ctx.guild.fetch_member(uid)
-                    except discord.NotFound:
-                        member_obj = None
-
-        # Get the user from the channel name if topic failed
-        if not member_obj:
-            member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
-            if member_name == ctx.channel.name:  # SOAP suffix didn't match, try NNID
-                member_name = ctx.channel.name.removesuffix(NNID_CHANNEL_SUFFIX)
-            member_obj = ctx.guild.get_member_named(member_name)
-
+        member_obj = await _find_helpee(ctx)
         embed = discord.Embed(
             title="📱 Keeping Homebrew Apps after System Transfer",
             description=(
@@ -368,6 +370,29 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
             ),
             color=discord.Color.red(),
         )
+        # Send with user mention if found
+        if member_obj:
+            await ctx.respond(content=member_obj.mention, embed=embed)
+        else:
+            await ctx.respond(embed=embed)
+
+    @command_with_perms(
+        name="sysversion",
+        aliases=["systemversion", "sysver", "version"],
+        help="Explains where to find the full system version",
+    )
+    async def sysversion(self, ctx):
+        member_obj = await _find_helpee(ctx)
+        embed = discord.Embed(
+            title="🔢 Finding Your System Version",
+            description=(
+                "**1.** From the HOME Menu, open **System Settings**.\n"
+                "**2.** Your system version is shown in the bottom right of the top screen (for example, `Ver. 11.17.0-50U`).\n"
+                "**3.** Send us the full version, including the letter at the end."
+            ),
+            color=discord.Color.blue(),
+        )
+        embed.set_footer(text="You may also send us a picture if you're unsure.")
         # Send with user mention if found
         if member_obj:
             await ctx.respond(content=member_obj.mention, embed=embed)
