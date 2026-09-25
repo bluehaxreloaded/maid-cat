@@ -29,7 +29,7 @@
       "description": "This error occurs after a SOAP transfer when your Nintendo 3DS has trouble connecting to Nintendo Network or downloading from the eShop.",
       "steps": [
         "If you are using Pretendo, switch to Nintendo Network with Nimbus.",
-        "Ensure you are not using any eShop alternatives such as Brewtendo.",
+        "Ensure you are not using any eShop alternatives such as Brewtendo. If you have used one, try renaming the `luma` folder on the root of your SD card to `luma.old`, then power on the console and check the eShop again.",
         "Power cycle your router and modem, then try again.",
         "Check your internet connection for congestion or bandwidth issues. If other devices are using a lot of bandwidth, your connection may time out.",
         "Check for wireless interference and try moving closer to your router.",
@@ -42,7 +42,9 @@
       "codes": [
         "007-2670",
         "022-5432",
-        "022-2482"
+        "022-2482",
+        "001-0502",
+        "002-0121"
       ],
       "title": "Network Error - Pretendo Enabled",
       "description": "This error occurs when Pretendo is enabled and you're trying to access Nintendo services.",
@@ -51,7 +53,8 @@
         "Open the **Nimbus** app on your 3DS.",
         "Select **Nintendo Network**.",
         "Try opening the eShop or Pokémon Bank again.",
-        "If you're not using Pretendo, this may be a network issue. Please ask a Soaper for help."
+        "If you're not using Pretendo, restart your console and router, then enter alternate DNS settings (such as Google DNS: 8.8.8.8 and 8.8.4.4) into your 3DS Internet settings. [Guide](<https://en-americas-support.nintendo.com/app/answers/detail/a_id/217>)",
+        "If the issue persists, please ask a Soaper for help."
       ],
       "service": "eShop"
     },
@@ -114,6 +117,76 @@
         "Try opening the eShop or the app again."
       ],
       "service": "eShop"
+    },
+    "netpass_spotpass": {
+      "ranges": [
+        [
+          "004-6000",
+          "004-6007"
+        ]
+      ],
+      "title": "NetPass patches issue",
+      "description": "This error means some patches NetPass uses are interfering with SpotPass services.",
+      "steps": [
+        "Open NetPass",
+        "Go to `Settings`",
+        "Go to `Miscellaneous`",
+        "Go to `Update Patches`",
+        "Press `Remove`",
+        "Reboot and try again."
+      ],
+      "service": "SpotPass"
+    },
+    "wireless_network": {
+      "codes": [
+        "003-1099"
+      ],
+      "ranges": [
+        [
+          "003-4000",
+          "003-4099"
+        ]
+      ],
+      "title": "Unable to Connect to Wireless Network",
+      "description": "This error occurs when your Nintendo 3DS is unable to find or connect to your wireless network. See Nintendo's documentation for details: https://en-americas-support.nintendo.com/app/answers/detail/a_id/4404",
+      "steps": [
+        "Check for wireless interference and try moving closer to your router.",
+        "Create a new connection in **System Settings → Internet Settings → Connection Settings** and make sure the network name and password are correct.",
+        "If the issue persists, change your router's broadcast mode to **B/G** or **Mixed**.",
+        "Try a different network (such as a phone hotspot). If that works, the issue is with your router.",
+        "If the issue persists, please ask a Soaper for help."
+      ],
+      "service": "eShop"
+    },
+    "eshop_replacement": {
+      "codes": [
+        "011-8011"
+      ],
+      "title": "eShop Replacement Installed",
+      "description": "This error occurs when an eShop replacement such as Samtendo or Brewtendo is installed on your console.",
+      "steps": [
+        "Uninstall the eShop replacement you are using.",
+        "If you are using Pretendo, switch to Nintendo Network with Nimbus.",
+        "If the issue persists, rename the `luma` folder on the root of your SD card to `luma.old`, then power on the console and try again.",
+        "If the issue persists, please ask a Soaper for help."
+      ],
+      "service": "eShop"
+    },
+    "pokemon_bank_reinstall": {
+      "codes": [
+        "006-1608",
+        "026-3151"
+      ],
+      "title": "Pokémon Bank Reinstall Required",
+      "description": "This error occurs when your Pokémon Bank install is outdated or has broken tickets. Your Pokémon are stored on Nintendo's servers and will not be lost.",
+      "steps": [
+        "Delete **Pokémon Bank** and **Poké Transporter** in **System Settings → Data Management → Nintendo 3DS → Software**.",
+        "If you have FBI, go to **Tickets** and delete any leftover Pokémon Bank tickets (`0004000E000C9B00`, `00040000000C9B00`, `0004000D000C9B00`).",
+        "Restart your console.",
+        "Redownload Pokémon Bank and Poké Transporter along with their updates from [hShop](<https://hshop.erista.me/>) or the eShop.",
+        "Try opening Pokémon Bank again."
+      ],
+      "service": "Pokémon Bank"
     }
   },
   "009-1003": {
@@ -215,17 +288,40 @@
     ],
     "service": "eShop"
   },
-  "004-6007": {
-    "title": "NetPass patches issue",
-    "description": "This error means some patches NetPass uses are interfering with SpotPass services.",
+  "022-2812": {
+    "title": "NNID Console Ban",
+    "description": "This error indicates some sort of Nintendo Network ID ban on your console.",
     "steps": [
-      "Open NetPass",
-      "Go to `Settings`",
-      "Go to `Miscellaneous`",
-      "Go to `Update Patches`",
-      "Press `Remove`",
-      "Reboot and try again."
+      "Please ask a Soaper for help."
     ],
-    "service": "SpotPass"
+    "service": "eShop"
+  },
+  "022-2932": {
+    "title": "NNID Creation Error",
+    "description": "This error occurs when creating a Nintendo Network ID and is caused by the console's language setting.",
+    "steps": [
+      "On your 3DS, open **System Settings → Other Settings → Profile → Language**.",
+      "Change the language to something else.",
+      "Try creating your Nintendo Network ID again. You can change the language back afterwards."
+    ],
+    "service": "eShop"
+  },
+  "009-2720": {
+    "title": "eShop Error - Luma Folder",
+    "description": "This error occurs when opening the eShop on a console that is not using NetPass.",
+    "steps": [
+      "Rename the `luma` folder on the root of your SD card to `luma.old`.",
+      "Power on the console and check the eShop again.",
+      "If you are using NetPass, please ask a Soaper for help."
+    ],
+    "service": "eShop"
+  },
+  "005-4800": {
+    "title": "Missing movable.sed",
+    "description": "This error occurs when your console's movable.sed is missing.",
+    "steps": [
+      "Please ask a Soaper for help."
+    ],
+    "service": "eShop"
   }
 }

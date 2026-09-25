@@ -23,8 +23,13 @@ def _load_error_info(error_code: str) -> dict | None:
         for key, value in raw_db.items():
             if key == "groups" and isinstance(value, dict):
                 for group in value.values():
-                    codes = group.get("codes", [])
-                    template = {k: v for k, v in group.items() if k != "codes"}
+                    codes = list(group.get("codes", []))
+                    # Expand inclusive ranges like ["003-4000", "003-4099"]
+                    for start, end in group.get("ranges", []):
+                        prefix = start[:4]
+                        for n in range(int(start[4:]), int(end[4:]) + 1):
+                            codes.append(f"{prefix}{n:04d}")
+                    template = {k: v for k, v in group.items() if k not in ("codes", "ranges")}
                     for code in codes:
                         if isinstance(code, str):
                             error_codes_db[code] = template
