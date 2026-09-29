@@ -132,7 +132,11 @@ async def send_soap_request(channel: discord.TextChannel, soaper: discord.abc.Us
     now = time.monotonic()
     sent_at, sent_by = _last_soap_requests.get(file_hash, (0, None))
     if now - sent_at < SOAP_REQUEST_COOLDOWN:
-        return f"{sent_by.mention} beat you to it, they already sent this SOAP to soap-cat."
+        seconds = int(now - sent_at)
+        return (
+            f"This SOAP is on cooldown, {sent_by.mention} already approved this SOAP "
+            f"{seconds} second{'' if seconds == 1 else 's'} ago."
+        )
     _last_soap_requests[file_hash] = (now, soaper)
     # soap-cat reads the file straight from the essentials folder, so it never goes through Discord
     await bots_only.send(f"SOAP_REQUEST {member.id} {serial} STORED")
