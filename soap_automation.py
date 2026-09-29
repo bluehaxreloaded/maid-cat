@@ -752,8 +752,13 @@ class EssentialUploadModal(discord.ui.DesignerModal):
                 interaction.channel,
                 f"Serial number didn't match their essential.exefs: entered `{safe_note_text(entered, 20)}`",
             )
-            # Not stored yet: it's held in memory until the serial is corrected
+            # Not stored yet: it's held in memory until the serial is corrected.
+            # It still replaces any earlier upload, so the old file isn't used by mistake.
             pending_essentials[interaction.channel.id] = (interaction.user.id, clean)
+            try:
+                delete_essential(interaction.channel.id)
+            except OSError as e:
+                print(f"Could not wipe old essential.exefs for #{interaction.channel.name}: {e}")
             await interaction.followup.send(
                 content=interaction.user.mention,
                 embed=serial_mismatch_embed(),
