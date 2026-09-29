@@ -2,7 +2,9 @@ import discord
 import io
 import re
 import asyncio
+from datetime import datetime, timezone
 from discord.ext import commands
+import constants
 from perms import command_with_perms
 from log import log_to_soaper_log
 from constants import (
@@ -26,7 +28,14 @@ from serial import (
     serials_match,
     uploaded_essential_serial,
 )
-from helpee import add_case_note, complete_case_setup, reset_case_setup, safe_note_text, member_from_topic
+from helpee import (
+    add_case_note,
+    case_notes,
+    complete_case_setup,
+    member_from_topic,
+    reset_case_setup,
+    safe_note_text,
+)
 
 
 STEP2_TITLE = "2️⃣ Upload your essential.exefs file"
@@ -74,6 +83,71 @@ class SerialMismatchView(discord.ui.View):
             correction=True,
         )
         await interaction.response.send_modal(modal)
+
+
+class SoapQueueView(discord.ui.View):
+    """Approve / Manual buttons on a soap-queue request. Pressing either disables both (they don't do anything else yet)."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def _choose(self, interaction: discord.Interaction):
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(
+        label="Approve",
+        style=discord.ButtonStyle.success,
+        emoji="✅",
+        custom_id="soap_queue_approve",
+    )
+    async def approve_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await self._choose(interaction)
+
+    @discord.ui.button(
+        label="Manual",
+        style=discord.ButtonStyle.secondary,
+        emoji="🛠️",
+        custom_id="soap_queue_manual",
+    )
+    async def manual_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await self._choose(interaction)
+
+
+def soap_queue_embed(
+    member: discord.abc.User, channel: discord.TextChannel | None, serial: str | None, notes: list[str]
+) -> discord.Embed:
+    """The soap-queue request for a helpee who finished steps 1 and 2."""
+    info = read_serial(serial) if serial else None
+    embed = discord.Embed(
+        title="🧼 New SOAP Request",
+        description=f"{member.mention} in {channel.mention}" if channel else member.mention,
+        color=discord.Color.blue(),
+        timestamp=datetime.now(timezone.utc),
+    )
+    embed.add_field(name="Username", value=member.name, inline=True)
+    embed.add_field(name="Serial Number", value=f"`{serial}`" if serial else "Not found", inline=True)
+    region = info.region if info and info.region else "Unknown"
+    embed.add_field(name="Region", value=f"{region} ({info.model})" if info and info.model else region, inline=True)
+    notes_text = "\n".join(f"- {n}" for n in notes) or "None"
+    if len(notes_text) > 1024:
+        notes_text = notes_text[:1021] + "..."
+    embed.add_field(name="Case Notes", value=notes_text, inline=False)
+    return embed
+
+
+async def post_to_soap_queue(channel: discord.TextChannel, member: discord.abc.User):
+    """Post a helpee's request to soap-queue once steps 1 and 2 are done."""
+    queue_id = getattr(constants, "SOAP_QUEUE_CHANNEL_ID", None)  # not every server has one set yet
+    queue = channel.guild.get_channel(queue_id) if queue_id else None
+    if queue is None:
+        return
+    embed = soap_queue_embed(member, channel, await entered_serial(channel), case_notes(channel))
+    try:
+        await queue.send(embed=embed, view=SoapQueueView())
+    except discord.HTTPException as e:
+        print(f"Could not post to soap-queue for #{channel.name}: {e}")
 
 
 class CompletionFollowUpView(discord.ui.View):
@@ -384,6 +458,7 @@ class SerialNumberModal(discord.ui.Modal):
             )
             await interaction.followup.send(embed=wait_embed)
             complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
+            await post_to_soap_queue(interaction.channel, interaction.user)
             return
 
         # Step 2: Ask for essential.exefs
@@ -612,6 +687,7 @@ class EssentialUploadModal(discord.ui.DesignerModal):
             )
             await interaction.followup.send(embed=received_embed, file=file)
             complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
+            await post_to_soap_queue(interaction.channel, interaction.user)
 
         # Disable buttons on the upload prompt message
         if self.prompt_message_id and interaction.channel:
@@ -982,6 +1058,28 @@ class SOAPAutomationCog(commands.Cog):
 
     @command_with_perms(
         min_role="Developer",
+        name="testqueue",
+        aliases=["queuetest", "queuepreview"],
+        help="Shows what this channel's soap-queue request looks like (Developer only)",
+    )
+    async def testqueue(self, ctx):
+        """Post the soap-queue embed here, using this channel's data if it's a helpee channel."""
+        member = await member_from_topic(ctx.channel) if getattr(ctx.channel, "topic", None) else None
+        if member is not None:
+            embed = soap_queue_embed(member, ctx.channel, await entered_serial(ctx.channel), case_notes(ctx.channel))
+        else:
+            # Not a helpee channel, so show sample data
+            author = ctx.author if hasattr(ctx, "author") else ctx.user
+            embed = soap_queue_embed(
+                author,
+                ctx.channel,
+                "YJM123456784",
+                ["Entered a serial number in the wrong format: `YJM1234`", "Uploaded a file that isn't an .exefs: `photo.jpg`"],
+            )
+        await ctx.respond(embed=embed, view=SoapQueueView())
+
+    @command_with_perms(
+        min_role="Developer",
         name="reset",
         aliases=["resetchannel", "testsoap", "soaptest", "testsoapflow"],
         help="Restarts the SOAP channel setup in the current channel (Developer only)",
@@ -1009,6 +1107,7 @@ class SOAPAutomationCog(commands.Cog):
         self.bot.add_view(EssentialUploadView())
         self.bot.add_view(EssentialFollowUpView())
         self.bot.add_view(SerialMismatchView())
+        self.bot.add_view(SoapQueueView())
 
     @commands.Cog.listener("on_message")
     async def block_chat_essential(self, message: discord.Message):

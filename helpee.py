@@ -185,6 +185,18 @@ def pending_case_notes(channel_id: int) -> list[str]:
     return list(_notes().get(str(channel_id), {}).get("notes", []))
 
 
+def case_notes(channel: discord.TextChannel) -> list[str]:
+    """All case notes for a channel: the ones already in its topic, then any not written yet."""
+    notes = []
+    topic = channel.topic or ""
+    if CASE_NOTES_HEADER in topic:
+        for line in topic.split(CASE_NOTES_HEADER, 1)[1].split("\n"):
+            if line.startswith("- "):
+                notes.append(line[2:])
+    notes += [n for n in pending_case_notes(channel.id) if n not in notes]
+    return notes
+
+
 def clear_case_notes(channel_id: int):
     """Forget a channel's case notes, e.g. once they're written into its archive topic."""
     if _notes().pop(str(channel_id), None) is not None:
