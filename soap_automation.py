@@ -16,12 +16,19 @@ from constants import (
     is_late_night_hours,
 )
 from soap_helper import SoapHelperView
-from exefs import InvalidEssential, read_essential, serial_from_secinfo, serials_match
-from serial import read_serial
+from exefs import InvalidEssential, read_essential, serial_from_secinfo
+from serial import (
+    SERIAL_RECEIVED_TITLE,
+    describe_serial,
+    entered_serial,
+    find_serial,
+    read_serial,
+    serials_match,
+    uploaded_essential_serial,
+)
 from helpee import add_case_note, complete_case_setup, reset_case_setup, safe_note_text, member_from_topic
 
 
-SERIAL_RECEIVED_TITLE = "✅ Serial number received"
 STEP2_TITLE = "2️⃣ Upload your essential.exefs file"
 
 
@@ -44,28 +51,6 @@ def serial_mismatch_embed() -> discord.Embed:
         text="Once you've found your serial number, press the button below to enter it."
     )
     return embed
-
-
-async def _entered_serial(channel: discord.TextChannel) -> str | None:
-    """The serial the helpee entered in step 1, read back from the "Serial number received" message."""
-    async for message in channel.history(limit=100):
-        if message.embeds and message.embeds[0].title == SERIAL_RECEIVED_TITLE:
-            return (message.embeds[0].description or "").strip() or None
-    return None
-
-
-async def _uploaded_essential_serial(channel: discord.TextChannel) -> str | None:
-    """Serial inside the most recent essential.exefs posted in the channel, if there is a valid one."""
-    async for message in channel.history(limit=100):
-        for attachment in message.attachments:
-            if not attachment.filename.lower().endswith(".exefs"):
-                continue
-            try:
-                essential = read_essential(await attachment.read())
-            except (discord.HTTPException, InvalidEssential):
-                continue
-            return serial_from_secinfo(essential["secinfo"])
-    return None
 
 
 class SerialMismatchView(discord.ui.View):
@@ -293,9 +278,7 @@ class CopySerialView(discord.ui.View):
         if interaction.message and interaction.message.embeds:
             # Always derive from the clicked message to avoid stale serials
             # from persistent view instances.
-            desc = interaction.message.embeds[0].description or ""
-            match = re.search(r"\b([A-Z]{2,3}\d{8,9})\b", desc)
-            serial = match.group(1) if match else None
+            serial = find_serial(interaction.message.embeds[0].description or "")
 
         # Backward-compatible fallback for older message formats.
         if not serial and self.serial:
@@ -321,7 +304,7 @@ class SerialNumberModal(discord.ui.Modal):
             label="Please enter your console's serial number.",
             placeholder="e.g. YJM123456784 or QW12345678",
             required=True,
-            max_length=12,
+            max_length=14,  # room for a space, e.g. YJM12345678 4
         )
         self.add_item(self.serial_input)
 
@@ -350,10 +333,12 @@ class SerialNumberModal(discord.ui.Modal):
             )
             return
         serial = info.serial
+        if info.unusual:
+            add_case_note(interaction.channel, f"Serial number has an unusual region code: `{info.region_code}`")
 
         await interaction.response.defer()
         if self.correction and interaction.channel:
-            file_serial = await _uploaded_essential_serial(interaction.channel)
+            file_serial = await uploaded_essential_serial(interaction.channel)
             if file_serial and not serials_match(serial, file_serial):
                 add_case_note(
                     interaction.channel,
@@ -368,9 +353,12 @@ class SerialNumberModal(discord.ui.Modal):
 
         serial_embed = discord.Embed(
             title=SERIAL_RECEIVED_TITLE,
-            description=serial,
+            description=serial,  # keep this just the serial; the copy button and file check read it back
             color=discord.Color.green(),
         )
+        label = describe_serial(info)
+        if label:
+            serial_embed.set_footer(text=label)
         copy_view = CopySerialView(serial=serial)
         await interaction.followup.send(embed=serial_embed, view=copy_view)
 
@@ -603,7 +591,7 @@ class EssentialUploadModal(discord.ui.DesignerModal):
             return
 
         file = discord.File(io.BytesIO(data), filename=attachment.filename)
-        entered = await _entered_serial(interaction.channel) if interaction.channel else None
+        entered = await entered_serial(interaction.channel) if interaction.channel else None
         if entered and not serials_match(entered, serial_from_secinfo(essential["secinfo"])):
             add_case_note(
                 interaction.channel,

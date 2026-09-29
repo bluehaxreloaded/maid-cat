@@ -52,15 +52,3 @@ def read_essential(data: bytes) -> dict[str, bytes]:
 def serial_from_secinfo(secinfo: bytes) -> str:
     """Serial number stored in secinfo (same place soap-cat reads it from)."""
     return secinfo[0x102:0x112].replace(b"\x00", b"").decode("ascii", errors="ignore").strip().upper()
-
-
-def serials_match(entered: str, from_file: str) -> bool:
-    """Whether the serial the helpee entered matches the one in their file.
-    The file has 8 digits, while the sticker adds a 9th check digit, so one extra digit on either side still matches."""
-    entered = entered.strip().upper()
-    if not entered or not from_file:
-        return False
-    if entered == from_file:
-        return True
-    longer, shorter = (entered, from_file) if len(entered) > len(from_file) else (from_file, entered)
-    return len(longer) == len(shorter) + 1 and longer.startswith(shorter)
