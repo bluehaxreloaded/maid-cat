@@ -146,7 +146,8 @@ async def send_soap_request(channel: discord.TextChannel, soaper: discord.abc.Us
 
 
 class SoapQueueView(discord.ui.View):
-    """Approve / Manual buttons on a soap-queue request. Pressing either disables both (they don't do anything else yet)."""
+    """Approve / Manual buttons on a soap-queue request. Pressing either disables both.
+    Manual moves the channel to manual (same as .manual); Approve doesn't do anything else yet."""
 
     def __init__(self):
         super().__init__(timeout=None)
@@ -172,7 +173,34 @@ class SoapQueueView(discord.ui.View):
         custom_id="soap_queue_manual",
     )
     async def manual_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await self._choose(interaction)
+        soaper = discord.utils.get(interaction.guild.roles, name="Soaper")
+        if soaper is None or not _has_role_or_higher(interaction.user, soaper):
+            await interaction.response.send_message("You must be a Soaper or higher to use this.", ephemeral=True)
+            return
+        # The request's embed says "<helpee> in <#channel>"
+        embed = interaction.message.embeds[0] if interaction.message.embeds else None
+        match = re.search(r"<#(\d+)>", embed.description or "") if embed else None
+        channel = interaction.guild.get_channel(int(match.group(1))) if match else None
+        if channel is None:
+            await interaction.response.send_message("That SOAP channel doesn't exist anymore.", ephemeral=True)
+            return
+
+        # Same as .manual, which replies to the Soaper with how it went
+        soap_cog = interaction.client.get_cog("SoapCog")
+        if not await soap_cog._move_soap_category(interaction, None, channel, MANUAL_SOAP_CATEGORY_ID, "manual"):
+            return
+
+        manual_embed = discord.Embed(
+            title="⚠️ Moving to Manual",
+            description="This SOAP Request has been selected to be performed manually by a Soaper.",
+            color=discord.Color.orange(),
+        )
+        manual_embed.set_footer(text="Please wait for assistance and prepare to answer any questions.")
+        await channel.send(embed=manual_embed)
+
+        for item in self.children:
+            item.disabled = True
+        await interaction.message.edit(view=self)
 
 
 def soap_queue_embed(

@@ -934,8 +934,8 @@ class SoapCog(commands.Cog):  # SOAP commands
         channel: discord.TextChannel | None,
         target_category_id: int,
         category_name: str,
-    ):
-        """Move a SOAP channel to the given category."""
+    ) -> bool:
+        """Move a SOAP channel to the given category. Returns whether it was moved."""
         target_channel = channel
         if target_channel is None and user is not None:
             target_channel = find_open_channel(
@@ -945,7 +945,8 @@ class SoapCog(commands.Cog):  # SOAP commands
             target_channel = ctx.channel
 
         if not target_channel:
-            return await ctx.respond("Channel not found.", ephemeral=True)
+            await ctx.respond("Channel not found.", ephemeral=True)
+            return False
 
         is_archived = (
             target_channel.category
@@ -953,7 +954,8 @@ class SoapCog(commands.Cog):  # SOAP commands
             and target_channel.category.id == TEMP_ARCHIVE_CATEGORY_ID
         )
         if is_archived:
-            return await ctx.respond("Cannot move archived channels.", ephemeral=True)
+            await ctx.respond("Cannot move archived channels.", ephemeral=True)
+            return False
 
         is_soap = (
             target_channel.category
@@ -963,26 +965,30 @@ class SoapCog(commands.Cog):  # SOAP commands
             )
         )
         if not is_soap:
-            return await ctx.respond(f"{target_channel.mention} is not a SOAP channel!", ephemeral=True)
+            await ctx.respond(f"{target_channel.mention} is not a SOAP channel!", ephemeral=True)
+            return False
 
         category = discord.utils.get(ctx.guild.categories, id=target_category_id)
         if not category:
-            return await ctx.respond("Category not found.", ephemeral=True)
+            await ctx.respond("Category not found.", ephemeral=True)
+            return False
 
         if target_channel.category and target_channel.category.id == target_category_id:
-            return await ctx.respond(f"Channel is already in the {category_name} category.", ephemeral=True)
+            await ctx.respond(f"Channel is already in the {category_name} category.", ephemeral=True)
+            return False
 
         try:
             await _edit_channel_with_retry(target_channel, category=category)
             await ctx.respond(f"Moved {target_channel.mention} to {category_name} category.", ephemeral=True)
         except Exception as e:
             await ctx.respond(f"Failed to move channel: {e}", ephemeral=True)
-            return
+            return False
 
         # Manual channels don't restrict the rest of the server, so update the helpee role
         member = await member_from_topic(target_channel)
         if member:
             await sync_helpee_role(member, moved={target_channel.id: target_category_id})
+        return True
 
     # Leaving this for Manual SOAPs.
     @command_with_perms(
