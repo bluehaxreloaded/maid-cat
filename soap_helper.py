@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from discord.ext import commands
 from perms import command_with_perms
+from helpee import add_case_note, safe_note_text
 from constants import (
     SOAPER_ROLE_ID,
     AWAITING_EMOTE_ID,
@@ -294,6 +295,10 @@ class ErrorCodeModal(discord.ui.Modal):
 
         # Validate basic format XXX-XXXX (three digits, dash, four digits)
         if not re.fullmatch(r"\d{3}-\d{4}", error_code):
+            add_case_note(
+                interaction.channel,
+                f"Entered an error code in the wrong format: `{safe_note_text(error_code, 20)}`",
+            )
             invalid_embed = discord.Embed(
                 title="🆘 Invalid Error Code Format",
                 description=(
@@ -333,6 +338,7 @@ class ErrorCodeModal(discord.ui.Modal):
         error_info = _load_error_info(error_code)
 
         if error_info:
+            add_case_note(interaction.channel, f"Reported error code `{error_code}` ({error_info['title']})")
             steps_text = _format_steps(error_info["steps"])
 
             embed = discord.Embed(
@@ -382,6 +388,7 @@ class ErrorCodeModal(discord.ui.Modal):
                     )
         else:
             # Error code not found in our database
+            add_case_note(interaction.channel, f"Reported error code `{error_code}`, which isn't in our database")
             unknown_embed = discord.Embed(
                 title="🆘 Unknown Error Code",
                 description=(
@@ -417,6 +424,7 @@ class ErrorCodeModal(discord.ui.Modal):
 
 async def _request_help_without_code(view: discord.ui.View, interaction: discord.Interaction):
     """The helpee has no error code to enter, so disable the buttons and ping Soapers."""
+    add_case_note(interaction.channel, "Said there is no error code for their issue")
     for child in view.children:
         child.disabled = True
     try:
