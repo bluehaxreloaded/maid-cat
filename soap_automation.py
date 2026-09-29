@@ -18,7 +18,7 @@ from constants import (
 from soap_helper import SoapHelperView
 from exefs import InvalidEssential, read_essential, serial_from_secinfo, serials_match
 from serial import read_serial
-from helpee import add_case_note, complete_case_setup, safe_note_text
+from helpee import add_case_note, complete_case_setup, reset_case_setup, safe_note_text, member_from_topic
 
 
 SERIAL_RECEIVED_TITLE = "✅ Serial number received"
@@ -994,17 +994,21 @@ class SOAPAutomationCog(commands.Cog):
 
     @command_with_perms(
         min_role="Developer",
-        name="testsoap",
-        aliases=["testsoapflow"],
-        help="Test the full SOAP channel setup in the current channel (Developer only)",
+        name="reset",
+        aliases=["resetchannel", "testsoap", "soaptest", "testsoapflow"],
+        help="Restarts the SOAP channel setup in the current channel (Developer only)",
     )
-    async def testserial(self, ctx):
-        """Run create_soap_interface in the current channel for testing."""
-        member = ctx.author if hasattr(ctx, "author") else getattr(ctx, "user", None)
+    async def reset(self, ctx):
+        """Run create_soap_interface in the current channel, for the helpee named in its topic."""
+        member = await member_from_topic(ctx.channel) if getattr(ctx.channel, "topic", None) else None
+        if member is None:
+            # Not a helpee channel (e.g. testing), so run it for whoever used the command
+            member = ctx.author if hasattr(ctx, "author") else getattr(ctx, "user", None)
         if not isinstance(member, discord.Member):
             await ctx.respond("Could not get user.", ephemeral=True)
             return
-        await ctx.respond("Running full channel setup here...", ephemeral=True)
+        await ctx.respond("Restarting the channel setup here...", ephemeral=True)
+        reset_case_setup(ctx.channel)
         await self.create_soap_interface(ctx.channel, member)
 
     @commands.Cog.listener()

@@ -172,6 +172,14 @@ def complete_case_setup(channel: discord.TextChannel | None):
         _schedule_write(channel)
 
 
+def reset_case_setup(channel: discord.TextChannel | None):
+    """The channel setup is starting over (.reset), so collect notes again until step 2 is done."""
+    entry = _notes().get(str(channel.id)) if channel is not None else None
+    if entry and entry["complete"]:
+        entry["complete"] = False
+        _save_notes()
+
+
 def pending_case_notes(channel_id: int) -> list[str]:
     """Case notes saved for a channel but not written to its topic yet."""
     return list(_notes().get(str(channel_id), {}).get("notes", []))
