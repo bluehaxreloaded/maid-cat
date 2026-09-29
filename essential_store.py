@@ -50,11 +50,18 @@ def save_essential(channel_id: int, user_id: int, data: bytes):
 
 
 def load_essential(channel_id: int, user_id: int | None) -> bytes | None:
-    """The essential.exefs stored for this helpee in this channel, if there is one."""
+    """The essential.exefs stored for this helpee in this channel, if there is one.
+    user_id is None for a channel with no helpee in its topic (e.g. testing), where anyone can upload,
+    so whichever file is stored for the channel is used."""
     if user_id is None:
-        return None
+        files = _channel_files(channel_id)
+        if not files:
+            return None
+        path = files[0]
+    else:
+        path = _path(channel_id, user_id)
     try:
-        fd = os.open(_path(channel_id, user_id), os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     except FileNotFoundError:
         return None
     with os.fdopen(fd, "rb") as f:

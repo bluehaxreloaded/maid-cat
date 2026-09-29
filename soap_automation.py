@@ -59,8 +59,9 @@ def store_essential(channel_id: int, user_id: int, data: bytes):
 
 async def reject_non_helpee(interaction: discord.Interaction) -> bool:
     """Only the helpee named in the channel topic can upload their essential.exefs.
-    Tells anyone else so and returns True."""
-    if interaction.user.id == helpee_id(interaction.channel):
+    Tells anyone else so and returns True. In a channel with no helpee in its topic (e.g. testing with .reset), anyone can."""
+    helpee = helpee_id(interaction.channel)
+    if helpee is None or interaction.user.id == helpee:
         return False
     await interaction.response.send_message(
         "Only the person this channel was opened for can upload their `essential.exefs`.", ephemeral=True
