@@ -711,7 +711,7 @@ class EssentialUploadModal(discord.ui.DesignerModal):
             return
         attachment = files[0]
 
-        # Files uploaded through a modal aren't posted anywhere; once it passes every check it's stored on disk
+        # Files uploaded through a modal aren't posted anywhere; once it passes every check it's stored on disk and reposted
         await interaction.response.defer()
         try:
             # Too big to be an essential.exefs, so don't download it at all
@@ -740,6 +740,8 @@ class EssentialUploadModal(discord.ui.DesignerModal):
 
         # Only the known files are kept, so nothing else that was in the upload gets stored
         clean = rebuild_essential(essential)
+        # For now it's also still posted in the channel (the checked copy, not the raw upload)
+        file = discord.File(io.BytesIO(clean), filename=attachment.filename)
         entered = await entered_serial(interaction.channel) if interaction.channel else None
         if entered and not serials_match(entered, serial_from_secinfo(essential["secinfo"])):
             add_case_note(
@@ -751,6 +753,7 @@ class EssentialUploadModal(discord.ui.DesignerModal):
             await interaction.followup.send(
                 content=interaction.user.mention,
                 embed=serial_mismatch_embed(),
+                file=file,
                 view=SerialMismatchView(),
             )
         else:
@@ -767,7 +770,7 @@ class EssentialUploadModal(discord.ui.DesignerModal):
                 description="Please wait for a Soaper to assist you.",
                 color=discord.Color.green(),
             )
-            await interaction.followup.send(embed=received_embed)
+            await interaction.followup.send(embed=received_embed, file=file)
             complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
             await post_to_soap_queue(interaction.channel, interaction.user)
 
