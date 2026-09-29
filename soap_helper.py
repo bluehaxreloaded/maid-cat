@@ -415,6 +415,32 @@ class ErrorCodeModal(discord.ui.Modal):
             )
 
 
+async def _request_help_without_code(view: discord.ui.View, interaction: discord.Interaction):
+    """The helpee has no error code to enter, so disable the buttons and ping Soapers."""
+    for child in view.children:
+        child.disabled = True
+    try:
+        await interaction.response.edit_message(view=view)
+    except Exception:
+        await interaction.response.defer()
+
+    soaper_ping = f"<@&{SOAPER_ROLE_ID}>"
+    embed = discord.Embed(
+        title="🆘 Assistance Requested",
+        description=(
+            f"{interaction.user.mention} doesn't have an error code. "
+            "Please wait for a Soaper to assist you."
+        ),
+        color=discord.Color.yellow(),
+    )
+    embed.set_footer(text="Describe in detail what's happening.")
+    await interaction.followup.send(
+        content=soaper_ping,
+        embed=embed,
+        allowed_mentions=discord.AllowedMentions(roles=True),
+    )
+
+
 class AwaitingErrorCodeView(discord.ui.View):
     """View that provides a button to open the error code modal."""
 
@@ -432,6 +458,14 @@ class AwaitingErrorCodeView(discord.ui.View):
         )
         enter_button.callback = self._input_error_callback
         self.add_item(enter_button)
+
+        no_code_button = discord.ui.Button(
+            label="There is no error code",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"awaiting_error_none:{ctx_suffix}",
+        )
+        no_code_button.callback = self._no_error_code_callback
+        self.add_item(no_code_button)
 
         something_else_button = discord.ui.Button(
             label="⚠️ I need something else",
@@ -454,6 +488,10 @@ class AwaitingErrorCodeView(discord.ui.View):
         modal = ErrorCodeModal(context=context)
         modal.target_message = interaction.message
         await interaction.response.send_modal(modal)
+
+    async def _no_error_code_callback(self, interaction: discord.Interaction):
+        """No error code on the console, so ask a Soaper for help."""
+        await _request_help_without_code(self, interaction)
 
     async def _no_code_callback(self, interaction: discord.Interaction):
         """User doesn't have / want to enter an error code – go back to SOAP helper."""
@@ -513,6 +551,14 @@ class InvalidErrorCodeView(discord.ui.View):
         reenter_button.callback = self._reenter_callback
         self.add_item(reenter_button)
 
+        no_code_button = discord.ui.Button(
+            label="There is no error code",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"invalid_error_none:{ctx_suffix}",
+        )
+        no_code_button.callback = self._no_error_code_callback
+        self.add_item(no_code_button)
+
         something_else_button = discord.ui.Button(
             label="⚠️ I need something else",
             style=discord.ButtonStyle.danger,
@@ -535,6 +581,10 @@ class InvalidErrorCodeView(discord.ui.View):
         if self.target_message is not None:
             modal.target_message = self.target_message
         await interaction.response.send_modal(modal)
+
+    async def _no_error_code_callback(self, interaction: discord.Interaction):
+        """No error code on the console, so ask a Soaper for help."""
+        await _request_help_without_code(self, interaction)
 
     async def _no_code_callback(self, interaction: discord.Interaction):
         """Return the user to the main SOAP helper menu."""
