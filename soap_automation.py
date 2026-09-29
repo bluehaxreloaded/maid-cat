@@ -51,6 +51,15 @@ SOAP_REQUEST_COOLDOWN = 15  # seconds before the same essential.exefs can be sen
 _last_soap_requests: dict[str, tuple[float, discord.abc.User]] = {}  # essential.exefs hash -> when and by who it was last sent
 
 
+def forget_essential(channel: discord.abc.GuildChannel):
+    """Wipe a channel's essential.exefs, e.g. when it's archived or deleted."""
+    pending_essentials.pop(channel.id, None)
+    try:
+        delete_essential(channel.id)
+    except OSError as e:
+        print(f"Could not wipe essential.exefs for #{channel.name}: {e}")
+
+
 def store_essential(channel_id: int, user_id: int, data: bytes):
     """Save a helpee's fully checked essential.exefs to disk for their channel."""
     save_essential(channel_id, user_id, data)
@@ -1259,11 +1268,7 @@ class SOAPAutomationCog(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
         """A deleted channel's essential.exefs isn't needed anymore."""
-        pending_essentials.pop(channel.id, None)
-        try:
-            delete_essential(channel.id)
-        except OSError as e:
-            print(f"Could not wipe essential.exefs for #{channel.name}: {e}")
+        forget_essential(channel)
 
     @discord.slash_command(
         name="essential",
