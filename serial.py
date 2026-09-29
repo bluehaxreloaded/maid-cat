@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from perms import command_with_perms
 from discord.ext import commands
 from exefs import InvalidEssential, read_essential, serial_from_secinfo
+from essential_store import load_essential
+from helpee import helpee_id
 
 # 3DS serial: model letter, 1-2 region letters, 8 digits, then an optional check digit
 # (the 9th digit on the console's sticker, which isn't stored in secinfo)
@@ -127,7 +129,10 @@ async def entered_serial(channel: discord.TextChannel) -> str | None:
 
 
 async def uploaded_essential_serial(channel: discord.TextChannel) -> str | None:
-    """Serial inside the most recent essential.exefs posted in the channel, if there is a valid one."""
+    """Serial inside the channel's stored essential.exefs, or else the most recent valid one posted in the channel."""
+    stored = load_essential(channel.id, helpee_id(channel))
+    if stored:
+        return serial_from_secinfo(read_essential(stored)["secinfo"])
     async for message in channel.history(limit=100):
         for attachment in message.attachments:
             if not attachment.filename.lower().endswith(".exefs"):

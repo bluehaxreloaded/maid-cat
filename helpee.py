@@ -18,6 +18,12 @@ def channel_name_for(user: discord.abc.User, suffix: str) -> str:
     return user.name.lstrip(".").rstrip(".").lower().replace(".", "-") + suffix
 
 
+def helpee_id(channel: discord.abc.GuildChannel | None) -> int | None:
+    """ID of the helpee named in a SOAP/NNID channel topic."""
+    m = re.search(r"<@!?(\d+)>", getattr(channel, "topic", None) or "")
+    return int(m.group(1)) if m else None
+
+
 def _topic_mentions(channel: discord.TextChannel, user_id: int) -> bool:
     return re.search(rf"<@!?{user_id}>", channel.topic or "") is not None
 

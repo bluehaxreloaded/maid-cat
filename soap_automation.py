@@ -1,11 +1,13 @@
 import discord
+import hashlib
 import io
+import time
 import re
 import asyncio
 from datetime import datetime, timezone
-from discord.ext import commands
+from discord.ext import commands, tasks
 import constants
-from perms import command_with_perms
+from perms import _has_role_or_higher, command_with_perms
 from log import log_to_soaper_log
 from constants import (
     BOTS_ONLY_CHANNEL_ID,
@@ -18,7 +20,8 @@ from constants import (
     is_late_night_hours,
 )
 from soap_helper import SoapHelperView
-from exefs import InvalidEssential, read_essential, serial_from_secinfo
+from exefs import MAX_ESSENTIAL_SIZE, InvalidEssential, read_essential, rebuild_essential, serial_from_secinfo
+from essential_store import delete_essential, load_essential, save_essential, sweep_essentials
 from serial import (
     SERIAL_RECEIVED_TITLE,
     describe_serial,
@@ -32,6 +35,7 @@ from helpee import (
     add_case_note,
     case_notes,
     complete_case_setup,
+    helpee_id,
     member_from_topic,
     reset_case_setup,
     safe_note_text,
@@ -39,6 +43,29 @@ from helpee import (
 
 
 STEP2_TITLE = "2️⃣ Upload your essential.exefs file"
+
+# essential.exefs files that passed every check except the serial, held here until the helpee corrects it.
+# Channel ID -> (helpee ID, file)
+pending_essentials: dict[int, tuple[int, bytes]] = {}
+SOAP_REQUEST_COOLDOWN = 15  # seconds before the same essential.exefs can be sent to soap-cat again
+_last_soap_requests: dict[str, tuple[float, discord.abc.User]] = {}  # essential.exefs hash -> when and by who it was last sent
+
+
+def store_essential(channel_id: int, user_id: int, data: bytes):
+    """Save a helpee's fully checked essential.exefs to disk for their channel."""
+    save_essential(channel_id, user_id, data)
+    pending_essentials.pop(channel_id, None)
+
+
+async def reject_non_helpee(interaction: discord.Interaction) -> bool:
+    """Only the helpee named in the channel topic can upload their essential.exefs.
+    Tells anyone else so and returns True."""
+    if interaction.user.id == helpee_id(interaction.channel):
+        return False
+    await interaction.response.send_message(
+        "Only the person this channel was opened for can upload their `essential.exefs`.", ephemeral=True
+    )
+    return True
 
 
 def serial_mismatch_embed() -> discord.Embed:
@@ -83,6 +110,34 @@ class SerialMismatchView(discord.ui.View):
             correction=True,
         )
         await interaction.response.send_modal(modal)
+
+
+async def send_soap_request(channel: discord.TextChannel, soaper: discord.abc.User) -> str | None:
+    """Ask soap-cat to soap this channel's helpee using their stored essential.exefs.
+    Returns why it couldn't be sent, or None if it was. Not hooked up to anything yet."""
+    member = await member_from_topic(channel)
+    if member is None:
+        return "Could not find the helpee for this channel."
+    serial = await entered_serial(channel)
+    if not serial:
+        return "No serial number was entered in this channel."
+    data = load_essential(channel.id, member.id)
+    if data is None:
+        return "There's no essential.exefs saved for this helpee."
+    bots_only = channel.guild.get_channel(BOTS_ONLY_CHANNEL_ID)
+    if bots_only is None:
+        return "Could not find the bots only channel."
+    # Cancel duplicates, e.g. two Soapers pressing Approve at the same time
+    file_hash = hashlib.sha256(data).hexdigest()
+    now = time.monotonic()
+    sent_at, sent_by = _last_soap_requests.get(file_hash, (0, None))
+    if now - sent_at < SOAP_REQUEST_COOLDOWN:
+        return f"{sent_by.mention} beat you to it, they already sent this SOAP to soap-cat."
+    _last_soap_requests[file_hash] = (now, soaper)
+    # soap-cat reads the file straight from the essentials folder, so it never goes through Discord
+    await bots_only.send(f"SOAP_REQUEST {member.id} {serial} STORED")
+    add_case_note(channel, "SOAP approved and sent to soap-cat")
+    return None
 
 
 class SoapQueueView(discord.ui.View):
@@ -411,8 +466,13 @@ class SerialNumberModal(discord.ui.Modal):
             add_case_note(interaction.channel, f"Serial number has an unusual region code: `{info.region_code}`")
 
         await interaction.response.defer()
+        # The file from the mismatched upload; if it's gone (e.g. after a restart) they'll be asked for it again
+        pending = pending_essentials.get(interaction.channel.id) if interaction.channel else None
         if self.correction and interaction.channel:
-            file_serial = await uploaded_essential_serial(interaction.channel)
+            if pending:
+                file_serial = serial_from_secinfo(read_essential(pending[1])["secinfo"])
+            else:
+                file_serial = await uploaded_essential_serial(interaction.channel)
             if file_serial and not serials_match(serial, file_serial):
                 add_case_note(
                     interaction.channel,
@@ -424,6 +484,12 @@ class SerialNumberModal(discord.ui.Modal):
                     ephemeral=True,
                 )
                 return
+            if pending:
+                try:
+                    store_essential(interaction.channel.id, *pending)
+                except OSError as e:
+                    print(f"Could not store essential.exefs for #{interaction.channel.name}: {e}")
+                    pending = None  # ask for the file again below
 
         serial_embed = discord.Embed(
             title=SERIAL_RECEIVED_TITLE,
@@ -449,7 +515,7 @@ class SerialNumberModal(discord.ui.Modal):
             except Exception:
                 pass
 
-        if self.correction:
+        if self.correction and (pending or load_essential(interaction.channel.id, helpee_id(interaction.channel))):
             # The file is already in, so there's no step 2 this time
             wait_embed = discord.Embed(
                 title="✅ Serial number updated",
@@ -632,6 +698,8 @@ class EssentialUploadModal(discord.ui.DesignerModal):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        if await reject_non_helpee(interaction):
+            return
         files = self.file_upload.values or []
         if not files or not files[0].filename.lower().endswith(".exefs"):
             name = safe_note_text(files[0].filename) if files else "no file"
@@ -643,15 +711,20 @@ class EssentialUploadModal(discord.ui.DesignerModal):
             return
         attachment = files[0]
 
-        # Files uploaded through a modal aren't posted anywhere, so repost it in the channel
+        # Files uploaded through a modal aren't posted anywhere; once it passes every check it's stored on disk
         await interaction.response.defer()
         try:
+            # Too big to be an essential.exefs, so don't download it at all
+            if attachment.size > MAX_ESSENTIAL_SIZE:
+                raise InvalidEssential("file is too big")
             data = await attachment.read()
         except discord.HTTPException:
             await interaction.followup.send(
                 "Could not read your file. Please try uploading it again.", ephemeral=True
             )
             return
+        except InvalidEssential:
+            data = b""  # reported below like any other invalid file
 
         # Make sure it's a real essential.exefs and not just a file with that name
         try:
@@ -665,27 +738,36 @@ class EssentialUploadModal(discord.ui.DesignerModal):
             )
             return
 
-        file = discord.File(io.BytesIO(data), filename=attachment.filename)
+        # Only the known files are kept, so nothing else that was in the upload gets stored
+        clean = rebuild_essential(essential)
         entered = await entered_serial(interaction.channel) if interaction.channel else None
         if entered and not serials_match(entered, serial_from_secinfo(essential["secinfo"])):
             add_case_note(
                 interaction.channel,
                 f"Serial number didn't match their essential.exefs: entered `{safe_note_text(entered, 20)}`",
             )
-            # Post the file anyway so Soapers have it, along with the mismatch instructions
+            # Not stored yet: it's held in memory until the serial is corrected
+            pending_essentials[interaction.channel.id] = (interaction.user.id, clean)
             await interaction.followup.send(
                 content=interaction.user.mention,
                 embed=serial_mismatch_embed(),
-                file=file,
                 view=SerialMismatchView(),
             )
         else:
+            try:
+                store_essential(interaction.channel.id, interaction.user.id, clean)
+            except OSError as e:
+                print(f"Could not store essential.exefs for #{interaction.channel.name}: {e}")
+                await interaction.followup.send(
+                    "Could not save your file. Please try uploading it again.", ephemeral=True
+                )
+                return
             received_embed = discord.Embed(
                 title="✅ essential.exefs received",
                 description="Please wait for a Soaper to assist you.",
                 color=discord.Color.green(),
             )
-            await interaction.followup.send(embed=received_embed, file=file)
+            await interaction.followup.send(embed=received_embed)
             complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
             await post_to_soap_queue(interaction.channel, interaction.user)
 
@@ -718,6 +800,8 @@ class EssentialUploadView(discord.ui.View):
     async def essential_upload_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
+        if await reject_non_helpee(interaction):
+            return
         modal = EssentialUploadModal(prompt_message_id=interaction.message.id)
         await interaction.response.send_modal(modal)
 
@@ -782,6 +866,8 @@ class EssentialFollowUpView(discord.ui.View):
     async def essential_followup_upload_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
+        if await reject_non_helpee(interaction):
+            return
         modal = EssentialUploadModal(
             prompt_message_id=interaction.message.id,
             prompt_view_class=EssentialFollowUpView,
@@ -940,6 +1026,9 @@ class EshopVerificationView(discord.ui.View):
 class SOAPAutomationCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    def cog_unload(self):
+        self.essential_sweeper.cancel()
 
     def _generate_progress_bar(self, percentage: int) -> str:
         """Generate an ASCII progress bar based on percentage (wider version)"""
@@ -1108,6 +1197,49 @@ class SOAPAutomationCog(commands.Cog):
         self.bot.add_view(EssentialFollowUpView())
         self.bot.add_view(SerialMismatchView())
         self.bot.add_view(SoapQueueView())
+        if not self.essential_sweeper.is_running():
+            self.essential_sweeper.start()
+
+    @tasks.loop(hours=1)
+    async def essential_sweeper(self):
+        """Wipe stored essentials whose channel is gone (e.g. deleted while the bot was offline) or that are too old."""
+        # A server that hasn't loaded would look like it has no channels, so wait for the next run
+        if not self.bot.guilds or any(guild.unavailable for guild in self.bot.guilds):
+            return
+        open_ids = {channel.id for guild in self.bot.guilds for channel in guild.text_channels}
+        try:
+            wiped = sweep_essentials(open_ids)
+        except OSError as e:
+            print(f"Could not sweep stored essentials: {e}")
+            return
+        if wiped:
+            print(f"Wiped {wiped} stored essential.exefs file(s)")
+
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
+        """A deleted channel's essential.exefs isn't needed anymore."""
+        pending_essentials.pop(channel.id, None)
+        try:
+            delete_essential(channel.id)
+        except OSError as e:
+            print(f"Could not wipe essential.exefs for #{channel.name}: {e}")
+
+    @discord.slash_command(
+        name="essential",
+        description="Sends you this channel's essential.exefs (only you can see it)",
+    )
+    async def essential(self, ctx: discord.ApplicationContext):
+        """The helpee's essential.exefs isn't posted in the channel, so Soapers get it from here.
+        Slash only, since only a slash command can reply with a message just the sender can see."""
+        soaper = discord.utils.get(ctx.guild.roles, name="Soaper") if ctx.guild else None
+        if soaper is None or not _has_role_or_higher(ctx.author, soaper):
+            await ctx.respond("You must be a Soaper or higher to use this.", ephemeral=True)
+            return
+        data = load_essential(ctx.channel.id, helpee_id(ctx.channel))
+        if data is None:
+            await ctx.respond("There's no essential.exefs saved for this channel's helpee.", ephemeral=True)
+            return
+        await ctx.respond(file=discord.File(io.BytesIO(data), filename="essential.exefs"), ephemeral=True)
 
     @commands.Cog.listener("on_message")
     async def block_chat_essential(self, message: discord.Message):
