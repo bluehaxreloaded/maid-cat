@@ -5,7 +5,6 @@ from datetime import datetime, timezone, timedelta
 from discord.ext import commands
 from perms import command_with_perms, soap_channels_only
 from log import log_to_soaper_log
-from helpee import REOPENED_TITLE
 from constants import (
     SOAP_CHANNEL_SUFFIX,
     SOAP_CHANNEL_CATEGORY_ID,
@@ -18,11 +17,22 @@ from constants import (
     INACTIVITY_CHECK_MINUTES,
 )
 
-# Open channel with no reply: remind every INACTIVITY_REMINDER_HOURS, then close after the last reminder.
+# When the latest message in a channel is from the bot and nobody has answered it (no message and no
+# button press since), remind every INACTIVITY_REMINDER_HOURS, then close after the last reminder.
 # Each step waits a full interval after the previous one, so a restart never fires two steps back to back.
-# The timer is cancelled for good once anyone (not a bot) sends a message or presses a button in the channel.
+# A newer bot message starts the countdown over; .keepopen and .lock turn it off.
 INACTIVITY_STEP = timedelta(hours=INACTIVITY_REMINDER_HOURS)
-REMINDER_FOOTER_PREFIX = "Inactivity reminder "  # used to find reminders the bot already sent
+REMINDER_TITLE = "⏰ Are you still there?"
+FINAL_REMINDER_TITLE = "⏰ Final Reminder"
+REMINDER_FOOTER_PREFIX = "Inactivity reminder "  # older reminders had this footer instead
+# Bot messages that hand the channel to staff; the helpee is waiting on a Soaper, so these don't start the countdown
+STAFF_TURN_TITLES = (
+    "✅ essential.exefs received",
+    "✅ Serial number updated",
+    "🆘 Assistance Requested",
+    "🆘 Unknown Error Code",
+    "🛑 Something went wrong...",
+)
 KEEPOPEN_TITLE = "🔓 Inactivity Timer Disabled"  # used to find .keepopen in the channel
 KEEPOPEN_FOOTER = "Inactivity timer disabled"  # older .keepopen messages used this footer instead
 
@@ -35,14 +45,14 @@ class InactivityCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._task = None
-        self._pressed = set()  # channel IDs where someone pressed a button since startup
+        self._pressed: dict[int, datetime] = {}  # channel ID -> last button press since startup
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         """Button presses and form submissions count as replies."""
         if interaction.type in (discord.InteractionType.component, discord.InteractionType.modal_submit):
             if interaction.channel_id and interaction.user and not interaction.user.bot:
-                self._pressed.add(interaction.channel_id)
+                self._pressed[interaction.channel_id] = datetime.now(timezone.utc)
 
     def cog_load(self):
         self._start()
@@ -102,35 +112,38 @@ class InactivityCog(commands.Cog):
                     pass
 
     async def _check_channel(self, channel: discord.TextChannel, is_soap: bool, now: datetime):
-        if channel.id in self._pressed:
-            return  # someone pressed a button, so the timer is cancelled
         soaper = channel.guild.get_role(SOAPER_ROLE_ID)
         if soaper and channel.overwrites_for(soaper).send_messages is False:
             return  # .lock is on, so the helpee can't reply
-        reminders = []  # send times of reminders already posted, newest first
-        started = channel.created_at
+        reminders = []  # send times of reminders sent since the bot's latest message, newest first
+        waiting_since = None  # the bot's latest message, if nobody has answered it
         async for message in channel.history(limit=None):
-            if (
-                message.author.id == self.bot.user.id
-                and message.embeds
-                and message.embeds[0].title == REOPENED_TITLE
+            ours = message.author.id == self.bot.user.id
+            embed = message.embeds[0] if message.embeds else None
+            footer = embed.footer.text if embed and embed.footer else None
+            if ours and embed and (embed.title == KEEPOPEN_TITLE or footer == KEEPOPEN_FOOTER):
+                return  # .keepopen was used, so the timer is off for good
+            if waiting_since is not None:
+                continue  # only still looking for .keepopen
+            if ours and embed and (
+                embed.title in (REMINDER_TITLE, FINAL_REMINDER_TITLE)
+                or (footer and footer.startswith(REMINDER_FOOTER_PREFIX))
             ):
-                started = message.created_at  # reopened for a helpee who rejoined, so start over from here
-                break
+                reminders.append(message.created_at)
+                continue
             if not message.author.bot:
-                return  # someone replied, so the timer is cancelled
-            # Bot replies to a button or form keep who pressed it, which covers presses from before a restart
-            meta = getattr(message, "interaction_metadata", None)
-            if meta and meta.user and not meta.user.bot:
-                return
-            if message.author.id == self.bot.user.id and message.embeds:
-                footer = message.embeds[0].footer.text if message.embeds[0].footer else None
-                if message.embeds[0].title == KEEPOPEN_TITLE or footer == KEEPOPEN_FOOTER:
-                    return  # .keepopen was used, so the timer is off for good
-                if footer and footer.startswith(REMINDER_FOOTER_PREFIX):
-                    reminders.append(message.created_at)
+                return  # the latest message is from a person, so the timer waits for the next bot message
+            if embed and embed.title in STAFF_TURN_TITLES:
+                return  # the helpee is waiting on a Soaper, not the other way around
+            waiting_since = message.created_at  # every other bot message restarts the timer
 
-        last_step = reminders[0] if reminders else started
+        if waiting_since is None:
+            return
+        pressed = self._pressed.get(channel.id)
+        if pressed and pressed > waiting_since:
+            return  # a button was pressed since the bot's latest message
+
+        last_step = reminders[0] if reminders else waiting_since
         if now - last_step < INACTIVITY_STEP:
             return
 
@@ -144,7 +157,7 @@ class InactivityCog(commands.Cog):
         transfer = "SOAP" if is_soap else "NNID"
         if number < INACTIVITY_REMINDERS:
             embed = discord.Embed(
-                title="⏰ Are you still there?",
+                title=REMINDER_TITLE,
                 description=(
                     "We haven't heard from you in a while. Please follow the instructions above and send a message in this channel once you're ready.\n\n"
                     f"If we don't hear back, this channel will be closed <t:{int(close_time.timestamp())}:R>."
@@ -153,14 +166,13 @@ class InactivityCog(commands.Cog):
             )
         else:
             embed = discord.Embed(
-                title="⏰ Final Reminder",
+                title=FINAL_REMINDER_TITLE,
                 description=(
                     f"This channel will be closed <t:{int(close_time.timestamp())}:R> if we don't hear back.\n\n"
                     f"If it gets closed, you can request another {transfer} transfer at any time."
                 ),
                 color=discord.Color.red(),
             )
-        embed.set_footer(text=f"{REMINDER_FOOTER_PREFIX}{number}/{INACTIVITY_REMINDERS}")
 
         m = MENTION_RE.search(channel.topic or "")
         await channel.send(content=f"<@{m.group(1)}>" if m else None, embed=embed)
