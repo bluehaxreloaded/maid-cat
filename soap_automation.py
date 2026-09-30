@@ -535,14 +535,13 @@ class SerialNumberModal(discord.ui.Modal):
 
         serial_embed = discord.Embed(
             title=SERIAL_RECEIVED_TITLE,
-            description=serial,  # keep this just the serial; the copy button and file check read it back
+            description=serial,  # keep this just the serial; the file check and soap-cat read it back
             color=discord.Color.green(),
         )
         label = describe_serial(info)
         if label:
             serial_embed.set_footer(text=label)
-        copy_view = CopySerialView(serial=serial)
-        await interaction.followup.send(embed=serial_embed, view=copy_view)
+        await interaction.followup.send(embed=serial_embed)
 
         # Disable buttons on the serial prompt message
         if self.prompt_message_id and interaction.channel:
@@ -1242,7 +1241,7 @@ class SOAPAutomationCog(commands.Cog):
         self.bot.add_view(EshopVerificationView())
         self.bot.add_view(SerialNumberCheckView())
         self.bot.add_view(SerialNumberFollowUpView())
-        self.bot.add_view(CopySerialView())
+        self.bot.add_view(CopySerialView())  # new serial messages don't have it, but older ones still do
         self.bot.add_view(EssentialUploadView())
         self.bot.add_view(EssentialFollowUpView())
         self.bot.add_view(SerialMismatchView())
