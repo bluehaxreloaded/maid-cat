@@ -5,6 +5,7 @@ from perms import command_with_perms, soap_channels_only, nnid_channels_only
 from discord.ext import commands
 from discord.ext.bridge import BridgeOption
 from functools import wraps
+from random import randint
 from constants import (
     SOAP_CHANNEL_SUFFIX,
     NNID_CHANNEL_SUFFIX,
@@ -492,31 +493,29 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     @soap_channels_only()
     async def nocomputer(self, ctx):
         try:
-            path = Path(__file__).parent / "assets" / "essential-3dsx.webp"
-            file = discord.File(fp=path, filename="essential-3dsx.webp")
+            path = Path(__file__).parent / "assets" / "transporter-cia.webp"
+            file = discord.File(fp=path, filename="transporter-cia.webp")
             embed = discord.Embed(
                 title="💻 Submitting essential.exefs without a computer",
                 description=(
                     "**1.** Open FBI and navigate to `Remote Install` → `Scan QR Code`\n"
                     "**2.** Scan the QR code below with the camera and press A to install.\n"
                     "**3.** After it is installed, close FBI.\n"
-                    "**4.** Open the Homebrew Launcher.\n"
-                    "**5.** Select essentialsubmit from the list of applications.\n"
-                    "**6.** Press Y and type in your Discord username, then press OK.\n"
-                    "**7.** Select the large :soap: icon.\n"
-                    "**8.** Let us know when it has been submitted.\n"
-                    "**9.** After we confirm you submitted properly, you can safely delete essentialsubmit.3dsx from the 3ds folder on your SD card."
+                    "**5.** Select Bluehax Transporter from the HOME Menu.\n"
+                    "**6.** Press A and type in the following pairing code, then press OK.\n"
+                    "- Your pairing code is: **" + str(randint(0,9999)).rjust(4, "0") + "**\n"
+                    "**7.** Let us know when it has been submitted and you have powered off your console."
                 ),
                 color=discord.Color.blue(),
             )
-            embed.set_image(url="attachment://essential-3dsx.webp")
+            embed.set_image(url="attachment://transporter-cia.webp")
             embed.set_footer(
                 text="If you have questions or issues, let us know. "
             )
             await ctx.respond(file=file, embed=embed)
         except FileNotFoundError as e:
-            print(f"Error: Could not find assets/essential-3dsx.webp - {e}")
-            await ctx.respond("Could not get essentialsubmit QR code.")
+            print(f"Error: Could not find assets/transporter-cia.webp - {e}")
+            await ctx.respond("Could not get Bluehax Transporter QR code.")
 
     @command_with_perms(
         name="cfwupdate",
