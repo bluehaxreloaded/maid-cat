@@ -15,6 +15,7 @@ from constants import (
     SOAP_CHANNEL_SUFFIX,
     MANUAL_SOAP_CATEGORY_ID,
     LOADING_EMOTE_ID,
+    AWAITING_EMOTE_ID,
     SOAP_COMPLETION_AUTO_CLOSE_MINUTES,
     SOAPER_ROLE_ID,
     is_late_night_hours,
@@ -76,6 +77,24 @@ async def reject_non_helpee(interaction: discord.Interaction) -> bool:
         "Only the person this channel was opened for can upload their `essential.exefs`.", ephemeral=True
     )
     return True
+
+
+AWAITING_APPROVAL_TITLE = "Your SOAP is awaiting approval"  # the inactivity timer also matches on this
+
+
+def awaiting_approval_embed(guild: discord.Guild | None) -> discord.Embed:
+    """Sent once steps 1 and 2 are done and the request is in soap-queue."""
+    awaiting_emoji = discord.utils.get(guild.emojis, id=AWAITING_EMOTE_ID) if guild else None
+    embed = discord.Embed(
+        title=f"{awaiting_emoji} {AWAITING_APPROVAL_TITLE}" if awaiting_emoji else AWAITING_APPROVAL_TITLE,
+        description=(
+            "Please wait for our Soapers to review your case. Once approved, your SOAP Transfer will begin "
+            "automatically and you will be notified upon its completion."
+        ),
+        color=discord.Color.yellow(),
+    )
+    embed.set_footer(text="Please don't use your 3DS until your SOAP is complete.")
+    return embed
 
 
 def serial_mismatch_embed() -> discord.Embed:
@@ -560,10 +579,10 @@ class SerialNumberModal(discord.ui.Modal):
             # The file is already in, so there's no step 2 this time
             wait_embed = discord.Embed(
                 title="✅ Serial number updated",
-                description="Please wait for a Soaper to assist you.",
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=wait_embed)
+            await interaction.followup.send(embed=awaiting_approval_embed(interaction.guild))
             complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
             await post_to_soap_queue(interaction.channel, interaction.user)
             return
@@ -752,7 +771,8 @@ class EssentialUploadModal(discord.ui.DesignerModal):
             return
         attachment = files[0]
 
-        # Files uploaded through a modal aren't posted anywhere; once it passes every check it's stored on disk and reposted
+        # Files uploaded through a modal aren't posted anywhere; once it passes every check it's stored on disk
+        # (Soapers get it with /essential)
         await interaction.response.defer()
         try:
             # Too big to be an essential.exefs, so don't download it at all
@@ -781,8 +801,6 @@ class EssentialUploadModal(discord.ui.DesignerModal):
 
         # Only the known files are kept, so nothing else that was in the upload gets stored
         clean = rebuild_essential(essential)
-        # For now it's also still posted in the channel (the checked copy, not the raw upload)
-        file = discord.File(io.BytesIO(clean), filename=attachment.filename)
         entered = await entered_serial(interaction.channel) if interaction.channel else None
         if entered and not serials_match(entered, serial_from_secinfo(essential["secinfo"])):
             add_case_note(
@@ -799,7 +817,6 @@ class EssentialUploadModal(discord.ui.DesignerModal):
             await interaction.followup.send(
                 content=interaction.user.mention,
                 embed=serial_mismatch_embed(),
-                file=file,
                 view=SerialMismatchView(),
             )
         else:
@@ -811,12 +828,14 @@ class EssentialUploadModal(discord.ui.DesignerModal):
                     "Could not save your file. Please try uploading it again.", ephemeral=True
                 )
                 return
+            name = attachment.filename.replace("`", "'")
             received_embed = discord.Embed(
                 title="✅ essential.exefs received",
-                description="Please wait for a Soaper to assist you.",
+                description=f"📎 `{name}` | {len(clean) / 1024:.1f} KB",
                 color=discord.Color.green(),
             )
-            await interaction.followup.send(embed=received_embed, file=file)
+            await interaction.followup.send(embed=received_embed)
+            await interaction.followup.send(embed=awaiting_approval_embed(interaction.guild))
             complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
             await post_to_soap_queue(interaction.channel, interaction.user)
 

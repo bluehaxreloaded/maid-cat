@@ -32,6 +32,7 @@ STAFF_TURN_TITLES = (
     "🆘 Assistance Requested",
     "🆘 Unknown Error Code",
     "🛑 Something went wrong...",
+    "Your SOAP is awaiting approval",  # starts with the awaiting emoji, so titles are matched by how they end
 )
 KEEPOPEN_TITLE = "🔓 Inactivity Timer Disabled"  # used to find .keepopen in the channel
 KEEPOPEN_FOOTER = "Inactivity timer disabled"  # older .keepopen messages used this footer instead
@@ -133,7 +134,7 @@ class InactivityCog(commands.Cog):
                 continue
             if not message.author.bot:
                 return  # the latest message is from a person, so the timer waits for the next bot message
-            if embed and embed.title in STAFF_TURN_TITLES:
+            if embed and embed.title and embed.title.endswith(STAFF_TURN_TITLES):
                 return  # the helpee is waiting on a Soaper, not the other way around
             waiting_since = message.created_at  # every other bot message restarts the timer
 
