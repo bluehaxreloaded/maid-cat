@@ -97,6 +97,46 @@ def awaiting_approval_embed(guild: discord.Guild | None) -> discord.Embed:
     return embed
 
 
+APPROVED_TITLE = "✅ Your SOAP is approved"  # the inactivity timer also matches on this
+
+
+async def _find_awaiting_message(channel: discord.TextChannel) -> discord.Message | None:
+    """The awaiting approval message in a SOAP channel, whether or not it's been marked approved yet."""
+    async for message in channel.history(limit=50):
+        if message.author.id != channel.guild.me.id or not message.embeds:
+            continue
+        title = message.embeds[0].title or ""
+        if title.endswith(AWAITING_APPROVAL_TITLE) or title == APPROVED_TITLE:
+            return message
+    return None
+
+
+async def mark_soap_approved(channel: discord.TextChannel):
+    """Change the awaiting approval message to say the SOAP is approved (on Approve or when the transfer starts)."""
+    message = await _find_awaiting_message(channel)
+    if message is None or message.embeds[0].title == APPROVED_TITLE:
+        return  # already approved (Approve and the transfer starting both call this)
+    embed = discord.Embed(
+        title=APPROVED_TITLE,
+        description="Transfer will begin momentarily...",
+        color=discord.Color.green(),
+    )
+    try:
+        await message.edit(embed=embed)
+    except discord.HTTPException:
+        pass
+
+
+async def delete_awaiting_message(channel: discord.TextChannel):
+    """Remove the awaiting/approved message (when the transfer finishes or the request goes manual)."""
+    message = await _find_awaiting_message(channel)
+    if message is not None:
+        try:
+            await message.delete()
+        except discord.HTTPException:
+            pass
+
+
 def serial_mismatch_embed() -> discord.Embed:
     """Sent when the serial the helpee entered doesn't match the one in their essential.exefs."""
     embed = discord.Embed(
@@ -185,6 +225,22 @@ class SoapQueueView(discord.ui.View):
             item.disabled = True
         await interaction.response.edit_message(view=self)
 
+    @staticmethod
+    async def _is_soaper(interaction: discord.Interaction) -> bool:
+        """Approve and Manual are Soaper or higher only."""
+        soaper = discord.utils.get(interaction.guild.roles, name="Soaper")
+        if soaper is None or not _has_role_or_higher(interaction.user, soaper):
+            await interaction.response.send_message("You must be a Soaper or higher to use this.", ephemeral=True)
+            return False
+        return True
+
+    @staticmethod
+    def _request_channel(interaction: discord.Interaction) -> discord.TextChannel | None:
+        """The SOAP channel this request is for; the request's embed says "<helpee> in <#channel>"."""
+        embed = interaction.message.embeds[0] if interaction.message.embeds else None
+        match = re.search(r"<#(\d+)>", embed.description or "") if embed else None
+        return interaction.guild.get_channel(int(match.group(1))) if match else None
+
     @discord.ui.button(
         label="Approve",
         style=discord.ButtonStyle.success,
@@ -192,7 +248,13 @@ class SoapQueueView(discord.ui.View):
         custom_id="soap_queue_approve",
     )
     async def approve_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if not await self._is_soaper(interaction):
+            return
         await self._choose(interaction)
+        # Only updates the helpee's message for now; it doesn't start the SOAP
+        channel = self._request_channel(interaction)
+        if channel is not None:
+            await mark_soap_approved(channel)
 
     @discord.ui.button(
         label="Manual",
@@ -201,14 +263,9 @@ class SoapQueueView(discord.ui.View):
         custom_id="soap_queue_manual",
     )
     async def manual_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        soaper = discord.utils.get(interaction.guild.roles, name="Soaper")
-        if soaper is None or not _has_role_or_higher(interaction.user, soaper):
-            await interaction.response.send_message("You must be a Soaper or higher to use this.", ephemeral=True)
+        if not await self._is_soaper(interaction):
             return
-        # The request's embed says "<helpee> in <#channel>"
-        embed = interaction.message.embeds[0] if interaction.message.embeds else None
-        match = re.search(r"<#(\d+)>", embed.description or "") if embed else None
-        channel = interaction.guild.get_channel(int(match.group(1))) if match else None
+        channel = self._request_channel(interaction)
         if channel is None:
             await interaction.response.send_message("That SOAP channel doesn't exist anymore.", ephemeral=True)
             return
@@ -224,6 +281,7 @@ class SoapQueueView(discord.ui.View):
             color=discord.Color.orange(),
         )
         manual_embed.set_footer(text="Please wait for assistance and prepare to answer any questions.")
+        await delete_awaiting_message(channel)
         await channel.send(embed=manual_embed)
 
         for item in self.children:
@@ -1431,6 +1489,8 @@ class SOAPAutomationCog(commands.Cog):
 
         if status_text == "PROGRESS" and target_channel:
             if status_detail == "START":
+                # The transfer started, so it's approved even if nobody pressed Approve
+                await mark_soap_approved(target_channel)
                 # Send initial progress message
                 progress_bar = self._generate_progress_bar(0)
                 embed = discord.Embed(
@@ -1489,6 +1549,7 @@ class SOAPAutomationCog(commands.Cog):
 
             # Delete progress message asynchronously after sending success message
             await self._delete_progress_message(target_channel)
+            await delete_awaiting_message(target_channel)
 
         if status_text == "LOTTERY" and target_channel:
             # Send LOTTERY message immediately
@@ -1544,10 +1605,12 @@ class SOAPAutomationCog(commands.Cog):
 
             # Run update and deletion in background without blocking
             asyncio.create_task(update_and_delete_progress())
+            await delete_awaiting_message(target_channel)
 
         if status_text == "ERROR" and target_channel:
             # Delete progress message when error occurs
             await self._delete_progress_message(target_channel)
+            await delete_awaiting_message(target_channel)
 
             # Check if it's a serial mismatch error
             is_serial_error = (

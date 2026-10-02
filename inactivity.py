@@ -33,6 +33,7 @@ STAFF_TURN_TITLES = (
     "🆘 Unknown Error Code",
     "🛑 Something went wrong...",
     "Your SOAP is awaiting approval",  # starts with the awaiting emoji, so titles are matched by how they end
+    "✅ Your SOAP is approved",
 )
 KEEPOPEN_TITLE = "🔓 Inactivity Timer Disabled"  # used to find .keepopen in the channel
 KEEPOPEN_FOOTER = "Inactivity timer disabled"  # older .keepopen messages used this footer instead
