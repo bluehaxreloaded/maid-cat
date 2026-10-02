@@ -468,7 +468,7 @@ class AwaitingErrorCodeView(discord.ui.View):
         self.add_item(enter_button)
 
         no_code_button = discord.ui.Button(
-            label="There is no error code",
+            label="🚫 There is no error code",
             style=discord.ButtonStyle.secondary,
             custom_id=f"awaiting_error_none:{ctx_suffix}",
         )
@@ -560,7 +560,7 @@ class InvalidErrorCodeView(discord.ui.View):
         self.add_item(reenter_button)
 
         no_code_button = discord.ui.Button(
-            label="There is no error code",
+            label="🚫 There is no error code",
             style=discord.ButtonStyle.secondary,
             custom_id=f"invalid_error_none:{ctx_suffix}",
         )
