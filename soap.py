@@ -22,7 +22,6 @@ from constants import (
     SOAPER_ROLE_ID,
 )
 from perms import _has_role_or_higher
-from soap_automation import forget_essential
 from helpee import (
     append_case_notes,
     clear_case_notes,
@@ -605,9 +604,6 @@ class SoapCog(commands.Cog):  # SOAP commands
                     err_embed.add_field(name="Channel", value=channel.mention, inline=False)
                     await _send_to_log(channel.guild, ERROR_LOG_ID, embed=err_embed)
                 return
-
-        # The case is closed, so its essential.exefs isn't kept (reopening means uploading it again)
-        forget_essential(channel)
 
         # Then the -cya name and deletion timer, which Discord rate limits (about 2 per 10 minutes)
         deletion_time = await self._set_archive_timer(channel, topic)

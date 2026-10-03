@@ -53,7 +53,7 @@ _last_soap_requests: dict[str, tuple[float, discord.abc.User]] = {}  # essential
 
 
 def forget_essential(channel: discord.abc.GuildChannel):
-    """Wipe a channel's essential.exefs, e.g. when it's archived or deleted."""
+    """Wipe a channel's essential.exefs once the channel is deleted (kept while it's archived as -cya)."""
     pending_essentials.pop(channel.id, None)
     try:
         delete_essential(channel.id)
