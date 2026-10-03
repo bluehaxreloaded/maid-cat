@@ -1,5 +1,6 @@
 import hashlib
 import struct
+import constants
 
 # essential.exefs is an ExeFS container built by GodMode9.
 # Header (0x200 bytes): 10 file entries (8-byte name, u32 offset, u32 size), then at 0xC0
@@ -86,6 +87,34 @@ def rebuild_essential(files: dict[str, bytes]) -> bytes:
         body += content
         body += bytes(-len(body) % 0x200)  # each file starts on a 0x200 boundary
     return bytes(header + body)
+
+
+# secinfo is signed by Nintendo (RSA-2048, PKCS#1 v1.5, SHA-256) over its region and serial.
+# The public key is read from constants.py (SECINFO_RETAIL_N, same as soap-cat's cleaninty config)
+# rather than kept in this repo, and is only used if it's the genuine retail key.
+SECINFO_RETAIL_FINGERPRINT = "e109d0cce7298a46255bea27240f1630ac6cdaccb1b47a90d613171ac2ddfdda"  # cleaninty's hash of it
+SHA256_DIGEST_INFO = bytes.fromhex("3031300d060960864801650304020105000420")
+
+
+def _secinfo_key() -> int | None:
+    n = getattr(constants, "SECINFO_RETAIL_N", None)
+    if not n:
+        return None
+    n = int(n)
+    if hashlib.sha256(hex(n).encode("ascii")).hexdigest() != SECINFO_RETAIL_FINGERPRINT:
+        return None
+    return n
+
+
+def secinfo_signed(secinfo: bytes) -> bool | None:
+    """Whether secinfo is signed by Nintendo, or None if the key isn't set up."""
+    n = _secinfo_key()
+    if n is None:
+        return None
+    signature, data = secinfo[:0x100], secinfo[0x100:0x111]
+    decoded = pow(int.from_bytes(signature, "big"), 0x10001, n).to_bytes(256, "big")
+    expected = SHA256_DIGEST_INFO + hashlib.sha256(data).digest()
+    return decoded == b"\x00\x01" + b"\xff" * (256 - 3 - len(expected)) + b"\x00" + expected
 
 
 def serial_from_secinfo(secinfo: bytes) -> str:

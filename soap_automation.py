@@ -21,7 +21,14 @@ from constants import (
     is_late_night_hours,
 )
 from soap_helper import SoapHelperView
-from exefs import MAX_ESSENTIAL_SIZE, InvalidEssential, read_essential, rebuild_essential, serial_from_secinfo
+from exefs import (
+    MAX_ESSENTIAL_SIZE,
+    InvalidEssential,
+    read_essential,
+    rebuild_essential,
+    secinfo_signed,
+    serial_from_secinfo,
+)
 from essential_store import delete_essential, load_essential, save_essential, sweep_essentials
 from serial import (
     SERIAL_RECEIVED_TITLE,
@@ -289,8 +296,23 @@ class SoapQueueView(discord.ui.View):
         await interaction.message.edit(view=self)
 
 
+def essential_signed(channel_id: int, user_id: int | None) -> bool | None:
+    """Whether the stored essential.exefs is signed by Nintendo, or None if it can't be checked."""
+    data = load_essential(channel_id, user_id)
+    if data is None:
+        return None
+    try:
+        return secinfo_signed(read_essential(data)["secinfo"])
+    except InvalidEssential:
+        return None
+
+
 def soap_queue_embed(
-    member: discord.abc.User, channel: discord.TextChannel | None, serial: str | None, notes: list[str]
+    member: discord.abc.User,
+    channel: discord.TextChannel | None,
+    serial: str | None,
+    notes: list[str],
+    signed: bool | None = None,
 ) -> discord.Embed:
     """The soap-queue request for a helpee who finished steps 1 and 2."""
     info = read_serial(serial) if serial else None
@@ -304,6 +326,11 @@ def soap_queue_embed(
     embed.add_field(name="Serial Number", value=f"`{serial}`" if serial else "Not found", inline=True)
     region = info.region if info and info.region else "Unknown"
     embed.add_field(name="Region", value=f"{region} ({info.model})" if info and info.model else region, inline=True)
+    embed.add_field(
+        name="Signed by Nintendo",
+        value={True: "✅ Yes", False: "❌ No"}.get(signed, "➖ Not checked"),
+        inline=True,
+    )
     notes_text = "\n".join(f"- {n}" for n in notes) or "None"
     if len(notes_text) > 1024:
         notes_text = notes_text[:1021] + "..."
@@ -317,7 +344,13 @@ async def post_to_soap_queue(channel: discord.TextChannel, member: discord.abc.U
     queue = channel.guild.get_channel(queue_id) if queue_id else None
     if queue is None:
         return
-    embed = soap_queue_embed(member, channel, await entered_serial(channel), case_notes(channel))
+    embed = soap_queue_embed(
+        member,
+        channel,
+        await entered_serial(channel),
+        case_notes(channel),
+        essential_signed(channel.id, member.id),
+    )
     try:
         await queue.send(embed=embed, view=SoapQueueView())
     except discord.HTTPException as e:
@@ -857,6 +890,10 @@ class EssentialUploadModal(discord.ui.DesignerModal):
             )
             return
 
+        # Not required, but Soapers should know if the file wasn't signed by Nintendo
+        if secinfo_signed(essential["secinfo"]) is False:
+            add_case_note(interaction.channel, "Uploaded an essential.exefs that isn't signed by Nintendo")
+
         # Only the known files are kept, so nothing else that was in the upload gets stored
         clean = rebuild_essential(essential)
         entered = await entered_serial(interaction.channel) if interaction.channel else None
@@ -1284,7 +1321,13 @@ class SOAPAutomationCog(commands.Cog):
         """Post the soap-queue embed here, using this channel's data if it's a helpee channel."""
         member = await member_from_topic(ctx.channel) if getattr(ctx.channel, "topic", None) else None
         if member is not None:
-            embed = soap_queue_embed(member, ctx.channel, await entered_serial(ctx.channel), case_notes(ctx.channel))
+            embed = soap_queue_embed(
+                member,
+                ctx.channel,
+                await entered_serial(ctx.channel),
+                case_notes(ctx.channel),
+                essential_signed(ctx.channel.id, member.id),
+            )
         else:
             # Not a helpee channel, so show sample data
             author = ctx.author if hasattr(ctx, "author") else ctx.user
@@ -1293,6 +1336,7 @@ class SOAPAutomationCog(commands.Cog):
                 ctx.channel,
                 "YJM123456784",
                 ["Entered a serial number in the wrong format: `YJM1234`", "Uploaded a file that isn't an .exefs: `photo.jpg`"],
+                True,
             )
         await ctx.respond(embed=embed, view=SoapQueueView())
 

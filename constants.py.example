@@ -34,6 +34,10 @@ SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, MANUAL_SO
 # files
 ESSENTIALS_DIR = "~/essentials" # folder outside the repo where essential.exefs files are stored, must match ESSENTIALS_DIR in soap-cat's .env
 
+# Nintendo's public key for checking essential.exefs signatures; leave unset to skip the check.
+# Copy SECINFO_RETAIL_N from soap-cat's ~/.3ds/ctr_constants.json (it isn't kept in this repo)
+SECINFO_RETAIL_N = None
+
 # role IDs
 SOAPER_ROLE_ID = # role ID for Soapers who assist with SOAP requests
 RESTRICTED_ROLE_ID = # role ID for users who are restricted from requesting a SOAP/NNID transfer
