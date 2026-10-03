@@ -501,10 +501,10 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
                     "**1.** Open FBI and navigate to `Remote Install` → `Scan QR Code`\n"
                     "**2.** Scan the QR code below with the camera and press A to install.\n"
                     "**3.** After it is installed, close FBI.\n"
-                    "**5.** Select Bluehax Transporter from the HOME Menu.\n"
-                    "**6.** Press A and type in the following Pair Code, then press OK.\n"
+                    "**4.** Select Bluehax Transporter from the HOME Menu.\n"
+                    "**5.** Press A and type in the following Pair Code, then press OK.\n"
                     "- This is your Pair Code: **" + str(randint(0,9999)).rjust(4, "0") + "**\n"
-                    "**7.** Let us know when it has been submitted and you have powered off your console."
+                    "**6.** Let us know when it has been submitted and you have powered off your console."
                 ),
                 color=discord.Color.blue(),
             )
