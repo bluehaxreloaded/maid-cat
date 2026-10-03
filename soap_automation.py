@@ -1152,6 +1152,8 @@ class EshopVerificationView(discord.ui.View):
 class SOAPAutomationCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self._status_locks: dict[int, asyncio.Lock] = {}  # SOAP channel ID -> lock for its status updates
+        self._progress_messages: dict[int, discord.Message] = {}  # SOAP channel ID -> its progress bar
 
     def cog_unload(self):
         self.essential_sweeper.cancel()
@@ -1174,50 +1176,49 @@ class SOAPAutomationCog(commands.Cog):
             embed.set_footer(text=footer)
 
         # Try to find and edit the existing progress message
-        progress_message = None
-        async for msg in target_channel.history(limit=50):
-            if msg.author == self.bot.user and msg.embeds:
-                if (
-                    msg.embeds[0].author
-                    and msg.embeds[0].author.name == "🧼 SOAP Transfer - In Progress"
-                ):
-                    progress_message = msg
-                    break
-
+        progress_message = await self._find_progress_message(target_channel)
         if progress_message:
             try:
                 await progress_message.edit(embed=embed)
                 return True
-            except Exception:
-                # If edit fails, send a new message
-                await target_channel.send(embed=embed)
-                return False
-        else:
-            # If no progress message found, send a new one
-            await target_channel.send(embed=embed)
-            return False
+            except discord.HTTPException:
+                pass  # it's gone, so post a new one
+        # No progress message yet, so post one and remember it for the next update
+        self._progress_messages[target_channel.id] = await target_channel.send(embed=embed)
+        return False
+
+    def _is_progress_message(self, msg: discord.Message) -> bool:
+        return (
+            msg.author == self.bot.user
+            and bool(msg.embeds)
+            and msg.embeds[0].author is not None
+            and msg.embeds[0].author.name == "🧼 SOAP Transfer - In Progress"
+        )
 
     async def _find_progress_message(self, target_channel: discord.TextChannel):
         """Find the progress message in the channel. Returns the message or None."""
+        remembered = self._progress_messages.get(target_channel.id)
+        if remembered is not None:
+            return remembered
+        # Not remembered (e.g. after a restart), so look for it
         async for msg in target_channel.history(limit=50):
-            if msg.author == self.bot.user and msg.embeds:
-                if (
-                    msg.embeds[0].author
-                    and msg.embeds[0].author.name == "🧼 SOAP Transfer - In Progress"
-                ):
-                    return msg
+            if self._is_progress_message(msg):
+                self._progress_messages[target_channel.id] = msg
+                return msg
         return None
 
     async def _delete_progress_message(self, target_channel: discord.TextChannel):
         """Delete the progress message from the channel asynchronously."""
+        self._progress_messages.pop(target_channel.id, None)
 
         async def delete_progress():
-            progress_message = await self._find_progress_message(target_channel)
-            if progress_message:
-                try:
-                    await progress_message.delete()
-                except Exception:
-                    pass
+            # Remove every progress bar, including any duplicates
+            async for msg in target_channel.history(limit=50):
+                if self._is_progress_message(msg):
+                    try:
+                        await msg.delete()
+                    except discord.HTTPException:
+                        pass
 
         # Run deletion in background without blocking
         asyncio.create_task(delete_progress())
@@ -1414,7 +1415,19 @@ class SOAPAutomationCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        """Listen for status updates in the processing channel and respond in the user's SOAP channel."""
+        """soap-cat's status updates arrive seconds apart and would otherwise be handled at the same time,
+        so a later update could miss the progress bar an earlier one was still posting and post a second one.
+        Updates for each SOAP channel are handled one at a time, in the order they arrive."""
+        if not message.guild or message.channel.id != BOTS_ONLY_CHANNEL_ID or message.author.id == self.bot.user.id:
+            return
+        match = re.match(r"^SOAP_STATUS\s+(\d{15,25})\b", (message.content or "").strip(), re.IGNORECASE)
+        lock = self._status_locks.setdefault(int(match.group(1)), asyncio.Lock()) if match else asyncio.Lock()
+        # Nothing is awaited before taking the lock, so updates can't swap order on the way in
+        async with lock:
+            await self._handle_status_message(message)
+
+    async def _handle_status_message(self, message: discord.Message):
+        """Respond in the user's SOAP channel to a status update from soap-cat."""
         # Bots only channel only
         if not message.guild or message.channel.id != BOTS_ONLY_CHANNEL_ID:
             return
@@ -1491,14 +1504,8 @@ class SOAPAutomationCog(commands.Cog):
             if status_detail == "START":
                 # The transfer started, so it's approved even if nobody pressed Approve
                 await mark_soap_approved(target_channel)
-                # Send initial progress message
-                progress_bar = self._generate_progress_bar(0)
-                embed = discord.Embed(
-                    title=f"{progress_bar}", color=discord.Color.blue()
-                )
-                embed.set_footer(text=progress_footers.get("START", ""))
-                embed.set_author(name="🧼 SOAP Transfer - In Progress")
-                await target_channel.send(embed=embed)
+                # Send initial progress message (or reset the existing one, e.g. if the transfer is retried)
+                await self._update_progress_message(target_channel, 0, progress_footers.get("START", ""))
             elif status_detail and status_detail in progress_percentages:
                 # Update existing progress message
                 footer = progress_footers.get(status_detail, "")
@@ -1596,12 +1603,7 @@ class SOAPAutomationCog(commands.Cog):
                 await self._update_progress_message(target_channel, 100, footer)
                 # Wait a moment then delete
                 await asyncio.sleep(1)
-                progress_message = await self._find_progress_message(target_channel)
-                if progress_message:
-                    try:
-                        await progress_message.delete()
-                    except Exception:
-                        pass
+                await self._delete_progress_message(target_channel)
 
             # Run update and deletion in background without blocking
             asyncio.create_task(update_and_delete_progress())
