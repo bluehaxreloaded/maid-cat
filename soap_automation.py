@@ -1160,10 +1160,12 @@ class SOAPAutomationCog(commands.Cog):
 
     def _generate_progress_bar(self, percentage: int) -> str:
         """Generate an ASCII progress bar based on percentage (wider version)"""
-        bar_width = 25
+        # The percentage is padded to 3 digits so the bar is the same length at every percentage,
+        # and short enough that the loading emoji stays on the same line on mobile
+        bar_width = 23
         filled = (percentage * bar_width) // 100
         empty = bar_width - filled
-        return f"`[{'#' * filled}{' ' * empty}] {percentage}%` <a:loading:{LOADING_EMOTE_ID}>"
+        return f"`[{'#' * filled}{' ' * empty}] {percentage:>3}%` <a:loading:{LOADING_EMOTE_ID}>"
 
     async def _update_progress_message(
         self, target_channel: discord.TextChannel, percentage: int, footer: str = None
