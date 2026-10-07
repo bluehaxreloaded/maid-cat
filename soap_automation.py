@@ -1341,10 +1341,10 @@ class SOAPAutomationCog(commands.Cog):
         await ctx.respond(embed=embed, view=SoapQueueView())
 
     @command_with_perms(
-        min_role="Developer",
+        min_role="Soaper",
         name="reset",
         aliases=["resetchannel", "testsoap", "soaptest", "testsoapflow"],
-        help="Restarts the SOAP channel setup in the current channel (Developer only)",
+        help="Restarts the SOAP channel setup in the current channel (Soaper+ only)",
     )
     async def reset(self, ctx):
         """Run create_soap_interface in the current channel, for the helpee named in its topic."""
