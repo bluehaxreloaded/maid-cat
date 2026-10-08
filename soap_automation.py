@@ -292,6 +292,7 @@ class SoapQueueView(discord.ui.View):
         for item in self.children:
             item.disabled = True
         await interaction.message.edit(view=self)
+        await interaction.followup.send(f"Started SOAP in {channel.mention}.", ephemeral=True)
         await mark_soap_approved(channel)
 
     @discord.ui.button(
@@ -310,7 +311,14 @@ class SoapQueueView(discord.ui.View):
 
         # Same as .manual, which replies to the Soaper with how it went
         soap_cog = interaction.client.get_cog("SoapCog")
-        if not await soap_cog._move_soap_category(interaction, None, channel, MANUAL_SOAP_CATEGORY_ID, "manual"):
+        if not await soap_cog._move_soap_category(
+            interaction,
+            None,
+            channel,
+            MANUAL_SOAP_CATEGORY_ID,
+            "manual",
+            moved_message="Holding for review, moved {channel} to Manual SOAPs.",
+        ):
             return
 
         manual_embed = discord.Embed(

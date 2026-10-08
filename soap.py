@@ -934,8 +934,10 @@ class SoapCog(commands.Cog):  # SOAP commands
         channel: discord.TextChannel | None,
         target_category_id: int,
         category_name: str,
+        moved_message: str | None = None,
     ) -> bool:
-        """Move a SOAP channel to the given category. Returns whether it was moved."""
+        """Move a SOAP channel to the given category. Returns whether it was moved.
+        moved_message replaces the reply sent when it's moved; {channel} is filled in with the channel."""
         target_channel = channel
         if target_channel is None and user is not None:
             target_channel = find_open_channel(
@@ -979,7 +981,12 @@ class SoapCog(commands.Cog):  # SOAP commands
 
         try:
             await _edit_channel_with_retry(target_channel, category=category)
-            await ctx.respond(f"Moved {target_channel.mention} to {category_name} category.", ephemeral=True)
+            await ctx.respond(
+                (moved_message or "Moved {channel} to " + category_name + " category.").format(
+                    channel=target_channel.mention
+                ),
+                ephemeral=True,
+            )
         except Exception as e:
             await ctx.respond(f"Failed to move channel: {e}", ephemeral=True)
             return False
