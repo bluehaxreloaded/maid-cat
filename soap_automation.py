@@ -21,6 +21,7 @@ from constants import (
     is_late_night_hours,
 )
 from soap_helper import SoapHelperView
+from inactivity import AFTER_HOURS_TITLE
 from exefs import (
     MAX_ESSENTIAL_SIZE,
     InvalidEssential,
@@ -104,6 +105,28 @@ def awaiting_approval_embed(guild: discord.Guild | None) -> discord.Embed:
     return embed
 
 
+def after_hours_embed() -> discord.Embed:
+    """Sent after the awaiting approval message when it's late night for most of the staff."""
+    embed = discord.Embed(
+        title=AFTER_HOURS_TITLE,
+        description=(
+            "It is currently after-hours for most of the staff members of this server, therefore it may take longer "
+            "than usual for your SOAP Transfer to be approved, or for us to provide help or answer questions.\n\n"
+            "You don't need to do anything else for now. We'll get to your request as soon as possible."
+        ),
+        color=discord.Color(0xD50032),
+    )
+    embed.set_footer(text="We appreciate your patience and understanding!")
+    return embed
+
+
+async def send_awaiting_approval(interaction: discord.Interaction):
+    """The awaiting approval message, plus the after hours notice if it's late night."""
+    await interaction.followup.send(embed=awaiting_approval_embed(interaction.guild))
+    if is_late_night_hours():
+        await interaction.followup.send(embed=after_hours_embed())
+
+
 APPROVED_TITLE = "✅ Your SOAP is approved"  # the inactivity timer also matches on this
 
 
@@ -119,10 +142,10 @@ async def _find_awaiting_message(channel: discord.TextChannel) -> discord.Messag
 
 
 async def mark_soap_approved(channel: discord.TextChannel):
-    """Change the awaiting approval message to say the SOAP is approved (on Approve or when the transfer starts)."""
+    """Change the awaiting approval message to say the SOAP is approved (on Start SOAP or when the transfer starts)."""
     message = await _find_awaiting_message(channel)
     if message is None or message.embeds[0].title == APPROVED_TITLE:
-        return  # already approved (Approve and the transfer starting both call this)
+        return  # already approved (Start SOAP and the transfer starting both call this)
     embed = discord.Embed(
         title=APPROVED_TITLE,
         description="Transfer will begin momentarily...",
@@ -190,7 +213,7 @@ class SerialMismatchView(discord.ui.View):
 
 async def send_soap_request(channel: discord.TextChannel, soaper: discord.abc.User) -> str | None:
     """Ask soap-cat to soap this channel's helpee using their stored essential.exefs.
-    Returns why it couldn't be sent, or None if it was. Not hooked up to anything yet."""
+    Returns why it couldn't be sent, or None if it was."""
     member = await member_from_topic(channel)
     if member is None:
         return "Could not find the helpee for this channel."
@@ -203,7 +226,7 @@ async def send_soap_request(channel: discord.TextChannel, soaper: discord.abc.Us
     bots_only = channel.guild.get_channel(BOTS_ONLY_CHANNEL_ID)
     if bots_only is None:
         return "Could not find the bots only channel."
-    # Cancel duplicates, e.g. two Soapers pressing Approve at the same time
+    # Cancel duplicates, e.g. two Soapers pressing Start SOAP at the same time
     file_hash = hashlib.sha256(data).hexdigest()
     now = time.monotonic()
     sent_at, sent_by = _last_soap_requests.get(file_hash, (0, None))
@@ -215,26 +238,23 @@ async def send_soap_request(channel: discord.TextChannel, soaper: discord.abc.Us
         )
     _last_soap_requests[file_hash] = (now, soaper)
     # soap-cat reads the file straight from the essentials folder, so it never goes through Discord
-    await bots_only.send(f"SOAP_REQUEST {member.id} {serial} STORED")
+    # The channel ID tells soap-cat which channel this is, so it doesn't have to find it by topic
+    await bots_only.send(f"SOAP_REQUEST {member.id} {serial} STORED {channel.id}")
     add_case_note(channel, "SOAP approved and sent to soap-cat")
     return None
 
 
 class SoapQueueView(discord.ui.View):
-    """Approve / Manual buttons on a soap-queue request. Pressing either disables both.
-    Manual moves the channel to manual (same as .manual); Approve doesn't do anything else yet."""
+    """Start SOAP / Hold for Review buttons on a soap-queue request. Pressing either disables both.
+    Start SOAP sends the request to soap-cat in the bots only channel; Hold for Review moves the channel
+    to manual (same as .manual)."""
 
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def _choose(self, interaction: discord.Interaction):
-        for item in self.children:
-            item.disabled = True
-        await interaction.response.edit_message(view=self)
-
     @staticmethod
     async def _is_soaper(interaction: discord.Interaction) -> bool:
-        """Approve and Manual are Soaper or higher only."""
+        """Start SOAP and Hold for Review are Soaper or higher only."""
         soaper = discord.utils.get(interaction.guild.roles, name="Soaper")
         if soaper is None or not _has_role_or_higher(interaction.user, soaper):
             await interaction.response.send_message("You must be a Soaper or higher to use this.", ephemeral=True)
@@ -249,22 +269,33 @@ class SoapQueueView(discord.ui.View):
         return interaction.guild.get_channel(int(match.group(1))) if match else None
 
     @discord.ui.button(
-        label="Approve",
+        label="Start SOAP",
         style=discord.ButtonStyle.success,
-        emoji="✅",
+        emoji="🧼",
         custom_id="soap_queue_approve",
     )
     async def approve_button(self, button: discord.ui.Button, interaction: discord.Interaction):
         if not await self._is_soaper(interaction):
             return
-        await self._choose(interaction)
-        # Only updates the helpee's message for now; it doesn't start the SOAP
         channel = self._request_channel(interaction)
-        if channel is not None:
-            await mark_soap_approved(channel)
+        if channel is None:
+            await interaction.response.send_message("That SOAP channel doesn't exist anymore.", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        error = await send_soap_request(channel, interaction.user)
+        if error:
+            # Buttons stay enabled so it can be tried again or held for review
+            await interaction.followup.send(error, ephemeral=True)
+            return
+
+        for item in self.children:
+            item.disabled = True
+        await interaction.message.edit(view=self)
+        await mark_soap_approved(channel)
 
     @discord.ui.button(
-        label="Manual",
+        label="Hold for Review",
         style=discord.ButtonStyle.secondary,
         emoji="🛠️",
         custom_id="soap_queue_manual",
@@ -673,7 +704,7 @@ class SerialNumberModal(discord.ui.Modal):
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=wait_embed)
-            await interaction.followup.send(embed=awaiting_approval_embed(interaction.guild))
+            await send_awaiting_approval(interaction)
             complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
             await post_to_soap_queue(interaction.channel, interaction.user)
             return
@@ -930,7 +961,7 @@ class EssentialUploadModal(discord.ui.DesignerModal):
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=received_embed)
-            await interaction.followup.send(embed=awaiting_approval_embed(interaction.guild))
+            await send_awaiting_approval(interaction)
             complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
             await post_to_soap_queue(interaction.channel, interaction.user)
 
@@ -1300,16 +1331,7 @@ class SOAPAutomationCog(commands.Cog):
         #     color=discord.Color.blue(),
         # )
         # await channel.send(embed=steps_embed)
-
-        # Send late night delay warning if applicable
-        if is_late_night_hours():
-            late_night_embed = discord.Embed(
-                title="🌕 After Hours Notice",
-                description="It is currently after-hours for most of the staff members of this server, therefore response times may be longer than usual for initiating SOAP transfers, providing help, or answering questions.\n\nIn the meantime, please follow all the instructions provided above. We'll assist you as soon as possible.",
-                color=discord.Color(0xD50032),
-            )
-            (late_night_embed.set_footer(text="We appreciate your patience and understanding!"),)
-            await channel.send(embed=late_night_embed)
+        # The after hours notice is sent once steps 1 and 2 are done, see send_awaiting_approval
 
     @command_with_perms(
         min_role="Developer",
@@ -1548,7 +1570,7 @@ class SOAPAutomationCog(commands.Cog):
 
         if status_text == "PROGRESS" and target_channel:
             if status_detail == "START":
-                # The transfer started, so it's approved even if nobody pressed Approve
+                # The transfer started, so it's approved even if nobody pressed Start SOAP
                 await mark_soap_approved(target_channel)
                 # Send initial progress message (or reset the existing one, e.g. if the transfer is retried)
                 await self._update_progress_message(target_channel, 0, progress_footers.get("START", ""))

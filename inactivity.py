@@ -35,6 +35,7 @@ STAFF_TURN_TITLES = (
     "Your SOAP is awaiting approval",  # starts with the awaiting emoji, so titles are matched by how they end
     "✅ Your SOAP is approved",
 )
+AFTER_HOURS_TITLE = "🌕 After Hours Notice"  # skipped, so the message before it decides whose turn it is
 KEEPOPEN_TITLE = "🔓 Inactivity Timer Disabled"  # used to find .keepopen in the channel
 KEEPOPEN_FOOTER = "Inactivity timer disabled"  # older .keepopen messages used this footer instead
 
@@ -132,6 +133,8 @@ class InactivityCog(commands.Cog):
                 or (footer and footer.startswith(REMINDER_FOOTER_PREFIX))
             ):
                 reminders.append(message.created_at)
+                continue
+            if ours and embed and embed.title == AFTER_HOURS_TITLE:
                 continue
             if not message.author.bot:
                 return  # the latest message is from a person, so the timer waits for the next bot message
