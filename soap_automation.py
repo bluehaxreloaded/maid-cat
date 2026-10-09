@@ -238,14 +238,16 @@ async def send_soap_request(channel: discord.TextChannel, soaper: discord.abc.Us
         )
     _last_soap_requests[file_hash] = (now, soaper)
     # soap-cat reads the file straight from the essentials folder, so it never goes through Discord
-    # The channel ID tells soap-cat which channel this is, so it doesn't have to find it by topic
-    await bots_only.send(f"SOAP_REQUEST {member.id} {serial} STORED {channel.id}")
+    # The channel ID tells soap-cat which channel this is, so it doesn't have to find it by topic,
+    # and the Soaper's ID lets it log who started the SOAP
+    await bots_only.send(f"SOAP_REQUEST {member.id} {serial} STORED {channel.id} {soaper.id}")
     add_case_note(channel, "SOAP approved and sent to soap-cat")
     return None
 
 
 class SoapQueueView(discord.ui.View):
-    """Start SOAP / Hold for Review buttons on a soap-queue request. Pressing either disables both.
+    """Start SOAP / Hold for Review buttons on a soap-queue request. Pressing either disables both,
+    turns the request green or yellow, and says who did it in the footer.
     Start SOAP sends the request to soap-cat in the bots only channel; Hold for Review moves the channel
     to manual (same as .manual)."""
 
@@ -268,6 +270,22 @@ class SoapQueueView(discord.ui.View):
         match = re.search(r"<#(\d+)>", embed.description or "") if embed else None
         return interaction.guild.get_channel(int(match.group(1))) if match else None
 
+    async def _close_request(self, interaction: discord.Interaction, action: str, color: discord.Color):
+        """Disable both buttons and mark the request with what was done and by who.
+        Footers can't show mentions, so it's the Soaper's name and avatar, and the embed's timestamp
+        (shown after the footer in each viewer's own timezone) becomes when it happened."""
+        for item in self.children:
+            item.disabled = True
+        embed = interaction.message.embeds[0].copy() if interaction.message.embeds else None
+        if embed is not None:
+            embed.color = color
+            embed.set_footer(
+                text=f"{action} by {interaction.user.display_name}",
+                icon_url=interaction.user.display_avatar.url,
+            )
+            embed.timestamp = datetime.now(timezone.utc)
+        await interaction.message.edit(embed=embed, view=self)
+
     @discord.ui.button(
         label="Start SOAP",
         style=discord.ButtonStyle.success,
@@ -289,9 +307,7 @@ class SoapQueueView(discord.ui.View):
             await interaction.followup.send(error, ephemeral=True)
             return
 
-        for item in self.children:
-            item.disabled = True
-        await interaction.message.edit(view=self)
+        await self._close_request(interaction, "Approved for SOAP", discord.Color.green())
         await interaction.followup.send(f"Started SOAP in {channel.mention}.", ephemeral=True)
         await mark_soap_approved(channel)
 
@@ -329,10 +345,7 @@ class SoapQueueView(discord.ui.View):
         manual_embed.set_footer(text="Please wait for assistance and prepare to answer any questions.")
         await delete_awaiting_message(channel)
         await channel.send(embed=manual_embed)
-
-        for item in self.children:
-            item.disabled = True
-        await interaction.message.edit(view=self)
+        await self._close_request(interaction, "Held for review", discord.Color.yellow())
 
 
 def essential_signed(channel_id: int, user_id: int | None) -> bool | None:
