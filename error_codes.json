@@ -201,6 +201,15 @@
     ],
     "service": "Pokémon Bank"
   },
+  "006-1201": {
+    "title": "Pokémon Bank Maintenance",
+    "description": "This error occurs when Pokémon Bank is down for maintenance. Nothing is wrong with your console.",
+    "steps": [
+      "Wait for the maintenance to finish, then try opening Pokémon Bank again.",
+      "If the issue persists, please ask a Soaper for help."
+    ],
+    "service": "Pokémon Bank"
+  },
   "022-2502": {
     "title": "Out of Region NNID",
     "description": "This error occurs when opening the eShop on a SOAP'd console with an out-of-region Nintendo Network ID. You must remove your old Nintendo Network ID from your system.",
