@@ -90,15 +90,20 @@ async def reject_non_helpee(interaction: discord.Interaction) -> bool:
 AWAITING_APPROVAL_TITLE = "Your SOAP is awaiting approval"  # the inactivity timer also matches on this
 
 
-def awaiting_approval_embed(guild: discord.Guild | None) -> discord.Embed:
+def awaiting_approval_embed(
+    guild: discord.Guild | None, queue_message: discord.Message | None = None
+) -> discord.Embed:
     """Sent once steps 1 and 2 are done and the request is in soap-queue."""
     awaiting_emoji = discord.utils.get(guild.emojis, id=AWAITING_EMOTE_ID) if guild else None
+    description = (
+        "Please wait for our Soapers to review your case. Once approved, your SOAP Transfer will begin "
+        "automatically and you will be notified upon its completion."
+    )
+    if queue_message is not None:
+        description += f"\n\nBluehax Team: [Click here]({queue_message.jump_url}) to jump to the request."
     embed = discord.Embed(
         title=f"{awaiting_emoji} {AWAITING_APPROVAL_TITLE}" if awaiting_emoji else AWAITING_APPROVAL_TITLE,
-        description=(
-            "Please wait for our Soapers to review your case. Once approved, your SOAP Transfer will begin "
-            "automatically and you will be notified upon its completion."
-        ),
+        description=description,
         color=discord.Color.yellow(),
     )
     embed.set_footer(text="Please don't use your 3DS until your SOAP is complete.")
@@ -120,9 +125,11 @@ def after_hours_embed() -> discord.Embed:
     return embed
 
 
-async def send_awaiting_approval(interaction: discord.Interaction):
+async def send_awaiting_approval(
+    interaction: discord.Interaction, queue_message: discord.Message | None = None
+):
     """The awaiting approval message, plus the after hours notice if it's late night."""
-    await interaction.followup.send(embed=awaiting_approval_embed(interaction.guild))
+    await interaction.followup.send(embed=awaiting_approval_embed(interaction.guild, queue_message))
     if is_late_night_hours():
         await interaction.followup.send(embed=after_hours_embed())
 
@@ -393,12 +400,14 @@ def soap_queue_embed(
     return embed
 
 
-async def post_to_soap_queue(channel: discord.TextChannel, member: discord.abc.User):
-    """Post a helpee's request to soap-queue once steps 1 and 2 are done."""
+async def post_to_soap_queue(
+    channel: discord.TextChannel, member: discord.abc.User
+) -> discord.Message | None:
+    """Post a helpee's request to soap-queue once steps 1 and 2 are done. Returns the queue message."""
     queue_id = getattr(constants, "SOAP_QUEUE_CHANNEL_ID", None)  # not every server has one set yet
     queue = channel.guild.get_channel(queue_id) if queue_id else None
     if queue is None:
-        return
+        return None
     embed = soap_queue_embed(
         member,
         channel,
@@ -407,9 +416,10 @@ async def post_to_soap_queue(channel: discord.TextChannel, member: discord.abc.U
         essential_signed(channel.id, member.id),
     )
     try:
-        await queue.send(embed=embed, view=SoapQueueView())
+        return await queue.send(embed=embed, view=SoapQueueView())
     except discord.HTTPException as e:
         print(f"Could not post to soap-queue for #{channel.name}: {e}")
+        return None
 
 
 class CompletionFollowUpView(discord.ui.View):
@@ -728,9 +738,10 @@ class SerialNumberModal(discord.ui.Modal):
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=wait_embed)
-            await send_awaiting_approval(interaction)
             complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
-            await post_to_soap_queue(interaction.channel, interaction.user)
+            # Post to soap-queue first so the awaiting approval message can link to it
+            queue_message = await post_to_soap_queue(interaction.channel, interaction.user)
+            await send_awaiting_approval(interaction, queue_message)
             return
 
         # Step 2: Ask for essential.exefs
@@ -985,9 +996,10 @@ class EssentialUploadModal(discord.ui.DesignerModal):
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=received_embed)
-            await send_awaiting_approval(interaction)
             complete_case_setup(interaction.channel)  # step 1 and step 2 are done now
-            await post_to_soap_queue(interaction.channel, interaction.user)
+            # Post to soap-queue first so the awaiting approval message can link to it
+            queue_message = await post_to_soap_queue(interaction.channel, interaction.user)
+            await send_awaiting_approval(interaction, queue_message)
 
         # Disable buttons on the upload prompt message
         if self.prompt_message_id and interaction.channel:
