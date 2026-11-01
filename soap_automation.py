@@ -368,11 +368,12 @@ def soap_queue_embed(
 ) -> discord.Embed:
     """The soap-queue request for a helpee who finished steps 1 and 2."""
     info = read_serial(serial) if serial else None
+    requested_at = datetime.now(timezone.utc)
     embed = discord.Embed(
-        title="🧼 New SOAP Request",
+        title="🧼 SOAP Request",
         description=f"{member.mention} in {channel.mention}" if channel else member.mention,
         color=discord.Color.blue(),
-        timestamp=datetime.now(timezone.utc),
+        timestamp=requested_at,
     )
     embed.add_field(name="Username", value=member.name, inline=True)
     embed.add_field(name="Serial Number", value=f"`{serial}`" if serial else "Not found", inline=True)
@@ -383,6 +384,8 @@ def soap_queue_embed(
         value={True: "✅ Yes", False: "❌ No"}.get(signed, "➖ Not checked"),
         inline=True,
     )
+    ts = int(requested_at.timestamp())
+    embed.add_field(name="Requested", value=f"<t:{ts}:f> (<t:{ts}:R>)", inline=True)
     notes_text = "\n".join(f"- {n}" for n in notes) or "None"
     if len(notes_text) > 1024:
         notes_text = notes_text[:1021] + "..."
