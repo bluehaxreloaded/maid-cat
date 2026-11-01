@@ -789,7 +789,7 @@ class SoapHelperDropdown(discord.ui.Select):
                     "**To find your console's serial number:**\n"
                     "- Hold START while powering on your console. This will boot you into GodMode9.\n"
                     "- Go to `[2:] SYSNAND TWLN` -> `sys` -> `log` -> `inspect.log`\n"
-                    "- Select `Open in Textviewer`.\n\n"
+                    "- Select `Open in Textviewer` or `Open in Text Editor`.\n\n"
                     "The correct serial number (three-letter prefix followed by nine numbers) should be in the file."
                 ),
                 color=discord.Color.blue(),

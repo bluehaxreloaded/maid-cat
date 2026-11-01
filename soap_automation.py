@@ -176,7 +176,7 @@ def serial_mismatch_embed() -> discord.Embed:
             "To find your console's serial number:\n"
             "- Hold START while powering on your console. This will boot you into GodMode9.\n"
             "- Go to `[2:] SYSNAND TWLN` -> `sys` -> `log` -> `inspect.log`\n"
-            "- Select `Open in Textviewer`.\n\n"
+            "- Select `Open in Textviewer` or `Open in Text Editor`.\n\n"
             "The correct serial number (two or three-letter prefix followed by eight numbers) should be in the file. "
             "You may also send us a picture if you're unsure."
         ),
@@ -793,7 +793,7 @@ class SerialNumberCheckView(discord.ui.View):
                 "**To find your console's serial number:**\n"
                 "- Hold START while powering on your console. This will boot you into GodMode9.\n"
                 "- Go to `[2:] SYSNAND TWLN` -> `sys` -> `log` -> `inspect.log`\n"
-                "- Select `Open in Textviewer`.\n\n"
+                "- Select `Open in Textviewer` or `Open in Text Editor`.\n\n"
                 "The correct serial number (two or three-letter prefix followed by eight numbers) should be in the file."
             ),
             color=discord.Color.blue(),
