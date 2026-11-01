@@ -594,13 +594,25 @@ class ModerationCog(commands.Cog):
             ephemeral=True,
         )
 
+    async def _guild_member(
+        self, guild: discord.Guild, user: discord.User
+    ) -> discord.Member | None:
+        """The user as a member of the guild, or None if they aren't in it."""
+        member = guild.get_member(user.id)
+        if member is None:
+            try:
+                member = await guild.fetch_member(user.id)
+            except discord.NotFound:
+                return None
+        return member
+
     @command_with_perms(
         min_role="Staff",
         name="restrict",
         aliases=["blacklist"],
         help="Restrict a user from requesting SOAP/NNID transfers by giving them the restricted role.",
     )
-    async def restrict_user(self, ctx, user: discord.Member, *, reason: str = None):
+    async def restrict_user(self, ctx, user: discord.User, *, reason: str = None):
         """
         Restrict a user from requesting SOAP/NNID transfers.
         Requires Staff role or higher.
@@ -621,6 +633,17 @@ class ModerationCog(commands.Cog):
                 color=discord.Color.red(),
             )
             return await ctx.respond(embed=embed, ephemeral=True)
+
+        # Roles can only be given to or taken from someone who is in the server
+        member = await self._guild_member(ctx.guild, user)
+        if member is None:
+            embed = discord.Embed(
+                title="❌ Not in Server",
+                description=f"{user.mention} isn't in the server, so they can't be given the restricted role.",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+        user = member
 
         # Check role hierarchy - can't restrict users with equal or higher roles
         if (
@@ -700,7 +723,7 @@ class ModerationCog(commands.Cog):
         aliases=["unblacklist"],
         help="Remove restriction from a user by removing the restricted role.",
     )
-    async def unrestrict_user(self, ctx, user: discord.Member, *, reason: str = None):
+    async def unrestrict_user(self, ctx, user: discord.User, *, reason: str = None):
         """
         Remove restriction from a user.
         Requires Staff role or higher.
@@ -721,6 +744,17 @@ class ModerationCog(commands.Cog):
                 color=discord.Color.red(),
             )
             return await ctx.respond(embed=embed, ephemeral=True)
+
+        # Roles can only be given to or taken from someone who is in the server
+        member = await self._guild_member(ctx.guild, user)
+        if member is None:
+            embed = discord.Embed(
+                title="❌ Not in Server",
+                description=f"{user.mention} isn't in the server, so they don't have the restricted role.",
+                color=discord.Color.red(),
+            )
+            return await ctx.respond(embed=embed, ephemeral=True)
+        user = member
 
         # Check role hierarchy - can't unrestrict users with equal or higher roles (unless they're already restricted)
         # But we still check hierarchy to prevent abuse
