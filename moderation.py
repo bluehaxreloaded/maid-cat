@@ -130,6 +130,10 @@ class ModerationCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        # User IDs currently being banned by the honeypot. on_member_ban fires
+        # before the audit log entry is readable, so the reason check alone
+        # can't reliably tell a honeypot ban apart from a manual one.
+        self._honeypot_ban_ids: set[int] = set()
 
     async def _send_member_log(self, member: discord.Member, joined: bool):
         """Send a join/leave embed to the JOIN_LEAVE_LOG_ID channel."""
@@ -328,6 +332,10 @@ class ModerationCog(commands.Cog):
     async def on_member_ban(self, guild: discord.Guild, user: discord.User):
         """Log all ban actions (except honeypot, which is already logged explicitly)."""
         if not BAN_LOG_ID:
+            return
+
+        # Skip honeypot bans (already logged explicitly)
+        if user.id in self._honeypot_ban_ids:
             return
 
         moderator = None
@@ -934,6 +942,15 @@ class ModerationCog(commands.Cog):
 
         # Ban the user (clearing messages from the last hour)
         reason = "Spam bot auto-ban/unban"
+        self._honeypot_ban_ids.add(user.id)
+
+        async def forget_honeypot_ban():
+            # Keep the ID long enough for the gateway ban event to arrive
+            await asyncio.sleep(30)
+            self._honeypot_ban_ids.discard(user.id)
+
+        asyncio.create_task(forget_honeypot_ban())
+
         try:
             await guild.ban(user, delete_message_seconds=3600, reason=reason)
         except discord.Forbidden:
