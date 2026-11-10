@@ -330,5 +330,14 @@
       "Please ask a Soaper for help."
     ],
     "service": "eShop"
+  },
+  "001-0811": {
+    "title": "Online Play Maintenance",
+    "description": "This error occurs when online game servers used for services like Pokémon Bank and the Friends List are down for maintenance. Nothing is wrong with your console.",
+    "steps": [
+      "Wait for the maintenance to finish, then try accessing the service you were attempting to access again.",
+      "If the issue persists, please ask a Soaper for help."
+    ],
+    "service": "Pokémon Bank"
   }
 }
