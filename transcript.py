@@ -30,6 +30,8 @@ MAX_IMAGE_DOWNLOAD = 25_000_000  # bigger attachments are linked instead of save
 IMAGE_LEVELS = [(1600, 75), (1024, 60), (640, 45), (320, 35)]
 UNCOMPRESSED_MAX = 1_000_000  # without Pillow, images up to this size are saved as they are
 
+TIMER_REASON = "deletion timer ran out"  # the normal way a channel goes, so it isn't called out
+NOT_ISSUES = {"SOAP approved and sent to soap-cat"}  # case notes that are progress, not problems
 DONE_TITLES = {"🎉 SOAP Transfer Complete", "🔄 NNID Transfer Complete"}
 DESTRUCT_TEXT = "Self-destruct sequence initiated!"
 INACTIVITY_TITLE = "💤 Closed Due to Inactivity"
@@ -115,7 +117,8 @@ class _Summary:
         self.helpee_messages = speakers.get(self.helpee_id, 0)
 
         for note in case_notes(channel):
-            self._issue(note, None)
+            if note not in NOT_ISSUES:
+                self._issue(note, None)
 
         for i, m in enumerate(messages):
             if m.author.id != bot_id:
@@ -584,7 +587,7 @@ async def build_html(bot, channel: discord.TextChannel, messages, summary: _Summ
         if closed_text:
             closed_line += f" by {closed_text}"
         timeline.append(closed_line + "</li>")
-    timeline.append(f"<li>Deleted {_time_span(_ts(now))} ({_esc(reason)})</li>")
+    timeline.append(f"<li>Deleted {_time_span(_ts(now))}" + ("" if reason == TIMER_REASON else f" ({_esc(reason)})") + "</li>")
 
     cards = f"""
 <div class="grid">
@@ -690,12 +693,12 @@ def build_embed(channel: discord.TextChannel, messages, summary: _Summary, reaso
 
     embed = discord.Embed(
         title=f"📜 {summary.kind} Channel Transcript" if summary.kind != "Channel" else "📜 Channel Transcript",
-        description=f"`#{channel.name}` was deleted ({reason}). The full transcript is attached.",
+        description=f"`#{channel.name}`" + ("" if reason == TIMER_REASON else f"\n{reason[0].upper()}{reason[1:]}."),
         color=color,
         timestamp=datetime.now(timezone.utc),
     )
     if helpee:
-        embed.set_thumbnail(url=_avatar(helpee))
+        embed.set_author(name=helpee.name, icon_url=_avatar(helpee))
     uid = summary.helpee_id
     embed.add_field(
         name="👤 Helpee",
