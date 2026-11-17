@@ -384,7 +384,7 @@ class TrackingCog(commands.Cog):
                 (self.bot.user.id, since),
             )
             totals = await db.fetchone(
-                """SELECT COUNT(*) AS soaps, SUM(soaper_id IS NULL) AS unattributed, SUM(soaper_id = %s) AS auto
+                """SELECT COUNT(*) AS soaps, SUM(soaper_id = %s) AS auto
                    FROM transfers WHERE kind = 'SOAP' AND completed_at >= %s""",
                 (self.bot.user.id, since),
             )
@@ -430,9 +430,6 @@ class TrackingCog(commands.Cog):
             auto = int(totals["auto"] or 0)
             if auto:
                 parts.append(f"{auto:,} auto-approved")
-            unattributed = int(totals["unattributed"] or 0)
-            if unattributed:
-                parts.append(f"{unattributed:,} with no Soaper on record")
             footer = " · ".join(parts)
             embed.set_footer(text=footer)
         await ctx.respond(embed=embed, allowed_mentions=discord.AllowedMentions.none())
