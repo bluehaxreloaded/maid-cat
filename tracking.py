@@ -1,5 +1,5 @@
 """Keeps the database in step with Discord: channels, members, Soapers and restrictions.
-Also has .lookup, .leaderboard, .soaplimit and .importhistory."""
+Also has .helpee, .leaderboard, .soaplimit and .importhistory."""
 
 import asyncio
 from datetime import datetime, timedelta, timezone
@@ -240,8 +240,8 @@ class TrackingCog(commands.Cog):
 
     @command_with_perms(
         min_role="Soaper",
-        name="lookup",
-        aliases=["inspect", "helpee", "history", "userinfo"],
+        name="helpee",
+        aliases=["lookup", "inspect", "history", "userinfo"],
         help="Show a user's SOAP and NNID history, serials, restrictions and channels",
     )
     async def lookup(self, ctx, user: BridgeOption(discord.User, "User to inspect")):
