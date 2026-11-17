@@ -376,10 +376,10 @@ class TrackingCog(commands.Cog):
         try:
             rows = await db.fetchall(
                 """SELECT t.soaper_id, COUNT(*) AS soaps, SUM(t.outcome = 'lottery') AS lotteries,
-                          MAX(t.completed_at) AS last_at, s.is_soaper
+                          MAX(t.completed_at) AS last_at, s.is_soaper, s.username
                    FROM transfers t LEFT JOIN soapers s ON s.user_id = t.soaper_id
                    WHERE t.kind = 'SOAP' AND t.soaper_id IS NOT NULL AND t.soaper_id != %s AND t.completed_at >= %s
-                   GROUP BY t.soaper_id, s.is_soaper
+                   GROUP BY t.soaper_id, s.is_soaper, s.username
                    ORDER BY soaps DESC, last_at DESC""",
                 (self.bot.user.id, since),
             )
@@ -407,7 +407,9 @@ class TrackingCog(commands.Cog):
             member = guild.get_member(r["soaper_id"]) if guild else None
             current = records.is_soaper(member) if member else bool(r["is_soaper"])
             former = "" if current else " *(former)*"
-            return f"{medals.get(rank, f'**{rank}.**')} <@{r['soaper_id']}>{former} · " + " · ".join(bits)
+            name = member.name if member else (r["username"] or str(r["soaper_id"]))
+            name = discord.utils.escape_markdown(name)
+            return f"{medals.get(rank, f'**{rank}.**')} **{name}**{former} · " + " · ".join(bits)
 
         lines = [line(i, r) for i, r in enumerate(rows[:LEADERBOARD_SIZE], 1)]
         author_id = ctx.author.id
@@ -416,18 +418,22 @@ class TrackingCog(commands.Cog):
             lines += ["...", line(mine, rows[mine - 1])]
 
         embed = discord.Embed(
-            title=f"🧼 Soaper Leaderboard · {label}",
+            title=f"🏅 Soaper Leaderboard · {label}",
             description="\n".join(lines) or "No SOAPs recorded in this period.",
-            color=discord.Color.blue(),
+            color=discord.Color.gold(),
         )
         if total_soaps:
-            footer = f"{total_soaps:,} SOAP{'s' if total_soaps != 1 else ''} by {len(rows)} Soaper{'s' if len(rows) != 1 else ''}"
+            parts = [
+                f"{total_soaps:,} SOAP{'s' if total_soaps != 1 else ''}",
+                f"{len(rows)} Soaper{'s' if len(rows) != 1 else ''}",
+            ]
             auto = int(totals["auto"] or 0)
             if auto:
-                footer += f", {auto:,} auto-approved"
+                parts.append(f"{auto:,} auto-approved")
             unattributed = int(totals["unattributed"] or 0)
             if unattributed:
-                footer += f", {unattributed:,} SOAP{'s' if unattributed != 1 else ''} without a known Soaper"
+                parts.append(f"{unattributed:,} with no Soaper on record")
+            footer = " · ".join(parts)
             embed.set_footer(text=footer)
         await ctx.respond(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
