@@ -96,4 +96,12 @@ CREATE TABLE IF NOT EXISTS channels (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_user (user_id),
     KEY idx_status (status)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- How many SOAPs one person can get in a rolling period, set by Staff with .soaplimit
+CREATE TABLE IF NOT EXISTS soap_limits (
+    period ENUM('day', 'week', 'month', 'year') PRIMARY KEY COMMENT 'month is 30 days, year is 365',
+    max_soaps INT UNSIGNED NOT NULL,
+    set_by BIGINT UNSIGNED NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci

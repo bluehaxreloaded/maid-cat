@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 import records
 import discord
@@ -317,8 +318,11 @@ class SOAPRequestView(discord.ui.View):
             await restore_helpee_access(existing_channel, interaction.user)
             return
 
-        # restricted users can't open a channel; Staff are told they tried
-        restriction = await records.restriction_for(interaction.user)
+        # restricted users can't open a channel; Staff are told they tried.
+        # Both checks run at once, since the button only has 3 seconds to answer
+        restriction, limit = await asyncio.gather(
+            records.restriction_for(interaction.user), records.soap_limit_for(interaction.user)
+        )
         if restriction:
             await interaction.response.send_message(embed=records.restricted_embed("SOAP", restriction), ephemeral=True)
             await records.log_restricted_attempt(
@@ -343,6 +347,12 @@ class SOAPRequestView(discord.ui.View):
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        # someone who's had as many SOAPs as the limit allows is stopped before the questions
+        if limit:
+            await interaction.response.send_message(embed=records.limit_embed(limit), ephemeral=True)
+            await records.log_limit_hit(interaction.guild, interaction.user, "Pressed Request SOAP", limit)
             return
 
         # no existing channel, proceed with the form

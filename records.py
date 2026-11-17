@@ -8,7 +8,7 @@ import asyncio
 import functools
 import re
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import discord
 
@@ -222,7 +222,9 @@ async def record_transfer(
     else:
         await save_placeholder_user(user_id)
     soaper = await resolve(guild, soaper_id, bot) if soaper_id else None
-    if soaper:
+    # A SOAP maid-cat approved by itself keeps its ID on the transfer, but the bot isn't a Soaper
+    by_bot = bool(soaper and soaper.bot)
+    if soaper and not by_bot:
         await save_soaper(soaper, in_server=isinstance(soaper, discord.Member))
     elif soaper_id:
         await db.execute(
@@ -243,7 +245,7 @@ async def record_transfer(
         )
     if refresh:
         await refresh_user_counts(user_id)
-        if soaper_id:
+        if soaper_id and not by_bot:
             await refresh_soaper_counts(soaper_id)
     return bool(added)
 
@@ -492,6 +494,8 @@ async def helpee_history(user_id: int, serial: str | None) -> dict | None:
 
 # ---------- refusing restricted users ----------
 
+BLOCKED_FOOTER = "If you believe this is in error, please ask in #soap-help."
+
 async def restriction_for(user) -> dict | None:
     """The user's restriction if they're restricted (by the role, or an active one in the database), else None."""
     import constants
@@ -529,7 +533,7 @@ def restricted_embed(kind: str, restriction: dict) -> discord.Embed:
         description=restricted_text(kind, restriction),
         color=discord.Color.red(),
     )
-    embed.set_footer(text="If you believe this is a mistake, please contact a Soaper or Staff Member.")
+    embed.set_footer(text=BLOCKED_FOOTER)
     return embed
 
 
@@ -568,3 +572,114 @@ async def log_restricted_attempt(guild: discord.Guild, user, kind: str, how: str
         await log.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
     except discord.HTTPException as e:
         print(f"Could not log a restricted user's channel attempt: {e}")
+
+
+# ---------- SOAP limits ----------
+
+# Each limit is a rolling window, e.g. week is any 7 days in a row
+LIMIT_PERIODS = {"day": 1, "week": 7, "month": 30, "year": 365}
+
+
+@quiet
+async def soap_limits() -> dict[str, int]:
+    """The limits Staff have set, as period -> most SOAPs allowed in it."""
+    rows = await db.fetchall("SELECT period, max_soaps FROM soap_limits")
+    return {r["period"]: int(r["max_soaps"]) for r in rows}
+
+
+@quiet
+async def set_soap_limit(period: str, max_soaps: int | None, by_id: int | None) -> bool:
+    """Set a limit, or remove it when max_soaps is None. period None with max_soaps None removes them all."""
+    if max_soaps is None:
+        if period is None:
+            await db.execute("DELETE FROM soap_limits")
+        else:
+            await db.execute("DELETE FROM soap_limits WHERE period = %s", (period,))
+    else:
+        await db.execute(
+            """INSERT INTO soap_limits (period, max_soaps, set_by) VALUES (%s, %s, %s)
+               ON DUPLICATE KEY UPDATE max_soaps = VALUES(max_soaps), set_by = VALUES(set_by)""",
+            (period, max_soaps, by_id),
+        )
+    return True
+
+
+@quiet
+async def _soap_limit_hit(user_id: int) -> dict | None:
+    limits = await soap_limits()
+    if not limits:
+        return None
+    current = now()
+    longest = max(LIMIT_PERIODS[p] for p in limits)
+    rows = await db.fetchall(
+        """SELECT completed_at FROM transfers
+           WHERE user_id = %s AND kind = 'SOAP' AND completed_at >= %s
+           ORDER BY completed_at DESC""",
+        (user_id, current - timedelta(days=longest)),
+    )
+    times = [r["completed_at"] for r in rows]  # newest first
+    hit = None
+    for period, most in limits.items():
+        window = timedelta(days=LIMIT_PERIODS[period])
+        inside = [t for t in times if t >= current - window]
+        if len(inside) >= most:
+            # Another is allowed once the oldest of the newest `most` SOAPs leaves the window
+            until = inside[most - 1] + window
+            if hit is None or until > hit["until"]:
+                hit = {"period": period, "max": most, "count": len(inside), "until": until}
+    return hit
+
+
+async def soap_limit_for(user) -> dict | None:
+    """The limit the user has hit, or None. Like restriction_for, it gives up after 2 seconds and lets them through."""
+    try:
+        return await asyncio.wait_for(_soap_limit_hit(user.id), timeout=2)
+    except asyncio.TimeoutError:
+        return None
+
+
+def limit_text(limit: dict) -> str:
+    most, period = limit["max"], limit["period"]
+    until = int(limit["until"].replace(tzinfo=timezone.utc).timestamp())
+    per = "30 days" if period == "month" else period
+    return (
+        f"You can only receive {most} SOAP transfer{'s' if most != 1 else ''} per {per}. "
+        f"You can request another one <t:{until}:f> (<t:{until}:R>)."
+    )
+
+
+def limit_embed(limit: dict) -> discord.Embed:
+    embed = discord.Embed(
+        title="⏳ SOAP Limit Reached",
+        description=limit_text(limit),
+        color=discord.Color.orange(),
+    )
+    embed.set_footer(text=BLOCKED_FOOTER)
+    return embed
+
+
+async def log_limit_hit(guild: discord.Guild, user, how: str, limit: dict):
+    """Tell Staff someone hit the SOAP limit."""
+    import constants
+
+    log_id = getattr(constants, "SOAP_LOG_ID", None)
+    log = guild.get_channel(log_id) if log_id else None
+    if log is None:
+        return
+    until = int(limit["until"].replace(tzinfo=timezone.utc).timestamp())
+    per = "30 days" if limit["period"] == "month" else limit["period"]
+    embed = discord.Embed(
+        title="⏳ SOAP Limit Reached",
+        description=f"{user.mention} {user.name}",
+        color=discord.Color.orange(),
+        timestamp=datetime.now(timezone.utc),
+    )
+    embed.add_field(name="How", value=how, inline=False)
+    embed.add_field(name="Limit", value=f"{limit['max']} per {per}", inline=True)
+    embed.add_field(name="SOAPs in That Time", value=str(limit["count"]), inline=True)
+    embed.add_field(name="Can Request Again", value=f"<t:{until}:f> (<t:{until}:R>)", inline=False)
+    embed.set_footer(text=f"ID: {user.id}")
+    try:
+        await log.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+    except discord.HTTPException as e:
+        print(f"Could not log a SOAP limit hit: {e}")

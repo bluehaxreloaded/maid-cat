@@ -52,7 +52,10 @@ from helpee import (
 )
 
 
+WELCOME_TITLE = "🧼 Welcome to your SOAP Channel!"
+STEP1_TITLE = "1️⃣ Please provide your serial number"
 STEP2_TITLE = "2️⃣ Upload your essential.exefs file"
+ESSENTIAL_RECEIVED_TITLE = "✅ essential.exefs received"
 
 # essential.exefs files that passed every check except the serial, held here until the helpee corrects it.
 # Channel ID -> (helpee ID, file)
@@ -487,6 +490,92 @@ async def post_to_soap_queue(
         return None
 
 
+AUTO_APPROVE_SECONDS = 8
+# Every bot message in a SOAP channel where nothing went wrong. Any other one (help instructions, a serial
+# mismatch, a reopened channel) means a Soaper should look at it first.
+CLEAN_CHANNEL_TITLES = {
+    WELCOME_TITLE,
+    STEP1_TITLE,
+    SERIAL_RECEIVED_TITLE,
+    STEP2_TITLE,
+    ESSENTIAL_RECEIVED_TITLE,
+    AFTER_HOURS_TITLE,
+}
+
+
+async def _auto_approve_blocker(
+    channel: discord.TextChannel, member: discord.abc.User, queue_message: discord.Message
+) -> str | None:
+    """Why this request still needs a Soaper, or None if it can be approved without one:
+    their first SOAP, no case notes or warnings, nobody has acted on it, and only the bot has spoken."""
+    channel = channel.guild.get_channel(channel.id)
+    if channel is None or channel.category_id != SOAP_CHANNEL_CATEGORY_ID:
+        return "channel is gone or not waiting anymore"
+    try:
+        queue_message = await queue_message.channel.fetch_message(queue_message.id)
+    except discord.HTTPException:
+        return "soap-queue request is gone"
+    embed = queue_message.embeds[0] if queue_message.embeds else None
+    if embed is None or (embed.footer and embed.footer.text):
+        return "a Soaper already acted on it"
+    if embed.color is None or embed.color.value != discord.Color.blue().value:
+        return "the request has warnings"  # new account, shared serial, restrictions and so on
+    if case_notes(channel):
+        return "it has case notes"
+    if essential_signed(channel.id, member.id) is not True:
+        return "essential.exefs isn't signed by Nintendo"
+    history = await records.helpee_history(member.id, await entered_serial(channel))
+    if history is None:
+        return "the database couldn't confirm it's their first SOAP"
+    if history["soaps"] or history["serial_mine"] or history["serial_others"] or history["restrictions"]:
+        return "not their first SOAP"
+    async for message in channel.history(limit=50):
+        if not message.author.bot:
+            return "someone has spoken in the channel"
+        if message.author.id != channel.guild.me.id or not message.embeds:
+            return "there's an unexpected message"
+        title = message.embeds[0].title or ""
+        if title not in CLEAN_CHANNEL_TITLES and not title.endswith(AWAITING_APPROVAL_TITLE):
+            return "they needed help"
+    return None
+
+
+async def auto_approve_later(
+    channel: discord.TextChannel, member: discord.abc.User, queue_message: discord.Message | None
+):
+    """Start the SOAP without a Soaper if it's still waiting after a few seconds and nothing about it needs a look."""
+    if queue_message is None:
+        return
+    await asyncio.sleep(AUTO_APPROVE_SECONDS)
+    try:
+        if await _auto_approve_blocker(channel, member, queue_message):
+            return
+        me = channel.guild.me
+        if await send_soap_request(channel, me):
+            return  # a Soaper started it at the same moment, or something's missing; they'll handle it
+        queue_message = await queue_message.channel.fetch_message(queue_message.id)
+        view = SoapQueueView()
+        for item in view.children:
+            item.disabled = True
+        embed = queue_message.embeds[0].copy()
+        embed.color = discord.Color.green()
+        embed.set_footer(text="Auto-approved, first SOAP with no issues", icon_url=me.display_avatar.url)
+        embed.timestamp = datetime.now(timezone.utc)
+        await queue_message.edit(embed=embed, view=view)
+        await mark_soap_approved(channel)
+    except Exception as e:
+        print(f"Auto-approve failed for #{channel.name}: {e!r}")
+
+
+_auto_approve_tasks: set[asyncio.Task] = set()  # kept so the tasks aren't garbage collected while they wait
+
+
+def start_auto_approve(channel, member, queue_message):
+    task = asyncio.create_task(auto_approve_later(channel, member, queue_message))
+    _auto_approve_tasks.add(task)
+    task.add_done_callback(_auto_approve_tasks.discard)
+
+
 class CompletionFollowUpView(discord.ui.View):
     """View for the follow-up questions after eShop verification"""
 
@@ -808,6 +897,7 @@ class SerialNumberModal(discord.ui.Modal):
             # Post to soap-queue first so the awaiting approval message can link to it
             queue_message = await post_to_soap_queue(interaction.channel, interaction.user)
             await send_awaiting_approval(interaction, queue_message)
+            start_auto_approve(interaction.channel, interaction.user, queue_message)
             return
 
         # Step 2: Ask for essential.exefs
@@ -1063,7 +1153,7 @@ class EssentialUploadModal(discord.ui.DesignerModal):
                 return
             name = attachment.filename.replace("`", "'")
             received_embed = discord.Embed(
-                title="✅ essential.exefs received",
+                title=ESSENTIAL_RECEIVED_TITLE,
                 description=f"📎 `{name}` | {len(clean) / 1024:.1f} KB",
                 color=discord.Color.green(),
             )
@@ -1072,6 +1162,7 @@ class EssentialUploadModal(discord.ui.DesignerModal):
             # Post to soap-queue first so the awaiting approval message can link to it
             queue_message = await post_to_soap_queue(interaction.channel, interaction.user)
             await send_awaiting_approval(interaction, queue_message)
+            start_auto_approve(interaction.channel, interaction.user, queue_message)
 
         # Disable buttons on the upload prompt message
         if self.prompt_message_id and interaction.channel:
@@ -1405,7 +1496,7 @@ class SOAPAutomationCog(commands.Cog):
         """Create the welcome embed for new SOAP channels"""
         # Welcome embed
         welcome_embed = discord.Embed(
-            title="🧼 Welcome to your SOAP Channel!",
+            title=WELCOME_TITLE,
             description="We're excited to assist you! To get started, please read the following:\n\n",
             color=discord.Color.blue(),
         )
@@ -1413,7 +1504,7 @@ class SOAPAutomationCog(commands.Cog):
 
         # Step-by-step instructions in a separate embed
         steps_embed = discord.Embed(
-            title="1️⃣ Please provide your serial number",
+            title=STEP1_TITLE,
             description=(
                 "To find your console's serial number, refer to the sticker on the back of your console. On a New 3DS, the sticker is on the front of the console underneath the faceplate. The serial number has a two or three-letter prefix followed by nine numbers.\n\n"
                 "Were you able to find your serial number?"

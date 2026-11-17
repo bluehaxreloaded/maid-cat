@@ -665,6 +665,13 @@ class SoapCog(commands.Cog):  # SOAP commands
             how = "Finished the request form" if requester is None or requester.id == user.id else f"Requested by {requester.name}"
             await records.log_restricted_attempt(guild, user, "SOAP", how, restriction, by=requester)
             return False, None, records.restricted_text("SOAP", restriction)
+        # The SOAP limit is checked when they press Request SOAP too; this catches one hit while they answered.
+        # Staff opening a channel for someone can go past it
+        if requester is None or requester.id == user.id:
+            limit = await records.soap_limit_for(user)
+            if limit:
+                await records.log_limit_hit(guild, user, "Finished the request form", limit)
+                return False, None, records.limit_text(limit)
         channel_name = channel_name_for(user, SOAP_CHANNEL_SUFFIX)
 
         # Only check channels in the SOAP categories (exclude archived)

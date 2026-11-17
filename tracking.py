@@ -1,5 +1,5 @@
 """Keeps the database in step with Discord: channels, members, Soapers and restrictions.
-Also has .lookup, .topsoapers and .importhistory."""
+Also has .lookup, .leaderboard, .soaplimit and .importhistory."""
 
 import asyncio
 from datetime import datetime, timedelta, timezone
@@ -22,6 +22,17 @@ LEADERBOARD_PERIODS = {  # name -> (title, days back, or None for all time)
     "week": ("Past 7 Days", 7),
     "today": ("Past 24 Hours", 1),
 }
+
+SOAP_LIMIT_PERIOD_WORDS = {}
+for _period, _words in {
+    "day": ("day", "days", "d", "daily", "24h"),
+    "week": ("week", "weeks", "w", "wk", "weekly", "7d"),
+    "month": ("month", "months", "mo", "m", "monthly", "30d"),
+    "year": ("year", "years", "y", "yr", "yearly", "365d"),
+}.items():
+    for _word in _words:
+        SOAP_LIMIT_PERIOD_WORDS[_word] = _period
+SOAP_LIMIT_PERIOD_WORDS[""] = None
 
 
 def _ts(dt: datetime | None, style: str = "f") -> str:
@@ -367,15 +378,15 @@ class TrackingCog(commands.Cog):
                 """SELECT t.soaper_id, COUNT(*) AS soaps, SUM(t.outcome = 'lottery') AS lotteries,
                           MAX(t.completed_at) AS last_at, s.is_soaper
                    FROM transfers t LEFT JOIN soapers s ON s.user_id = t.soaper_id
-                   WHERE t.kind = 'SOAP' AND t.soaper_id IS NOT NULL AND t.completed_at >= %s
+                   WHERE t.kind = 'SOAP' AND t.soaper_id IS NOT NULL AND t.soaper_id != %s AND t.completed_at >= %s
                    GROUP BY t.soaper_id, s.is_soaper
                    ORDER BY soaps DESC, last_at DESC""",
-                (since,),
+                (self.bot.user.id, since),
             )
             totals = await db.fetchone(
-                """SELECT COUNT(*) AS soaps, SUM(soaper_id IS NULL) AS unattributed
+                """SELECT COUNT(*) AS soaps, SUM(soaper_id IS NULL) AS unattributed, SUM(soaper_id = %s) AS auto
                    FROM transfers WHERE kind = 'SOAP' AND completed_at >= %s""",
-                (since,),
+                (self.bot.user.id, since),
             )
         except Exception as e:
             return await ctx.respond(f"Could not read the database: {e}", ephemeral=True)
@@ -411,11 +422,64 @@ class TrackingCog(commands.Cog):
         )
         if total_soaps:
             footer = f"{total_soaps:,} SOAP{'s' if total_soaps != 1 else ''} by {len(rows)} Soaper{'s' if len(rows) != 1 else ''}"
+            auto = int(totals["auto"] or 0)
+            if auto:
+                footer += f", {auto:,} auto-approved"
             unattributed = int(totals["unattributed"] or 0)
             if unattributed:
                 footer += f", {unattributed:,} SOAP{'s' if unattributed != 1 else ''} without a known Soaper"
             embed.set_footer(text=footer)
         await ctx.respond(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+
+    @command_with_perms(
+        min_role="Staff",
+        name="soaplimit",
+        aliases=["soaplimits", "setsoaplimit"],
+        help="How many SOAPs one person can get: .soaplimit 2 week, .soaplimit off week, or no args to show them",
+    )
+    async def soaplimit(
+        self,
+        ctx,
+        count: BridgeOption(str, "Most SOAPs allowed, or off to remove the limit", required=False) = None,
+        *,
+        period: BridgeOption(str, "Per day, week, month (30 days) or year", required=False) = None,
+    ):
+        if not db.enabled():
+            return await ctx.respond("The database isn't set up.", ephemeral=True)
+        if count is not None:
+            period = (period or "").lower().strip()
+            for word in ("per ", "a ", "every ", "/"):
+                period = period.removeprefix(word).strip()  # .soaplimit 2 per week
+            period_name = SOAP_LIMIT_PERIOD_WORDS.get(period)
+            off = count.lower() in ("off", "none", "remove", "clear", "0")
+            if period and period_name is None:
+                return await ctx.respond(
+                    f"`{period}` isn't a period. Use `day`, `week`, `month` or `year`.", ephemeral=True
+                )
+            if off:
+                await records.set_soap_limit(period_name, None, ctx.author.id)
+            elif not count.isdigit() or period_name is None:
+                return await ctx.respond(
+                    "Use `.soaplimit 2 week` to allow 2 SOAPs per week, or `.soaplimit off week` to remove that limit.",
+                    ephemeral=True,
+                )
+            elif await records.set_soap_limit(period_name, int(count), ctx.author.id) is None:
+                return await ctx.respond("Could not save the limit to the database.", ephemeral=True)
+
+        limits = await records.soap_limits()
+        if limits is None:
+            return await ctx.respond("Could not read the database.", ephemeral=True)
+        lines = [
+            f"**{most}** SOAP{'s' if most != 1 else ''} per {'30 days' if p == 'month' else p}"
+            for p, most in sorted(limits.items(), key=lambda kv: records.LIMIT_PERIODS[kv[0]])
+        ]
+        embed = discord.Embed(
+            title="⏳ SOAP Limits",
+            description="\n".join(lines) or "No limits set.",
+            color=discord.Color.blue(),
+        )
+        embed.set_footer(text="Each limit is per person and rolling, e.g. week is any 7 days. NNID transfers aren't limited.")
+        await ctx.respond(embed=embed)
 
     @command_with_perms(
         allowed_roles=["Developer"],
