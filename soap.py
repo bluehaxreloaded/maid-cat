@@ -33,6 +33,7 @@ from helpee import (
     sync_helpee_role,
     REOPENED_TITLE,
 )
+from transcript import send_transcript
 
 # Topic format for archived channels: "Archived. Deletion scheduled: YYYY-MM-DD HH:MM:SS UTC. " + original
 ARCHIVE_PREFIX = "Archived. Deletion scheduled: "
@@ -113,6 +114,24 @@ async def _get_channel_topic(channel: discord.TextChannel) -> str:
     return (channel.topic or "").strip()
 
 
+def _archived_at(topic: str) -> datetime | None:
+    """When a channel was archived, worked out from the deletion time in its topic."""
+    match = ARCHIVE_DELETION_REGEX.search(topic or "")
+    if not match:
+        return None
+    try:
+        deletion = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return deletion - timedelta(days=ARCHIVE_DAYS)
+
+
+async def delete_archived_channel(bot, channel: discord.TextChannel, reason: str) -> None:
+    """Save a transcript of an archived channel, then delete it. Raises discord.NotFound if it's already gone."""
+    await send_transcript(bot, channel, reason, _archived_at(channel.topic or ""))
+    await channel.delete()
+
+
 async def _notify_and_delete(channel: discord.TextChannel, message: str) -> None:
     """Send message to channel then delete it. Ignores NotFound."""
     try:
@@ -177,7 +196,9 @@ class ArchiveConfirmView(discord.ui.View):
         )
         await asyncio.sleep(3)
         try:
-            await channel.delete()
+            await delete_archived_channel(
+                self.bot, channel, f"deleted early by {interaction.user.name}"
+            )
         except discord.NotFound:
             pass
         await log_to_soaper_log(interaction, "Deleted archived channel (early)")
@@ -332,7 +353,7 @@ class SoapCog(commands.Cog):  # SOAP commands
                 continue
         if oldest_channel:
             try:
-                await oldest_channel.delete()
+                await delete_archived_channel(self.bot, oldest_channel, "deleted early, archive category was full")
                 embed = discord.Embed(
                     title="Early-deleted archived channel (category full)",
                     description=f"#{oldest_channel.name}",
@@ -392,7 +413,7 @@ class SoapCog(commands.Cog):  # SOAP commands
                     ).replace(tzinfo=timezone.utc)
                     if deletion_dt <= now:
                         try:
-                            await channel.delete()
+                            await delete_archived_channel(self.bot, channel, "deletion timer ran out")
                             embed = discord.Embed(
                                 title="Auto-deleted archived channel",
                                 description=f"#{channel.name}",
@@ -796,7 +817,9 @@ class SoapCog(commands.Cog):  # SOAP commands
                 if not ARCHIVE_DELETION_REGEX.search(topic):
                     continue
                 try:
-                    await channel.delete()
+                    await delete_archived_channel(
+                        self.bot, channel, f"archive cleared by {ctx.author.name}"
+                    )
                     deleted += 1
                 except (discord.Forbidden, discord.HTTPException, discord.NotFound) as e:
                     failed += 1

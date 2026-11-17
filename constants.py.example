@@ -27,6 +27,7 @@ BAN_LOG_ID = # channel where kicks/bans are logged
 MESSAGE_LOG_ID = # channel where message edits/deletes are logged
 SPAM_BOT_CHANNEL_ID =  # channel where spam bot feature is active
 ERROR_LOG_ID =  # channel that any error not dealt with gets logged to
+ARCHIVE_TRANSCRIPT_CHANNEL_ID =  # channel where HTML transcripts of archived channels are posted before they are deleted (optional, leave out to skip)
 SOAP_TRACKER_ID =  # voice channel that displays SOAP count
 NNID_TRACKER_ID =  # voice channel that displays NNID count
 SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID, ] # where soap channel specific commands can be used
