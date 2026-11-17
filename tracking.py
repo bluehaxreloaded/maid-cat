@@ -234,16 +234,9 @@ class TrackingCog(commands.Cog):
 
     # ---------- commands ----------
 
-    async def _private(self, ctx, **kwargs):
-        """Reply only to whoever ran the command: ephemeral for slash commands, a DM for prefix ones,
-        since .lookup shows serials and restriction reasons."""
-        if getattr(ctx, "is_app", False):
-            return await ctx.respond(ephemeral=True, **kwargs)
-        try:
-            await ctx.author.send(**kwargs)
-            await ctx.message.add_reaction("📬")
-        except discord.HTTPException:
-            await ctx.respond("I couldn't DM you. Use `/lookup` instead, it's only shown to you.")
+    async def _reply(self, ctx, **kwargs):
+        """Reply in the channel the command was used in, without pinging anyone it mentions."""
+        return await ctx.respond(allowed_mentions=discord.AllowedMentions.none(), **kwargs)
 
     @command_with_perms(
         min_role="Soaper",
@@ -253,12 +246,9 @@ class TrackingCog(commands.Cog):
     )
     async def lookup(self, ctx, user: BridgeOption(discord.User, "User to inspect")):
         if not db.enabled():
-            return await self._private(ctx, content="The database isn't set up.")
+            return await self._reply(ctx, content="The database isn't set up.")
         if hasattr(ctx, "defer"):
-            try:
-                await ctx.defer(ephemeral=True)
-            except TypeError:
-                await ctx.defer()
+            await ctx.defer()
         try:
             row = await db.fetchone("SELECT * FROM users WHERE user_id = %s", (user.id,))
             totals = await db.fetchone(
@@ -288,7 +278,7 @@ class TrackingCog(commands.Cog):
                 (user.id,),
             )
         except Exception as e:
-            return await self._private(ctx, content=f"Could not read the database: {e}")
+            return await self._reply(ctx, content=f"Could not read the database: {e}")
         limit = await records.soap_limit_for(user) if row and row["soap_count"] else None
 
         guild = getattr(ctx, "guild", None)
@@ -329,7 +319,7 @@ class TrackingCog(commands.Cog):
 
         if not row and not soaper:
             embed.add_field(name="History", value="No SOAP or NNID transfers on record.", inline=False)
-            return await self._private(ctx, embed=embed)
+            return await self._reply(ctx, embed=embed)
 
         if row:
             embed.add_field(name="SOAPs", value=f"**{row['soap_count']}**", inline=True)
@@ -394,7 +384,7 @@ class TrackingCog(commands.Cog):
                 f"last {_ts(soaper['last_soap_at'], 'R')}",
                 inline=False,
             )
-        await self._private(ctx, embed=embed)
+        await self._reply(ctx, embed=embed)
 
     @command_with_perms(
         min_role="Soaper",
