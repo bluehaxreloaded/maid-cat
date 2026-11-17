@@ -248,7 +248,7 @@ class TrackingCog(commands.Cog):
     @command_with_perms(
         min_role="Soaper",
         name="lookup",
-        aliases=["inspect", "history", "userinfo"],
+        aliases=["inspect", "helpee", "history", "userinfo"],
         help="Show a user's SOAP and NNID history, serials, restrictions and channels",
     )
     async def lookup(self, ctx, user: BridgeOption(discord.User, "User to inspect")):
