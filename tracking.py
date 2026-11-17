@@ -15,6 +15,7 @@ from perms import command_with_perms
 
 EXPIRY_CHECK_SECONDS = 60
 LEADERBOARD_SIZE = 15
+LOOKUP_TRANSFERS = 10
 LEADERBOARD_PERIODS = {  # name -> (title, days back, or None for all time)
     "all": ("All Time", None),
     "year": ("Past Year", 365),
@@ -247,10 +248,10 @@ class TrackingCog(commands.Cog):
     @command_with_perms(
         min_role="Soaper",
         name="lookup",
-        aliases=["history", "userinfo"],
-        help="Show someone's SOAPs, NNID transfers, serials, restrictions and channels",
+        aliases=["inspect", "history", "userinfo"],
+        help="Show a user's SOAP and NNID history, serials, restrictions and channels",
     )
-    async def lookup(self, ctx, user: BridgeOption(discord.User, "User to look up")):
+    async def lookup(self, ctx, user: BridgeOption(discord.User, "User to inspect")):
         if not db.enabled():
             return await self._private(ctx, content="The database isn't set up.")
         if hasattr(ctx, "defer"):
@@ -260,89 +261,137 @@ class TrackingCog(commands.Cog):
                 await ctx.defer()
         try:
             row = await db.fetchone("SELECT * FROM users WHERE user_id = %s", (user.id,))
+            totals = await db.fetchone(
+                "SELECT COUNT(*) AS n, COUNT(DISTINCT serial_base) AS serials FROM transfers WHERE user_id = %s",
+                (user.id,),
+            )
             transfers = await db.fetchall(
-                "SELECT * FROM transfers WHERE user_id = %s ORDER BY completed_at DESC LIMIT 10", (user.id,)
+                """SELECT t.*, s.username AS soaper_name FROM transfers t
+                   LEFT JOIN soapers s ON s.user_id = t.soaper_id
+                   WHERE t.user_id = %s ORDER BY t.completed_at DESC LIMIT %s""",
+                (user.id, LOOKUP_TRANSFERS),
             )
             restrictions = await db.fetchall(
-                "SELECT * FROM restrictions WHERE user_id = %s ORDER BY created_at DESC LIMIT 5", (user.id,)
+                "SELECT * FROM restrictions WHERE user_id = %s ORDER BY created_at DESC LIMIT 3", (user.id,)
             )
+            restriction_count = await db.fetchone("SELECT COUNT(*) AS n FROM restrictions WHERE user_id = %s", (user.id,))
             channels = await db.fetchall(
-                "SELECT * FROM channels WHERE user_id = %s ORDER BY created_at DESC LIMIT 5", (user.id,)
+                "SELECT * FROM channels WHERE user_id = %s ORDER BY created_at DESC LIMIT 3", (user.id,)
             )
             soaper = await db.fetchone("SELECT * FROM soapers WHERE user_id = %s", (user.id,))
             shared = await db.fetchall(
-                """SELECT DISTINCT t2.user_id, t2.serial FROM transfers t1
+                """SELECT t2.user_id, MAX(u.username) AS username, MAX(t2.serial) AS serial FROM transfers t1
                    JOIN transfers t2 ON t1.serial_base = t2.serial_base AND t2.user_id <> t1.user_id
-                   WHERE t1.user_id = %s AND t1.serial_base IS NOT NULL LIMIT 5""",
+                   LEFT JOIN users u ON u.user_id = t2.user_id
+                   WHERE t1.user_id = %s AND t1.serial_base IS NOT NULL
+                   GROUP BY t2.user_id LIMIT 5""",
                 (user.id,),
             )
         except Exception as e:
             return await self._private(ctx, content=f"Could not read the database: {e}")
+        limit = await records.soap_limit_for(user) if row and row["soap_count"] else None
 
-        embed = discord.Embed(title=f"🔎 {user.name}", color=discord.Color.blue())
-        embed.set_thumbnail(url=user.display_avatar.url)
-        embed.set_footer(text=f"User ID: {user.id}")
+        guild = getattr(ctx, "guild", None)
+        member = guild.get_member(user.id) if guild else None
+        now = records.now()
+
+        # Standing decides the colour: red while restricted, orange when something needs a look
+        flags = []
+        if row and row["restriction"] == "permanent":
+            standing, color = "⛔ Restricted, permanent", discord.Color.red()
+        elif row and row["restriction"] == "temporary":
+            standing = f"⛔ Restricted until {_ts(row['restricted_until'], 'D')}"
+            color = discord.Color.red()
+        elif limit:
+            standing, color = f"⏳ SOAP limit reached until {_ts(limit['until'], 'D')}", discord.Color.orange()
+        else:
+            standing, color = "✅ Good standing", discord.Color.green()
+        for s in shared:
+            name = discord.utils.escape_markdown(s["username"] or str(s["user_id"]))
+            flags.append(f"Serial `{s['serial']}` was also used by **{name}** (`{s['user_id']}`)")
+        if user.created_at and datetime.now(timezone.utc) - user.created_at < timedelta(days=7):
+            flags.append("Account is less than 7 days old")
+        if restriction_count and restriction_count["n"] and not (row and row["restriction"] != "none"):
+            n = restriction_count["n"]
+            flags.append(f"Restricted {n} time{'s' if n != 1 else ''} before")
+        if flags and color == discord.Color.green():
+            color = discord.Color.orange()
+
+        embed = discord.Embed(
+            title="User Overview",
+            description=f"{user.mention} · `{user.id}`",
+            color=color if (row or soaper) else discord.Color.light_grey(),
+            timestamp=datetime.now(timezone.utc),
+        )
+        name = user.name if not getattr(user, "global_name", None) else f"{user.name} ({user.global_name})"
+        embed.set_author(name=name, icon_url=user.display_avatar.url)
+        embed.set_footer(text="Bluehax Records")
+
         if not row and not soaper:
-            embed.description = "Nothing recorded for this user."
+            embed.add_field(name="History", value="No SOAP or NNID transfers on record.", inline=False)
             return await self._private(ctx, embed=embed)
+
         if row:
-            embed.description = (
-                f"{user.mention} · {'in the server' if row['in_server'] else 'not in the server'}\n"
-                f"**{row['soap_count']}** SOAP{'s' if row['soap_count'] != 1 else ''}, "
-                f"**{row['nnid_count']}** NNID transfer{'s' if row['nnid_count'] != 1 else ''}"
-            )
-            if row["roles"]:
-                embed.add_field(name="Roles", value=row["roles"][:1024], inline=False)
-            if row["restriction"] == "permanent":
-                restriction = "⛔ Restricted permanently"
-            elif row["restriction"] == "temporary":
-                restriction = f"⛔ Restricted until {_ts(row['restricted_until'])} ({_ts(row['restricted_until'], 'R')})"
+            embed.add_field(name="SOAPs", value=f"**{row['soap_count']}**", inline=True)
+            embed.add_field(name="NNID Transfers", value=f"**{row['nnid_count']}**", inline=True)
+            embed.add_field(name="Serials", value=f"**{totals['serials'] if totals else 0}**", inline=True)
+            embed.add_field(name="Standing", value=standing, inline=True)
+            embed.add_field(name="Account Created", value=_ts(user.created_at.replace(tzinfo=None), "D"), inline=True)
+            if member and member.joined_at:
+                joined = _ts(member.joined_at.replace(tzinfo=None), "D")
             else:
-                restriction = "Not restricted"
-            embed.add_field(name="Restriction", value=restriction, inline=False)
+                joined = "Not in server"
+            embed.add_field(name="Joined Server", value=joined, inline=True)
+
+        if flags:
+            embed.add_field(name="⚠️ Flags", value="\n".join(f"• {f}" for f in flags)[:1024], inline=False)
+
         if transfers:
+            total = totals["n"] if totals else len(transfers)
             lines = []
             for t in transfers:
-                bits = [f"{t['kind']}" + (" (lottery)" if t["outcome"] == "lottery" else ""), _ts(t["completed_at"], "d")]
+                kind = "SOAP" if t["kind"] == "SOAP" else "NNID"
+                if t["outcome"] == "lottery":
+                    kind += " (Lottery)"
+                bits = [_ts(t["completed_at"], "d"), f"**{kind}**"]
                 if t["serial"]:
                     bits.append(f"`{t['serial']}`")
-                if t["soaper_id"]:
-                    bits.append(f"by <@{t['soaper_id']}>")
-                elif t["method"] == "automatic":
-                    bits.append("automatic")
-                if t["donor"]:
-                    bits.append(f"donor `{t['donor']}`")
+                if t["soaper_id"] == self.bot.user.id:
+                    bits.append("Auto-approved")
+                elif t["soaper_id"]:
+                    by = guild.get_member(t["soaper_id"]) if guild else None
+                    by = by.name if by else (t["soaper_name"] or str(t["soaper_id"]))
+                    bits.append(f"by {discord.utils.escape_markdown(by)}")
                 lines.append(" · ".join(bits))
-            embed.add_field(name="Transfers", value="\n".join(lines)[:1024], inline=False)
-        if shared:
-            embed.add_field(
-                name="⚠️ Serial also used by",
-                value="\n".join(f"<@{s['user_id']}> (`{s['serial']}`)" for s in shared)[:1024],
-                inline=False,
-            )
+            heading = "Transfer History" + (f" (latest {len(transfers)} of {total})" if total > len(transfers) else "")
+            embed.add_field(name=heading, value="\n".join(lines)[:1024], inline=False)
+
         if restrictions:
             lines = []
             for r in restrictions:
-                length = f"until {_ts(r['expires_at'], 'd')}" if r["expires_at"] else "permanent"
-                state = "active" if r["ended_at"] is None else f"ended {_ts(r['ended_at'], 'd')} ({r['end_reason']})"
-                by = f" by <@{r['moderator_id']}>" if r["moderator_id"] else ""
-                lines.append(f"{_ts(r['created_at'], 'd')}{by}, {length}, {state}" + (f"\n> {r['reason'][:100]}" if r["reason"] else ""))
-            embed.add_field(name="Restriction history", value="\n".join(lines)[:1024], inline=False)
+                length = f"until {_ts(r['expires_at'], 'd')}" if r["expires_at"] else "Permanent"
+                state = "Active" if r["ended_at"] is None else f"Ended {_ts(r['ended_at'], 'd')}"
+                line = f"{_ts(r['created_at'], 'd')} · {length} · {state}"
+                if r["reason"]:
+                    line += f"\n-# {discord.utils.escape_markdown(r['reason'][:120])}"
+                lines.append(line)
+            embed.add_field(name="Restrictions", value="\n".join(lines)[:1024], inline=False)
+
         if channels:
             lines = []
             for c in channels:
-                where = f"<#{c['channel_id']}>" if c["status"] != "deleted" else f"#{c['name']}"
-                extra = []
-                if c["serial"]:
-                    extra.append(f"`{c['serial']}`")
+                where = f"<#{c['channel_id']}>" if c["status"] != "deleted" else f"`#{c['name']}`"
+                line = f"{where} · {c['status'].capitalize()} · {_ts(c['created_at'], 'd')}"
                 if c["pair_code"]:
-                    extra.append(f"pair code `{c['pair_code']}`")
-                lines.append(f"{where} · {c['status']} · {_ts(c['created_at'], 'd')}" + (" · " + " · ".join(extra) if extra else ""))
-            embed.add_field(name="Channels", value="\n".join(lines)[:1024], inline=False)
+                    line += f" · Pair code `{c['pair_code']}`"
+                lines.append(line)
+            embed.add_field(name="Recent Channels", value="\n".join(lines)[:1024], inline=False)
+
         if soaper and (soaper["soap_count"] or soaper["nnid_count"]):
             embed.add_field(
                 name="As a Soaper",
-                value=f"{soaper['soap_count']} SOAPs, {soaper['nnid_count']} NNID transfers, last {_ts(soaper['last_soap_at'], 'R')}",
+                value=f"**{soaper['soap_count']}** SOAPs · **{soaper['nnid_count']}** NNID transfers · "
+                f"last {_ts(soaper['last_soap_at'], 'R')}",
                 inline=False,
             )
         await self._private(ctx, embed=embed)
