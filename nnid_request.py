@@ -1,4 +1,5 @@
 from pathlib import Path
+import records
 import discord
 from discord.ext import commands, bridge
 from perms import command_with_perms
@@ -9,7 +10,6 @@ from constants import (
     NNID_CHANNEL_CATEGORY_ID,
     RESTRICTED_ROLE_ID,
 )
-
 
 class FilesCheckView(discord.ui.View):
     def __init__(self):
@@ -79,7 +79,6 @@ class FilesCheckView(discord.ui.View):
             embed.set_footer(text="Questions? Drop us a line in #soap-help")
             view = BrokenConsoleCheckView(interaction.user)
             await interaction.response.edit_message(embed=embed, view=view)
-
 
 class BrokenConsoleCheckView(discord.ui.View):
     def __init__(self, user: discord.Member):
@@ -189,7 +188,6 @@ class BrokenConsoleCheckView(discord.ui.View):
             )
             await interaction.response.edit_message(embed=embed, view=None)
 
-
 class BrokenReasonView(discord.ui.View):
     """Asks why the source console is inaccessible; rejects if sold or given away."""
 
@@ -261,7 +259,6 @@ class BrokenReasonView(discord.ui.View):
             embed.set_footer(text="Questions? Drop us a line in #soap-help")
             view = CFWCheckView(self.user)
             await interaction.response.edit_message(embed=embed, view=view)
-
 
 class CFWCheckView(discord.ui.View):
     def __init__(self, user: discord.Member):
@@ -385,7 +382,6 @@ class CFWCheckView(discord.ui.View):
             interaction.message.id, embed=embed, view=view
         )
 
-
 class NNIDRequestView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -419,6 +415,15 @@ class NNIDRequestView(discord.ui.View):
             await restore_helpee_access(existing_channel, interaction.user)
             return
 
+        # restricted users can't open a channel; Staff are told they tried
+        restriction = await records.restriction_for(interaction.user)
+        if restriction:
+            await interaction.response.send_message(embed=records.restricted_embed("NNID", restriction), ephemeral=True)
+            await records.log_restricted_attempt(
+                interaction.guild, interaction.user, "NNID", "Pressed Request NNID Transfer", restriction
+            )
+            return
+
         # a helpee who left and rejoined gets their archived channel back instead of a new one
         soap_cog = interaction.client.get_cog("SoapCog")
         archived_channel = (
@@ -438,22 +443,6 @@ class NNIDRequestView(discord.ui.View):
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
-        # check if user has the restricted role (set role in constants.py)
-        restricted_role = discord.utils.get(
-            interaction.guild.roles, id=RESTRICTED_ROLE_ID
-        )
-        if restricted_role in interaction.user.roles:
-            embed = discord.Embed(
-                title="⛔ Restricted from Bluehax Services",
-                description="You are unable to request a new NNID transfer. This restriction may be temporary or permanent, depending on the reason.\n\nYou may still receive help with previously completed NNID transfers in #soap-help.",
-                color=discord.Color.red(),
-            )
-            embed.set_footer(
-                text="If you believe this is a mistake, please contact a Soaper or Staff Member."
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-
         # no existing channel, proceed with the form
         embed = discord.Embed(
             title="🔍 Pre-NNID Transfer Check",
@@ -469,7 +458,6 @@ class NNIDRequestView(discord.ui.View):
 
         view = FilesCheckView()
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
 
 class NNIDRequestCog(commands.Cog):
     def __init__(self, bot: discord.Bot):
@@ -534,7 +522,6 @@ class NNIDRequestCog(commands.Cog):
             await ctx.channel.send(embed=embed, view=view)
         if is_slash:
             await ctx.respond("Posted.", ephemeral=True)
-
 
 def setup(bot):
     return bot.add_cog(NNIDRequestCog(bot))

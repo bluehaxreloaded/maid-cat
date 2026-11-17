@@ -32,6 +32,10 @@ SOAP_TRACKER_ID =  # voice channel that displays SOAP count
 NNID_TRACKER_ID =  # voice channel that displays NNID count
 SOAP_USABLE_IDS = [SOAP_CHANNEL_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID, ] # where soap channel specific commands can be used
 
+# database: the same MariaDB database soap-cat uses (its .env MYSQL_* values). Records users, SOAPs, Soapers,
+# restrictions and channels, and makes temporary restrictions possible. Leave it out to run without a database.
+DATABASE = {"host": "127.0.0.1", "port": 3306, "user": "", "password": "", "database": "bluehax-bots"}
+
 # files
 ESSENTIALS_DIR = "~/essentials" # folder outside the repo where essential.exefs files are stored, must match ESSENTIALS_DIR in soap-cat's .env
 

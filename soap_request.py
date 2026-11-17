@@ -1,10 +1,10 @@
 from pathlib import Path
+import records
 import discord
 from discord.ext import commands, bridge
 from perms import command_with_perms
 from helpee import find_open_channel, restore_helpee_access, REOPENED_TITLE
 from constants import REQUEST_SOAP_CHANNEL_ID, RESTRICTED_ROLE_ID
-
 
 class CFWCheckView(discord.ui.View):
     def __init__(self):
@@ -75,7 +75,6 @@ class CFWCheckView(discord.ui.View):
             view = RegionChangeView(interaction.user)
             await interaction.response.edit_message(embed=embed, view=view)
 
-
 class SOAPConfirmView(discord.ui.View):
     """Confirmation step before creating the SOAP channel."""
 
@@ -144,7 +143,6 @@ class SOAPConfirmView(discord.ui.View):
         await interaction.followup.edit_message(
             interaction.message.id, embed=embed, view=view
         )
-
 
 class RegionChangeView(discord.ui.View):
     def __init__(self, user: discord.Member):
@@ -280,7 +278,6 @@ class RegionChangeView(discord.ui.View):
             interaction.message.id, embed=embed, view=view
         )
 
-
 class SOAPRequestView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -320,6 +317,15 @@ class SOAPRequestView(discord.ui.View):
             await restore_helpee_access(existing_channel, interaction.user)
             return
 
+        # restricted users can't open a channel; Staff are told they tried
+        restriction = await records.restriction_for(interaction.user)
+        if restriction:
+            await interaction.response.send_message(embed=records.restricted_embed("SOAP", restriction), ephemeral=True)
+            await records.log_restricted_attempt(
+                interaction.guild, interaction.user, "SOAP", "Pressed Request SOAP", restriction
+            )
+            return
+
         # a helpee who left and rejoined gets their archived channel back instead of a new one
         soap_cog = interaction.client.get_cog("SoapCog")
         archived_channel = (
@@ -339,22 +345,6 @@ class SOAPRequestView(discord.ui.View):
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
-        # check if user has the restricted role (set role in constants.py)
-        restricted_role = discord.utils.get(
-            interaction.guild.roles, id=RESTRICTED_ROLE_ID
-        )
-        if restricted_role in interaction.user.roles:
-            embed = discord.Embed(
-                title="⛔ Restricted from Bluehax Services",
-                description="You are unable to request a new SOAP transfer. This restriction may be temporary or permanent, depending on the reason.\n\nYou may still receive help with previously completed SOAP transfers in #soap-help.",
-                color=discord.Color.red(),
-            )
-            embed.set_footer(
-                text="If you believe this is a mistake, please contact a Soaper or Staff Member."
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-
         # no existing channel, proceed with the form
         embed = discord.Embed(
             title="🔍 Pre-SOAP Check",
@@ -370,7 +360,6 @@ class SOAPRequestView(discord.ui.View):
 
         view = CFWCheckView()
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
 
 class SOAPRequestCog(commands.Cog):
     def __init__(self, bot: discord.Bot):
@@ -432,7 +421,6 @@ class SOAPRequestCog(commands.Cog):
             await ctx.channel.send(embed=embed, view=view)
         if is_slash:
             await ctx.respond("Posted.", ephemeral=True)
-
 
 def setup(bot):
     return bot.add_cog(SOAPRequestCog(bot))

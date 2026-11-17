@@ -1,4 +1,5 @@
 import discord
+import records
 import asyncio
 from perms import command_with_perms
 from helpee import (
@@ -74,6 +75,12 @@ class NNIDCog(commands.Cog):  # NNID commands
         Helper function to create a NNID channel.
         Returns tuple: (success: bool, channel: discord.TextChannel | None, message: str)
         """
+        # Restricted users can't get a channel, even if they were restricted partway through the request
+        restriction = await records.restriction_for(user)
+        if restriction:
+            how = "Finished the request form" if requester is None or requester.id == user.id else f"Requested by {requester.name}"
+            await records.log_restricted_attempt(guild, user, "NNID", how, restriction, by=requester)
+            return False, None, records.restricted_text("NNID", restriction)
         channel_name = channel_name_for(user, NNID_CHANNEL_SUFFIX)
 
         # Only check channels in the NNID category (exclude archived)
@@ -160,6 +167,14 @@ class NNIDCog(commands.Cog):  # NNID commands
         ctx,
         user: BridgeOption(discord.Member, "User to create an NNID channel for"),
     ):
+        restriction = await records.restriction_for(user)
+        if restriction:
+            await ctx.respond(
+                f"`{user.name}` is restricted from NNID transfers, so a channel can't be opened for them. "
+                "Use `.unrestrict` first if this should go ahead."
+            )
+            await records.log_restricted_attempt(ctx.guild, user, "NNID", "`.creatennid`", restriction, by=ctx.author)
+            return
         channel_name = channel_name_for(user, NNID_CHANNEL_SUFFIX)
         # Only open NNID channels count as existing (archived ones don't)
         channel = find_open_channel(

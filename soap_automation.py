@@ -4,9 +4,10 @@ import io
 import time
 import re
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from discord.ext import commands, tasks
 import constants
+import records
 from perms import _has_role_or_higher, command_with_perms
 from log import log_to_soaper_log
 from constants import (
@@ -248,6 +249,7 @@ async def send_soap_request(channel: discord.TextChannel, soaper: discord.abc.Us
     # The channel ID tells soap-cat which channel this is, so it doesn't have to find it by topic,
     # and the Soaper's ID lets it log who started the SOAP
     await bots_only.send(f"SOAP_REQUEST {member.id} {serial} STORED {channel.id} {soaper.id}")
+    await records.update_channel(channel, soaper_id=soaper.id, serial=serial)
     add_case_note(channel, "SOAP approved and sent to soap-cat")
     return None
 
@@ -372,8 +374,10 @@ def soap_queue_embed(
     serial: str | None,
     notes: list[str],
     signed: bool | None = None,
+    history: dict | None = None,
 ) -> discord.Embed:
-    """The soap-queue request for a helpee who finished steps 1 and 2."""
+    """The soap-queue request for a helpee who finished steps 1 and 2.
+    history is records.helpee_history, shown when the database is set up."""
     info = read_serial(serial) if serial else None
     requested_at = datetime.now(timezone.utc)
     embed = discord.Embed(
@@ -393,6 +397,65 @@ def soap_queue_embed(
     )
     ts = int(requested_at.timestamp())
     embed.add_field(name="Requested", value=f"<t:{ts}:f> (<t:{ts}:R>)", inline=True)
+    warn = False
+
+    def stamp(dt: datetime) -> str:
+        t = int(dt.replace(tzinfo=timezone.utc).timestamp()) if dt.tzinfo is None else int(dt.timestamp())
+        return f"<t:{t}:f> (<t:{t}:R>)"
+
+    created = getattr(member, "created_at", None)
+    if created:
+        new_account = requested_at - created < timedelta(days=7)
+        warn |= new_account
+        embed.add_field(name="Account Created", value=("⚠️ " if new_account else "") + stamp(created), inline=True)
+    joined = getattr(member, "joined_at", None)
+    if joined:
+        embed.add_field(name="Joined Server", value=stamp(joined), inline=True)
+
+    if history is not None:
+        soaps, nnids, last = history["soaps"], history["nnids"], history["last"]
+        if soaps or nnids:
+            lines = [f"**{soaps}** SOAP{'s' if soaps != 1 else ''}, **{nnids}** NNID transfer{'s' if nnids != 1 else ''}"]
+            if last:
+                recent = requested_at - last["completed_at"].replace(tzinfo=timezone.utc) < timedelta(days=7)
+                warn |= recent
+                how = "lottery" if last["outcome"] == "lottery" else last["method"]
+                by = f" by <@{last['soaper_id']}>" if last["soaper_id"] else ""
+                lines.append(
+                    ("⚠️ " if recent else "")
+                    + f"Last SOAP {stamp(last['completed_at'])}"
+                    + (f" with `{last['serial']}`" if last["serial"] else "")
+                    + f", {how}{by}"
+                )
+        else:
+            lines = ["None, this is their first"]
+        embed.add_field(name="Previous Transfers", value="\n".join(lines)[:1024], inline=False)
+
+        serial_lines = []
+        if history["serial_mine"]:
+            n = len(history["serial_mine"])
+            serial_lines.append(
+                f"SOAPed for them {n} time{'s' if n != 1 else ''} before, last {stamp(history['serial_mine'][0]['completed_at'])}"
+            )
+        others = {}
+        for r in history["serial_others"]:
+            others.setdefault(r["user_id"], r["completed_at"])
+        if others:
+            warn = True
+            serial_lines += [f"⚠️ Also SOAPed for <@{uid}> {stamp(at)}" for uid, at in list(others.items())[:5]]
+        if serial_lines:
+            embed.add_field(name="Serial History", value="\n".join(serial_lines)[:1024], inline=False)
+
+        if history["restrictions"]:
+            warn = True
+            n = history["restrictions"]
+            text = f"Restricted {n} time{'s' if n != 1 else ''} in total, last {stamp(history['last_restricted'])}"
+            if history["restricted_now"]:
+                text = "⛔ Restricted right now\n" + text
+            embed.add_field(name="Restrictions", value=text, inline=False)
+
+    if warn:
+        embed.color = discord.Color.orange()
     notes_text = "\n".join(f"- {n}" for n in notes) or "None"
     if len(notes_text) > 1024:
         notes_text = notes_text[:1021] + "..."
@@ -408,12 +471,14 @@ async def post_to_soap_queue(
     queue = channel.guild.get_channel(queue_id) if queue_id else None
     if queue is None:
         return None
+    serial = await entered_serial(channel)
     embed = soap_queue_embed(
         member,
         channel,
-        await entered_serial(channel),
+        serial,
         case_notes(channel),
         essential_signed(channel.id, member.id),
+        await records.helpee_history(member.id, serial),
     )
     try:
         return await queue.send(embed=embed, view=SoapQueueView())
@@ -717,6 +782,7 @@ class SerialNumberModal(discord.ui.Modal):
         if label:
             serial_embed.set_footer(text=label)
         await interaction.followup.send(embed=serial_embed)
+        await records.update_channel(interaction.channel, serial=serial)
 
         # Disable buttons on the serial prompt message
         if self.prompt_message_id and interaction.channel:
@@ -962,6 +1028,12 @@ class EssentialUploadModal(discord.ui.DesignerModal):
 
         # Only the known files are kept, so nothing else that was in the upload gets stored
         clean = rebuild_essential(essential)
+        await records.update_channel(
+            interaction.channel,
+            essential_filename=attachment.filename[:255],
+            essential_uploaded_at=records.now(),
+            exefs_serial=serial_from_secinfo(essential["secinfo"]),
+        )
         entered = await entered_serial(interaction.channel) if interaction.channel else None
         if entered and not serials_match(entered, serial_from_secinfo(essential["secinfo"])):
             add_case_note(
@@ -1379,12 +1451,14 @@ class SOAPAutomationCog(commands.Cog):
         """Post the soap-queue embed here, using this channel's data if it's a helpee channel."""
         member = await member_from_topic(ctx.channel) if getattr(ctx.channel, "topic", None) else None
         if member is not None:
+            serial = await entered_serial(ctx.channel)
             embed = soap_queue_embed(
                 member,
                 ctx.channel,
-                await entered_serial(ctx.channel),
+                serial,
                 case_notes(ctx.channel),
                 essential_signed(ctx.channel.id, member.id),
+                await records.helpee_history(member.id, serial),
             )
         else:
             # Not a helpee channel, so show sample data
@@ -1395,6 +1469,22 @@ class SOAPAutomationCog(commands.Cog):
                 "YJM123456784",
                 ["Entered a serial number in the wrong format: `YJM1234`", "Uploaded a file that isn't an .exefs: `photo.jpg`"],
                 True,
+                {  # sample history so every field shows
+                    "soaps": 2,
+                    "nnids": 1,
+                    "last": {
+                        "completed_at": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=3),
+                        "serial": "YJM12345678",
+                        "outcome": "transfer",
+                        "method": "automatic",
+                        "soaper_id": author.id,
+                    },
+                    "serial_mine": [{"user_id": author.id, "completed_at": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=3)}],
+                    "serial_others": [{"user_id": ctx.bot.user.id, "completed_at": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=40)}],
+                    "restrictions": 1,
+                    "restricted_now": False,
+                    "last_restricted": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=90),
+                },
             )
         await ctx.respond(embed=embed, view=SoapQueueView())
 
@@ -1617,12 +1707,30 @@ class SOAPAutomationCog(commands.Cog):
                     target_channel, progress_percentages[status_detail], footer
                 )
 
-        if status_text == "SUCCESS" and target_channel:
-            # Increment SOAP count when SUCCESS is received
-            tracker_cog = self.bot.get_cog("TrackerCog")
-            if tracker_cog:
-                tracker_cog.increment_soap_count()
+        if status_text in ("SUCCESS", "LOTTERY") and target_channel:
+            helpee = helpee_id(target_channel)
+            added = None
+            if helpee:
+                added = await records.record_transfer(
+                    message.guild,
+                    user_id=helpee,
+                    kind="SOAP",
+                    method="automatic",
+                    outcome="lottery" if status_text == "LOTTERY" else "transfer",
+                    serial=serial_number,
+                    channel_id=target_channel.id,
+                    completed_at=message.created_at,
+                    message_id=message.id,  # the SOAP_STATUS message, the same one .importhistory reads
+                    bot=self.bot,
+                )
+            # The voice channel counter goes up with every SOAP the database records (lotteries too), so the two
+            # stay in step. False means it was already recorded; None means no database, so count it anyway.
+            if added is not False:
+                tracker_cog = self.bot.get_cog("TrackerCog")
+                if tracker_cog:
+                    tracker_cog.increment_soap_count()
 
+        if status_text == "SUCCESS" and target_channel:
             # Send SUCCESS message immediately
             # Try to recover the user ID from the channel topic so we can mention them.
             user_id = None

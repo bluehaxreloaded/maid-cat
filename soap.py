@@ -1,4 +1,5 @@
 import discord
+import records
 import asyncio
 import re
 from datetime import datetime, timezone, timedelta
@@ -658,6 +659,12 @@ class SoapCog(commands.Cog):  # SOAP commands
         Helper function to create a manual SOAP channel.
         Returns tuple: (success: bool, channel: discord.TextChannel | None, message: str)
         """
+        # Restricted users can't get a channel, even if they were restricted partway through the request
+        restriction = await records.restriction_for(user)
+        if restriction:
+            how = "Finished the request form" if requester is None or requester.id == user.id else f"Requested by {requester.name}"
+            await records.log_restricted_attempt(guild, user, "SOAP", how, restriction, by=requester)
+            return False, None, records.restricted_text("SOAP", restriction)
         channel_name = channel_name_for(user, SOAP_CHANNEL_SUFFIX)
 
         # Only check channels in the SOAP categories (exclude archived)
@@ -1032,6 +1039,14 @@ class SoapCog(commands.Cog):  # SOAP commands
         ctx,
         user: BridgeOption(discord.Member, "User to create a SOAP channel for"),
     ):  # Creates soup channel
+        restriction = await records.restriction_for(user)
+        if restriction:
+            await ctx.respond(
+                f"`{user.name}` is restricted from SOAP transfers, so a channel can't be opened for them. "
+                "Use `.unrestrict` first if this should go ahead."
+            )
+            await records.log_restricted_attempt(ctx.guild, user, "SOAP", "`.createsoap`", restriction, by=ctx.author)
+            return
 
         channel_name = channel_name_for(user, SOAP_CHANNEL_SUFFIX)
         # Only open SOAP channels count as existing (archived ones don't)

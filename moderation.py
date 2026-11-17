@@ -2,7 +2,11 @@ import discord
 import asyncio
 from datetime import datetime, timezone, timedelta
 from discord.ext import commands
+import re
+from discord.ext.bridge import BridgeOption
 from perms import command_with_perms
+import db
+import records
 from constants import (
     JOIN_LEAVE_LOG_ID,
     SPAM_BOT_CHANNEL_ID,
@@ -78,6 +82,43 @@ def _format_timeout_duration(until: datetime) -> str:
         parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
 
     return ", ".join(parts)
+
+
+DURATION_UNITS = {
+    "m": 60, "min": 60, "mins": 60, "minute": 60, "minutes": 60,
+    "h": 3600, "hr": 3600, "hrs": 3600, "hour": 3600, "hours": 3600,
+    "d": 86400, "day": 86400, "days": 86400,
+    "w": 604800, "wk": 604800, "wks": 604800, "week": 604800, "weeks": 604800,
+    "mo": 2592000, "month": 2592000, "months": 2592000,
+    "y": 31536000, "yr": 31536000, "year": 31536000, "years": 31536000,
+}
+DURATION_PART_RE = re.compile(r"(\d+)\s*([a-z]+)")
+PERMANENT_WORDS = {"perm", "permanent", "permanently", "forever", "indefinite"}
+
+
+def parse_duration(text: str | None):
+    """A restriction length like 30m, 12h, 7d, 2w, 1mo or 1d12h.
+    Returns a timedelta, None for permanent (nothing given, or "perm"), or False if it isn't a length."""
+    if not text:
+        return None
+    text = text.strip().lower()
+    if text in PERMANENT_WORDS:
+        return None
+    pos, seconds = 0, 0
+    for match in DURATION_PART_RE.finditer(text):
+        if text[pos:match.start()].strip() or match.group(2) not in DURATION_UNITS:
+            return False
+        seconds += int(match.group(1)) * DURATION_UNITS[match.group(2)]
+        pos = match.end()
+    if pos == 0 or text[pos:].strip() or seconds <= 0:
+        return False
+    return timedelta(seconds=min(seconds, 10 * 31536000))
+
+
+def _restriction_length(expires_at: datetime | None) -> str:
+    if expires_at is None:
+        return "Permanent"
+    return f"{_format_timeout_duration(expires_at)}, ends <t:{int(expires_at.timestamp())}:f> (<t:{int(expires_at.timestamp())}:R>)"
 
 
 class HelpeeLeftView(discord.ui.View):
@@ -175,6 +216,8 @@ class ModerationCog(commands.Cog):
         reason: str | None = None,
         source: str | None = None,
         timeout_until: datetime | None = None,
+        restrict_until: datetime | None = None,
+        restrict_permanent: bool = False,
     ):
         """Log moderation actions (ban, kick, timeout, restrict, etc.) to the ban log channel."""
         if not BAN_LOG_ID:
@@ -238,6 +281,13 @@ class ModerationCog(commands.Cog):
             embed.add_field(
                 name="Timeout Length",
                 value=length_str,
+                inline=False,
+            )
+
+        if action.lower() == "restrict" and (restrict_until is not None or restrict_permanent):
+            embed.add_field(
+                name="Restriction Length",
+                value=_restriction_length(restrict_until),
                 inline=False,
             )
 
@@ -614,25 +664,16 @@ class ModerationCog(commands.Cog):
                 return None
         return member
 
-    @command_with_perms(
-        min_role="Staff",
-        name="restrict",
-        aliases=["blacklist"],
-        help="Restrict a user from requesting SOAP/NNID transfers by giving them the restricted role.",
-    )
-    async def restrict_user(self, ctx, user: discord.User, *, reason: str = None):
-        """
-        Restrict a user from requesting SOAP/NNID transfers.
-        Requires Staff role or higher.
-        """
+    async def _restriction_setup(self, ctx):
+        """The restricted role, or None after telling the moderator what's wrong."""
         if not RESTRICTED_ROLE_ID:
             embed = discord.Embed(
                 title="❌ Configuration Error",
                 description="RESTRICTED_ROLE_ID is not configured in constants.py.",
                 color=discord.Color.red(),
             )
-            return await ctx.respond(embed=embed, ephemeral=True)
-
+            await ctx.respond(embed=embed, ephemeral=True)
+            return None
         restricted_role = ctx.guild.get_role(RESTRICTED_ROLE_ID)
         if restricted_role is None:
             embed = discord.Embed(
@@ -640,16 +681,88 @@ class ModerationCog(commands.Cog):
                 description="Restricted role not found. Check RESTRICTED_ROLE_ID in constants.py.",
                 color=discord.Color.red(),
             )
-            return await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.respond(embed=embed, ephemeral=True)
+            return None
+        return restricted_role
 
-        # Roles can only be given to or taken from someone who is in the server
-        member = await self._guild_member(ctx.guild, user)
-        if member is None:
+    def _mark_own_role_change(self, user_id: int):
+        """Tell the tracking cog this role change is the bot's own, so it isn't recorded twice."""
+        tracking = self.bot.get_cog("TrackingCog")
+        if tracking:
+            tracking.own_role_changes.add(user_id)
+
+    @command_with_perms(
+        min_role="Staff",
+        name="restrict",
+        aliases=["blacklist"],
+        help="Stop a user requesting SOAP/NNID transfers, permanently or for a time (e.g. 7d)",
+    )
+    async def restrict_user(
+        self,
+        ctx,
+        user: BridgeOption(discord.User, "User to restrict"),
+        duration: BridgeOption(str, "How long, e.g. 30m, 12h, 7d, 2w, 1mo. Leave empty for permanent", required=False) = None,
+        *,
+        reason: BridgeOption(str, "Why they're being restricted", required=False) = None,
+    ):
+        """
+        Restrict a user from requesting SOAP/NNID transfers.
+        Requires Staff role or higher.
+        """
+        length = parse_duration(duration)
+        if length is False and duration and duration[0].isdigit() and reason:
+            # .restrict @user 2 weeks reason: the unit is the next word
+            unit, _, rest = reason.partition(" ")
+            combined = parse_duration(f"{duration} {unit}")
+            if combined is not False:
+                length, reason = combined, rest.strip() or None
+        if length is False:
+            # Anything starting with a number was meant as a length, so a typo there shouldn't become permanent
+            if getattr(ctx, "is_app", False) or (duration and duration[0].isdigit()):
+                embed = discord.Embed(
+                    title="❌ Invalid Length",
+                    description=f"`{duration}` isn't a length. Use something like `30m`, `12h`, `7d`, `2w` or `1mo`, or leave it empty for permanent.",
+                    color=discord.Color.red(),
+                )
+                return await ctx.respond(embed=embed, ephemeral=True)
+            # .restrict @user some reason: the first word was part of the reason, not a length
+            reason = f"{duration} {reason}" if reason else duration
+            length = None
+        expires_at = datetime.now(timezone.utc) + length if length else None
+        if expires_at and not db.enabled():
             embed = discord.Embed(
-                title="❌ Not in Server",
-                description=f"{user.mention} isn't in the server, so they can't be given the restricted role.",
+                title="❌ Database Not Set Up",
+                description="Temporary restrictions need the database. Leave out the length to restrict permanently.",
                 color=discord.Color.red(),
             )
+            return await ctx.respond(embed=embed, ephemeral=True)
+
+        restricted_role = await self._restriction_setup(ctx)
+        if restricted_role is None:
+            return
+
+        member = await self._guild_member(ctx.guild, user)
+        if member is None:
+            # Roles can only be given to members, but with the database it's applied if they rejoin
+            if not db.enabled():
+                embed = discord.Embed(
+                    title="❌ Not in Server",
+                    description=f"{user.mention} isn't in the server, so they can't be given the restricted role.",
+                    color=discord.Color.red(),
+                )
+                return await ctx.respond(embed=embed, ephemeral=True)
+            await records.add_restriction(user, moderator_id=ctx.author.id, reason=reason, expires_at=expires_at)
+            await self._log_mod_action(
+                guild=ctx.guild, user=user, action="restrict", moderator=ctx.author, reason=reason,
+                source=None, restrict_until=expires_at, restrict_permanent=expires_at is None,
+            )
+            embed = discord.Embed(
+                title="✅ User Restricted",
+                description=f"{user.mention} isn't in the server. They'll get the restricted role if they rejoin.",
+                color=discord.Color.red(),
+            )
+            embed.add_field(name="Length", value=_restriction_length(expires_at), inline=True)
+            embed.set_footer(text=f"User ID: {user.id}")
             return await ctx.respond(embed=embed, ephemeral=True)
         user = member
 
@@ -665,8 +778,8 @@ class ModerationCog(commands.Cog):
             )
             return await ctx.respond(embed=embed, ephemeral=True)
 
-        # Check if user already has the role
-        if restricted_role in user.roles:
+        already = restricted_role in user.roles
+        if already and not db.enabled():
             embed = discord.Embed(
                 title="⚠️ Already Restricted",
                 description=f"{user.mention} is already restricted from requesting SOAP/NNID transfers.",
@@ -674,25 +787,31 @@ class ModerationCog(commands.Cog):
             )
             return await ctx.respond(embed=embed, ephemeral=True)
 
-        # Add the role
-        try:
-            await user.add_roles(
-                restricted_role, reason=reason or f"Restricted by {ctx.author}"
-            )
-        except discord.Forbidden:
-            embed = discord.Embed(
-                title="❌ Permission Error",
-                description="I don't have permission to add roles. Check my permissions.",
-                color=discord.Color.red(),
-            )
-            return await ctx.respond(embed=embed, ephemeral=True)
-        except discord.HTTPException as e:
-            embed = discord.Embed(
-                title="❌ Error",
-                description=f"Failed to restrict user: {e}",
-                color=discord.Color.red(),
-            )
-            return await ctx.respond(embed=embed, ephemeral=True)
+        # Record it first, so the role change below is already known when Discord reports it
+        await records.add_restriction(user, moderator_id=ctx.author.id, reason=reason, expires_at=expires_at)
+
+        if not already:
+            self._mark_own_role_change(user.id)
+            try:
+                await user.add_roles(
+                    restricted_role, reason=reason or f"Restricted by {ctx.author}"
+                )
+            except discord.Forbidden:
+                await records.end_restriction(user.id, ended_by=None, end_reason="role could not be added")
+                embed = discord.Embed(
+                    title="❌ Permission Error",
+                    description="I don't have permission to add roles. Check my permissions.",
+                    color=discord.Color.red(),
+                )
+                return await ctx.respond(embed=embed, ephemeral=True)
+            except discord.HTTPException as e:
+                await records.end_restriction(user.id, ended_by=None, end_reason="role could not be added")
+                embed = discord.Embed(
+                    title="❌ Error",
+                    description=f"Failed to restrict user: {e}",
+                    color=discord.Color.red(),
+                )
+                return await ctx.respond(embed=embed, ephemeral=True)
 
         # Log the action
         await self._log_mod_action(
@@ -702,11 +821,17 @@ class ModerationCog(commands.Cog):
             moderator=ctx.author,
             reason=reason,
             source=None,
+            restrict_until=expires_at,
+            restrict_permanent=expires_at is None,
         )
 
         embed = discord.Embed(
-            title="✅ User Restricted",
-            description=f"{user.mention} has been restricted from requesting SOAP/NNID transfers.",
+            title="✅ Restriction Updated" if already else "✅ User Restricted",
+            description=(
+                f"{user.mention}'s restriction has been changed."
+                if already
+                else f"{user.mention} has been restricted from requesting SOAP/NNID transfers."
+            ),
             color=discord.Color.red(),
         )
         embed.set_thumbnail(url=user.display_avatar.url)
@@ -715,10 +840,26 @@ class ModerationCog(commands.Cog):
             value=ctx.author.mention,
             inline=True,
         )
+        embed.add_field(name="Length", value=_restriction_length(expires_at), inline=True)
         if reason:
             embed.add_field(
                 name="Reason",
                 value=reason,
+                inline=False,
+            )
+        # Restricting leaves a channel they already have open (on purpose), so just mention it
+        from helpee import find_open_channel
+
+        open_channels = [
+            c for c in (
+                find_open_channel(ctx.guild, user, [SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID], SOAP_CHANNEL_SUFFIX),
+                find_open_channel(ctx.guild, user, [NNID_CHANNEL_CATEGORY_ID], NNID_CHANNEL_SUFFIX),
+            ) if c
+        ]
+        if open_channels:
+            embed.add_field(
+                name="Still Open",
+                value=" ".join(c.mention for c in open_channels),
                 inline=False,
             )
         embed.set_footer(text=f"User ID: {user.id}")
@@ -736,26 +877,23 @@ class ModerationCog(commands.Cog):
         Remove restriction from a user.
         Requires Staff role or higher.
         """
-        if not RESTRICTED_ROLE_ID:
-            embed = discord.Embed(
-                title="❌ Configuration Error",
-                description="RESTRICTED_ROLE_ID is not configured in constants.py.",
-                color=discord.Color.red(),
-            )
-            return await ctx.respond(embed=embed, ephemeral=True)
-
-        restricted_role = ctx.guild.get_role(RESTRICTED_ROLE_ID)
+        restricted_role = await self._restriction_setup(ctx)
         if restricted_role is None:
-            embed = discord.Embed(
-                title="❌ Configuration Error",
-                description="Restricted role not found. Check RESTRICTED_ROLE_ID in constants.py.",
-                color=discord.Color.red(),
-            )
-            return await ctx.respond(embed=embed, ephemeral=True)
+            return
 
-        # Roles can only be given to or taken from someone who is in the server
         member = await self._guild_member(ctx.guild, user)
         if member is None:
+            # Not in the server, but their restriction can still be ended so it isn't applied if they rejoin
+            if await records.end_restriction(user.id, ended_by=ctx.author.id, end_reason="unrestricted"):
+                await self._log_mod_action(
+                    guild=ctx.guild, user=user, action="unrestrict", moderator=ctx.author, reason=reason, source=None
+                )
+                embed = discord.Embed(
+                    title="✅ Restriction Removed",
+                    description=f"{user.mention} isn't in the server, but their restriction has been removed.",
+                    color=discord.Color.green(),
+                )
+                return await ctx.respond(embed=embed, ephemeral=True)
             embed = discord.Embed(
                 title="❌ Not in Server",
                 description=f"{user.mention} isn't in the server, so they don't have the restricted role.",
@@ -779,6 +917,7 @@ class ModerationCog(commands.Cog):
 
         # Check if user has the role
         if restricted_role not in user.roles:
+            await records.end_restriction(user.id, ended_by=ctx.author.id, end_reason="unrestricted")
             embed = discord.Embed(
                 title="⚠️ Not Restricted",
                 description=f"{user.mention} is not currently restricted.",
@@ -787,6 +926,7 @@ class ModerationCog(commands.Cog):
             return await ctx.respond(embed=embed, ephemeral=True)
 
         # Remove the role
+        self._mark_own_role_change(user.id)
         try:
             await user.remove_roles(
                 restricted_role, reason=reason or f"Unrestricted by {ctx.author}"
@@ -805,6 +945,7 @@ class ModerationCog(commands.Cog):
                 color=discord.Color.red(),
             )
             return await ctx.respond(embed=embed, ephemeral=True)
+        await records.end_restriction(user.id, ended_by=ctx.author.id, end_reason="unrestricted")
 
         # Log the action
         await self._log_mod_action(

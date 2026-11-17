@@ -6,6 +6,7 @@ from discord.ext import commands
 from discord.ext.bridge import BridgeOption
 from functools import wraps
 from random import randint
+import records
 from constants import (
     SOAP_CHANNEL_SUFFIX,
     NNID_CHANNEL_SUFFIX,
@@ -92,6 +93,36 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     def __init__(self, bot: discord.Bot):
         self.bot = bot
 
+    async def _record_manual(self, ctx, kind: str, outcome: str = "transfer"):
+        """Record a transfer a Soaper finished with a completion command, in a helpee's channel, and count it on the
+        voice channel tracker. Nothing is counted for a test channel or a repeat of one already recorded."""
+        channel = ctx.channel
+        match = MENTION_RE.search(getattr(channel, "topic", None) or "")
+        if not match or not records.is_tracked_channel(channel):
+            return  # e.g. used in a test or help channel
+        if await records.recently_recorded(channel.id, kind, minutes=60):
+            return  # soap-cat already reported this one, or the command was run twice
+        ref = getattr(ctx, "message", None) or getattr(ctx, "interaction", None)
+        added = await records.record_transfer(
+            ctx.guild,
+            user_id=int(match.group(1)),
+            kind=kind,
+            method="manual",
+            outcome=outcome,
+            soaper_id=ctx.author.id,
+            channel_id=channel.id,
+            completed_at=records.now(),
+            message_id=ref.id if ref else None,
+            bot=self.bot,
+        )
+        tracker_cog = self.bot.get_cog("TrackerCog")
+        if added is not False and tracker_cog:
+            if kind == "SOAP":
+                tracker_cog.increment_soap_count()
+            else:
+                tracker_cog.increment_nnid_count()
+            await tracker_cog.update_trackers(ctx.guild)
+
     @command_with_perms(
         min_role="Soaper",
         name="soapnormal",
@@ -120,6 +151,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         )
 
         await ctx.respond(embed=embed)
+        await self._record_manual(ctx, "SOAP")
 
     @command_with_perms(
         min_role="Soaper",
@@ -147,6 +179,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         )
 
         await ctx.respond(embed=embed)
+        await self._record_manual(ctx, "SOAP", outcome="lottery")
 
     @command_with_perms(
         min_role="Soaper",
@@ -242,11 +275,8 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         else:
             await ctx.respond(embed=embed)
 
-        # Increment NNID counter
-        tracker_cog = self.bot.get_cog("TrackerCog")
-        if tracker_cog:
-            tracker_cog.increment_nnid_count()
-            await tracker_cog.update_trackers(ctx.guild)
+        # Records it and counts it on the NNID tracker
+        await self._record_manual(ctx, "NNID")
 
     @command_with_perms(
         name="removennid", aliases=["nnidremove"], help="NNID Removal instructions"
@@ -468,6 +498,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     )
     @soap_channels_only()
     async def nocomputer(self, ctx):
+        pair_code = await records.unused_pair_code()
         try:
             path = Path(__file__).parent / "assets" / "transporter-cia.webp"
             file = discord.File(fp=path, filename="transporter-cia.webp")
@@ -479,7 +510,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
                     "**3.** After it is installed, close FBI.\n"
                     "**4.** Select Bluehax Transporter from the HOME Menu.\n"
                     "**5.** Press A and type in the following Pair Code, then press OK.\n"
-                    "- This is your Pair Code: **" + str(randint(0,9999)).rjust(4, "0") + "**\n"
+                    "- This is your Pair Code: **" + pair_code + "**\n"
                     "**6.** Let us know when it has been submitted and you have powered off your console."
                 ),
                 color=discord.Color.blue(),
@@ -489,6 +520,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
                 text="If you have questions or issues, let us know. "
             )
             await ctx.respond(file=file, embed=embed)
+            await records.update_channel(ctx.channel, pair_code=pair_code, pair_code_at=records.now())
         except FileNotFoundError as e:
             print(f"Error: Could not find assets/transporter-cia.webp - {e}")
             await ctx.respond("Could not get Bluehax Transporter QR code.")
