@@ -1,5 +1,5 @@
 """Keeps the database in step with Discord: channels, members, Soapers and restrictions.
-Also has .helpee, .leaderboard, .soaplimit and .importhistory."""
+Also has .helpee, .note, .leaderboard, .soaplimit and .importhistory."""
 
 import asyncio
 from datetime import datetime, timedelta, timezone
@@ -11,11 +11,14 @@ from discord.ext.bridge import BridgeOption
 import db
 import records
 from constants import RESTRICTED_ROLE_ID, BAN_LOG_ID
-from perms import command_with_perms
+from perms import _has_role_or_higher, command_with_perms
 
 EXPIRY_CHECK_SECONDS = 60
 LEADERBOARD_SIZE = 15
 LOOKUP_TRANSFERS = 10
+LOOKUP_NOTES = 3  # newest notes shown on .helpee, .notes shows the rest
+NOTES_PAGE = 25
+NOTE_MAX_LENGTH = 500
 LEADERBOARD_PERIODS = {  # name -> (title, days back, or None for all time)
     "all": ("All Time", None),
     "year": ("Past Year", 365),
@@ -269,6 +272,8 @@ class TrackingCog(commands.Cog):
                 "SELECT * FROM channels WHERE user_id = %s ORDER BY created_at DESC LIMIT 3", (user.id,)
             )
             soaper = await db.fetchone("SELECT * FROM soapers WHERE user_id = %s", (user.id,))
+            notes = await self._notes_for(user.id, LOOKUP_NOTES)
+            note_count = await db.fetchone("SELECT COUNT(*) AS n FROM user_notes WHERE user_id = %s", (user.id,))
             shared = await db.fetchall(
                 """SELECT t2.user_id, MAX(u.username) AS username, MAX(t2.serial) AS serial FROM transfers t1
                    JOIN transfers t2 ON t1.serial_base = t2.serial_base AND t2.user_id <> t1.user_id
@@ -319,6 +324,8 @@ class TrackingCog(commands.Cog):
 
         if not row and not soaper:
             embed.add_field(name="History", value="No SOAP or NNID transfers on record.", inline=False)
+            if notes:
+                self._add_notes_field(embed, notes, note_count["n"] if note_count else len(notes), guild)
             return await self._reply(ctx, embed=embed)
 
         if row:
@@ -335,6 +342,9 @@ class TrackingCog(commands.Cog):
 
         if flags:
             embed.add_field(name="⚠️ Flags", value="\n".join(f"• {f}" for f in flags)[:1024], inline=False)
+
+        if notes:
+            self._add_notes_field(embed, notes, note_count["n"] if note_count else len(notes), guild)
 
         if transfers:
             total = totals["n"] if totals else len(transfers)
@@ -385,6 +395,119 @@ class TrackingCog(commands.Cog):
                 inline=False,
             )
         await self._reply(ctx, embed=embed)
+
+    # ---------- notes ----------
+
+    async def _notes_for(self, user_id: int, limit: int) -> list[dict]:
+        return await db.fetchall(
+            """SELECT n.*, COALESCE(s.username, u.username) AS author_name FROM user_notes n
+               LEFT JOIN soapers s ON s.user_id = n.author_id
+               LEFT JOIN users u ON u.user_id = n.author_id
+               WHERE n.user_id = %s ORDER BY n.created_at DESC, n.id DESC LIMIT %s""",
+            (user_id, limit),
+        )
+
+    @staticmethod
+    def _note_lines(notes: list[dict], guild: discord.Guild | None) -> list[str]:
+        lines = []
+        for n in notes:
+            author = guild.get_member(n["author_id"]) if guild else None
+            author = author.name if author else (n["author_name"] or str(n["author_id"]))
+            lines.append(
+                f"`#{n['id']}` {discord.utils.escape_markdown(n['note'])}\n"
+                f"-# {discord.utils.escape_markdown(author)} · {_ts(n['created_at'], 'd')}"
+            )
+        return lines
+
+    def _add_notes_field(self, embed: discord.Embed, notes: list[dict], total: int, guild):
+        heading = "📝 Notes" + (f" (latest {len(notes)} of {total}, see .notes)" if total > len(notes) else "")
+        value = ""
+        for line in self._note_lines(notes, guild):
+            if len(value) + len(line) + 1 > 1024:
+                break
+            value += ("\n" if value else "") + line
+        embed.add_field(name=heading, value=value or "Too long to show here, see .notes", inline=False)
+
+    @command_with_perms(
+        min_role="Soaper",
+        name="note",
+        aliases=["addnote"],
+        help="Leave a note on a user, shown on .helpee: .note @user text",
+    )
+    async def note(
+        self,
+        ctx,
+        user: BridgeOption(discord.User, "User the note is about"),
+        *,
+        text: BridgeOption(str, "The note", required=False) = None,
+    ):
+        if not db.enabled():
+            return await ctx.respond("The database isn't set up.", ephemeral=True)
+        text = (text or "").strip()
+        if not text:
+            return await self._show_notes(ctx, user)
+        if len(text) > NOTE_MAX_LENGTH:
+            return await ctx.respond(f"Notes can be up to {NOTE_MAX_LENGTH} characters.", ephemeral=True)
+        try:
+            member = ctx.guild.get_member(user.id) if ctx.guild else None
+            await records.save_user(member or user)  # so the note shows on .helpee before any transfer
+            note_id = await db.insert(
+                "INSERT INTO user_notes (user_id, author_id, note, created_at) VALUES (%s, %s, %s, %s)",
+                (user.id, ctx.author.id, text, records.now()),
+            )
+        except Exception as e:
+            return await ctx.respond(f"Could not save the note: {e}", ephemeral=True)
+        name = discord.utils.escape_markdown(user.name)
+        await ctx.respond(f"📝 Saved note `#{note_id}` on **{name}**.", allowed_mentions=discord.AllowedMentions.none())
+
+    @command_with_perms(
+        min_role="Soaper",
+        name="notes",
+        help="Show every note on a user: .notes @user",
+    )
+    async def notes(self, ctx, user: BridgeOption(discord.User, "User to show notes for")):
+        if not db.enabled():
+            return await ctx.respond("The database isn't set up.", ephemeral=True)
+        await self._show_notes(ctx, user)
+
+    async def _show_notes(self, ctx, user):
+        try:
+            notes = await self._notes_for(user.id, NOTES_PAGE)
+        except Exception as e:
+            return await ctx.respond(f"Could not read the database: {e}", ephemeral=True)
+        embed = discord.Embed(title="📝 Notes", description=f"{user.mention} · `{user.id}`", color=discord.Color.blurple())
+        embed.set_author(name=user.name, icon_url=user.display_avatar.url)
+        lines = self._note_lines(notes, getattr(ctx, "guild", None))
+        body = ""
+        for line in lines:
+            if len(body) + len(line) + 2 > 4000:
+                break
+            body += ("\n\n" if body else "") + line
+        embed.description += "\n\n" + (body or "No notes yet. Add one with `.note @user text`.")
+        embed.set_footer(text="Remove a note with .delnote <number>")
+        await self._reply(ctx, embed=embed)
+
+    @command_with_perms(
+        min_role="Soaper",
+        name="delnote",
+        aliases=["deletenote", "removenote", "rmnote"],
+        help="Remove a note by its number: .delnote 12 (your own notes, or any note if you're Staff)",
+    )
+    async def delnote(self, ctx, number: BridgeOption(str, "Note number, shown as #12")):
+        if not db.enabled():
+            return await ctx.respond("The database isn't set up.", ephemeral=True)
+        number = number.strip().lstrip("#")
+        if not number.isdigit():
+            return await ctx.respond("Use the note's number, like `.delnote 12`.", ephemeral=True)
+        row = await db.fetchone("SELECT * FROM user_notes WHERE id = %s", (int(number),))
+        if row is None:
+            return await ctx.respond(f"There's no note `#{number}`.", ephemeral=True)
+        staff = discord.utils.get(ctx.guild.roles, name="Staff") if ctx.guild else None
+        is_staff = staff is not None and isinstance(ctx.author, discord.Member) and _has_role_or_higher(ctx.author, staff)
+        if row["author_id"] != ctx.author.id and not is_staff:
+            return await ctx.respond("You can only remove your own notes.", ephemeral=True)
+        await db.execute("DELETE FROM user_notes WHERE id = %s", (row["id"],))
+        await ctx.respond(f"Removed note `#{row['id']}`.")
 
     @command_with_perms(
         min_role="Soaper",

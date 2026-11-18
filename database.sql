@@ -104,4 +104,14 @@ CREATE TABLE IF NOT EXISTS soap_limits (
     max_soaps INT UNSIGNED NOT NULL,
     set_by BIGINT UNSIGNED NULL,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Notes Soapers and Staff leave on a user with .note, shown on .helpee and never to the helpee
+CREATE TABLE IF NOT EXISTS user_notes (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    author_id BIGINT UNSIGNED NOT NULL,
+    note TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    KEY idx_user (user_id)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
