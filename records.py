@@ -418,24 +418,25 @@ async def sync_channel(channel: discord.TextChannel):
 
         delete_at = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S")
         archived_at = delete_at - timedelta(days=ARCHIVE_DAYS)
+    await channel_state.ensure_loaded()
     user_id = channel_state.helpee_id(channel)
-    try:
-        from helpee import case_notes
+    from helpee import case_notes
 
-        notes = "\n".join(case_notes(channel)) or None
-    except Exception:
-        notes = None
+    notes = case_notes(channel)
+    channel_state.adopt_case_notes(channel.id, notes)  # notes only in the topic, from before the database had them
     await db.execute(
-        """INSERT INTO channels (channel_id, user_id, kind, name, status, case_notes, created_at, archived_at, delete_at)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """INSERT INTO channels (channel_id, user_id, kind, name, status, case_notes, case_setup_complete,
+               created_at, archived_at, delete_at)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
            ON DUPLICATE KEY UPDATE user_id = COALESCE(user_id, VALUES(user_id)), kind = VALUES(kind), name = VALUES(name),
                status = VALUES(status), case_notes = COALESCE(VALUES(case_notes), case_notes),
+               case_setup_complete = VALUES(case_setup_complete),
                archived_at = CASE WHEN VALUES(status) = 'archived'
                    THEN COALESCE(VALUES(archived_at), archived_at, UTC_TIMESTAMP()) ELSE NULL END,
                delete_at = CASE WHEN VALUES(status) = 'archived' THEN COALESCE(VALUES(delete_at), delete_at) ELSE NULL END,
                deleted_at = NULL""",
-        (channel.id, user_id, channel_kind(channel), channel.name[:100], status, notes,
-         utc(channel.created_at), archived_at, delete_at),
+        (channel.id, user_id, channel_kind(channel), channel.name[:100], status, "\n".join(notes) or None,
+         channel_state.setup_complete(channel.id), utc(channel.created_at), archived_at, delete_at),
     )
     if not channel_state.known(channel.id):
         channel_state.remember(channel.id, user_id)  # a channel from before the database knew it
@@ -468,6 +469,9 @@ async def sync_all_channels(guilds: list[discord.Guild]):
     """Bring the channels table in line with Discord: save every SOAP/NNID channel and mark missing ones deleted.
     Takes every server the bot is in, so one server's channels aren't marked deleted while syncing another."""
     await channel_state.load()
+    from helpee import import_old_notes_file
+
+    import_old_notes_file()
     existing = set()
     for guild in guilds:
         for channel in guild.text_channels:

@@ -25,8 +25,7 @@ from constants import (
 from perms import _has_role_or_higher
 from helpee import (
     append_case_notes,
-    clear_case_notes,
-    pending_case_notes,
+    case_notes,
     channel_name_for,
     find_open_channel,
     restore_helpee_access,
@@ -501,9 +500,8 @@ class SoapCog(commands.Cog):  # SOAP commands
         Returns the deletion time, or None if Discord's rate limit blocked it (the archive checker retries)."""
         deletion_time = datetime.now(timezone.utc) + timedelta(days=ARCHIVE_DAYS)
         deletion_str = deletion_time.strftime("%Y-%m-%d %H:%M:%S")
-        # Case notes still waiting to be written go into this same edit
-        notes = pending_case_notes(channel.id)
-        new_topic = f"{ARCHIVE_PREFIX}{deletion_str} UTC. {append_case_notes(topic, notes)}"
+        # Case notes not in the topic yet go into this same edit
+        new_topic = f"{ARCHIVE_PREFIX}{deletion_str} UTC. {append_case_notes(topic, case_notes(channel))}"
         if len(new_topic) > 1024:
             new_topic = new_topic[:1021] + "..."
         suffix = ARCHIVE_CHANNEL_SUFFIX if ARCHIVE_CHANNEL_SUFFIX.startswith("-") else "-" + ARCHIVE_CHANNEL_SUFFIX
@@ -513,7 +511,6 @@ class SoapCog(commands.Cog):  # SOAP commands
             await asyncio.wait_for(channel.edit(name=name, topic=new_topic), timeout=10)
         except (asyncio.TimeoutError, discord.HTTPException):
             return None
-        clear_case_notes(channel.id)
         return deletion_time
 
     async def _send_archive_message(self, channel: discord.TextChannel, deletion_time: datetime):

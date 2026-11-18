@@ -39,6 +39,10 @@ MIGRATIONS: list[str] = [
        ADD COLUMN eshop_works TINYINT(1) NULL COMMENT '1 yes, 0 no, NULL not answered' AFTER message_id,
        ADD COLUMN eshop_answered_by BIGINT UNSIGNED NULL AFTER eshop_works,
        ADD COLUMN eshop_answered_at DATETIME NULL AFTER eshop_answered_by""",
+    # 3: case notes are kept here instead of case_notes.json, and this says when they go in the topic
+    """ALTER TABLE channels
+       ADD COLUMN case_setup_complete TINYINT(1) NOT NULL DEFAULT 0
+           COMMENT 'step 1 and step 2 are done, so case notes are shown in the topic' AFTER case_notes""",
 ]
 
 

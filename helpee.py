@@ -105,16 +105,15 @@ async def sync_helpee_role(member: discord.Member, moved: dict[int, int] | None 
         pass
 
 
-# Case notes: user-caused errors recorded in the channel topic for Soapers.
-# Notes are saved to case_notes.json and only written once step 1 and step 2 are done, so the topic is
-# edited once instead of on every mistake. Discord allows about 2 topic/name edits per 10 minutes per
-# channel, so later notes are written at most once per 10 minutes, keeping one edit free for .boom.
-# Notes still pending when a channel is archived go into the archive's own topic edit.
+# Case notes: user-caused errors, saved in the database and shown in the channel topic for Soapers.
+# They only go in the topic once step 1 and step 2 are done, so the topic is edited once instead of on every
+# mistake. Discord allows about 2 topic/name edits per 10 minutes per channel, so later notes are written at
+# most once per 10 minutes, keeping one edit free for .boom. Notes not in the topic yet when a channel is
+# archived go into the archive's own topic edit.
 CASE_NOTES_HEADER = "Case Notes:"
 TOPIC_LIMIT = 1024
-NOTES_FILE = Path(__file__).parent / "case_notes.json"
+OLD_NOTES_FILE = Path(__file__).parent / "case_notes.json"  # where notes were kept before the database
 NOTE_EDIT_SPACING = 600  # seconds between case note edits in one channel
-_notes_data: dict[str, dict] | None = None  # {channel_id: {"notes": [...], "complete": bool}}
 _note_locks: dict[int, asyncio.Lock] = {}
 _last_note_edit: dict[int, float] = {}
 _note_tasks: set[asyncio.Task] = set()  # keeps background writes alive until they finish
@@ -124,27 +123,6 @@ def _is_helpee_channel(channel) -> bool:
     return helpee_id(channel) is not None
 
 
-def _notes() -> dict[str, dict]:
-    global _notes_data
-    if _notes_data is None:
-        try:
-            with open(NOTES_FILE, "r", encoding="utf-8") as f:
-                _notes_data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            _notes_data = {}
-    return _notes_data
-
-
-def _save_notes():
-    try:
-        tmp = NOTES_FILE.with_suffix(".tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(_notes(), f)
-        tmp.replace(NOTES_FILE)
-    except OSError as e:
-        print(f"Could not save case notes: {e}")
-
-
 def _schedule_write(channel: discord.TextChannel):
     task = asyncio.create_task(_write_case_notes(channel))
     _note_tasks.add(task)
@@ -152,59 +130,58 @@ def _schedule_write(channel: discord.TextChannel):
 
 
 def add_case_note(channel: discord.TextChannel | None, note: str):
-    """Record a user-caused error under Case Notes in a SOAP/NNID channel topic."""
+    """Record a user-caused error in a SOAP/NNID channel's case notes."""
     if not _is_helpee_channel(channel):
         return  # only helpee channels have case notes
-    entry = _notes().setdefault(str(channel.id), {"notes": [], "complete": False})
     note = " ".join(note.split())  # one line per note
-    if note not in entry["notes"]:
-        entry["notes"].append(note)
-        _save_notes()
-    if entry["complete"]:
+    if channel_state.add_case_note(channel.id, note) and channel_state.setup_complete(channel.id):
         _schedule_write(channel)
 
 
 def complete_case_setup(channel: discord.TextChannel | None):
-    """Step 1 and step 2 are done, so write any case notes saved so far."""
+    """Step 1 and step 2 are done, so show the case notes saved so far in the topic."""
     if not _is_helpee_channel(channel):
         return
-    entry = _notes().setdefault(str(channel.id), {"notes": [], "complete": False})
-    if not entry["complete"]:
-        entry["complete"] = True
-        _save_notes()
-    if entry["notes"]:
+    channel_state.set_setup_complete(channel.id, True)
+    if channel_state.case_notes(channel.id):
         _schedule_write(channel)
 
 
 def reset_case_setup(channel: discord.TextChannel | None):
-    """The channel setup is starting over (.reset), so collect notes again until step 2 is done."""
-    entry = _notes().get(str(channel.id)) if channel is not None else None
-    if entry and entry["complete"]:
-        entry["complete"] = False
-        _save_notes()
+    """The channel setup is starting over (.reset), so hold new notes until step 2 is done again."""
+    if channel is not None:
+        channel_state.set_setup_complete(channel.id, False)
 
 
-def pending_case_notes(channel_id: int) -> list[str]:
-    """Case notes saved for a channel but not written to its topic yet."""
-    return list(_notes().get(str(channel_id), {}).get("notes", []))
+def topic_case_notes(topic: str | None) -> list[str]:
+    """Case notes shown in a topic."""
+    topic = topic or ""
+    if CASE_NOTES_HEADER not in topic:
+        return []
+    return [line[2:] for line in topic.split(CASE_NOTES_HEADER, 1)[1].split("\n") if line.startswith("- ")]
 
 
 def case_notes(channel: discord.TextChannel) -> list[str]:
-    """All case notes for a channel: the ones already in its topic, then any not written yet."""
-    notes = []
-    topic = channel.topic or ""
-    if CASE_NOTES_HEADER in topic:
-        for line in topic.split(CASE_NOTES_HEADER, 1)[1].split("\n"):
-            if line.startswith("- "):
-                notes.append(line[2:])
-    notes += [n for n in pending_case_notes(channel.id) if n not in notes]
-    return notes
+    """All case notes for a channel, from the database (the topic only if it has none saved)."""
+    return channel_state.case_notes(channel.id) or topic_case_notes(channel.topic)
 
 
-def clear_case_notes(channel_id: int):
-    """Forget a channel's case notes, e.g. once they're written into its archive topic."""
-    if _notes().pop(str(channel_id), None) is not None:
-        _save_notes()
+def import_old_notes_file():
+    """Move notes from case_notes.json, where they were kept before the database, then rename the file."""
+    if not OLD_NOTES_FILE.exists():
+        return
+    try:
+        with open(OLD_NOTES_FILE, "r", encoding="utf-8") as f:
+            old = json.load(f)
+        for channel_id, entry in old.items():
+            for note in entry.get("notes", []):
+                channel_state.add_case_note(int(channel_id), note)
+            if entry.get("complete"):
+                channel_state.set_setup_complete(int(channel_id), True)
+        OLD_NOTES_FILE.replace(OLD_NOTES_FILE.with_suffix(".json.imported"))
+        print(f"Moved case notes for {len(old)} channels from {OLD_NOTES_FILE.name} to the database")
+    except (OSError, ValueError, AttributeError) as e:
+        print(f"Could not move case notes from {OLD_NOTES_FILE.name}: {e}")
 
 
 def append_case_notes(topic: str | None, notes: list[str]) -> str:
@@ -222,6 +199,10 @@ def append_case_notes(topic: str | None, notes: list[str]) -> str:
     return topic
 
 
+def _topic_has_notes(topic: str | None, notes: list[str]) -> bool:
+    return append_case_notes(topic, notes) == (topic or "").rstrip()
+
+
 async def _write_case_notes(channel: discord.TextChannel):
     lock = _note_locks.setdefault(channel.id, asyncio.Lock())
     async with lock:
@@ -230,21 +211,16 @@ async def _write_case_notes(channel: discord.TextChannel):
             wait = last + NOTE_EDIT_SPACING - time.monotonic()
             if wait > 0:
                 await asyncio.sleep(wait)
-        notes = pending_case_notes(channel.id)
-        if not notes:
+        notes = channel_state.case_notes(channel.id)
+        if not notes or _topic_has_notes(channel.topic, notes):
             return  # an earlier write already included them
         try:
             fresh = await channel.guild.fetch_channel(channel.id)
             if fresh.category and fresh.category.id == TEMP_ARCHIVE_CATEGORY_ID:
                 return  # archiving writes them into its own topic edit
-            new_topic = append_case_notes(fresh.topic, notes)
-            if new_topic != (fresh.topic or "").rstrip():
-                await fresh.edit(topic=new_topic)
+            if not _topic_has_notes(fresh.topic, notes):
+                await fresh.edit(topic=append_case_notes(fresh.topic, notes))
                 _last_note_edit[channel.id] = time.monotonic()
-            entry = _notes().get(str(channel.id))
-            if entry:
-                entry["notes"] = [n for n in entry["notes"] if n not in notes]  # keep ones added meanwhile
-                _save_notes()
         except discord.HTTPException as e:
             print(f"Could not add case notes to #{channel.name}: {e}")
 
