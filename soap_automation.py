@@ -94,8 +94,82 @@ async def reject_non_helpee(interaction: discord.Interaction) -> bool:
 AWAITING_APPROVAL_TITLE = "Your SOAP is awaiting approval"  # the inactivity timer also matches on this
 
 
+WAIT_SAMPLE_DAYS = 14  # how far back soap-queue is read for the wait estimate
+WAIT_HOUR_WINDOW = 2  # requests within this many hours of the current time of day count as "this time of day"
+WAIT_MIN_SAMPLES = 5  # fewer approvals than this and no estimate is shown
+WAIT_CACHE_SECONDS = 600
+_wait_cache: tuple[float, list[tuple[datetime, float]]] | None = None
+
+
+async def _recent_waits(guild: discord.Guild) -> list[tuple[datetime, float]]:
+    """(requested at, seconds until approved) for Soaper-approved requests in soap-queue.
+    A request is posted when the helpee finishes steps 1 and 2, and Start SOAP sets the footer
+    "Approved for SOAP by ..." and the embed timestamp to when it was pressed. Auto-approved and
+    held requests are left out. Cached, since it reads a few pages of channel history."""
+    global _wait_cache
+    if _wait_cache and time.monotonic() - _wait_cache[0] < WAIT_CACHE_SECONDS:
+        return _wait_cache[1]
+    queue_id = getattr(constants, "SOAP_QUEUE_CHANNEL_ID", None)
+    queue = guild.get_channel(queue_id) if queue_id else None
+    if queue is None:
+        return []
+    waits = []
+    since = datetime.now(timezone.utc) - timedelta(days=WAIT_SAMPLE_DAYS)
+    async for message in queue.history(limit=300):  # newest first
+        if message.created_at < since:
+            break
+        if message.author.id != guild.me.id or not message.embeds:
+            continue
+        embed = message.embeds[0]
+        footer = (embed.footer and embed.footer.text) or ""
+        if not footer.startswith("Approved for SOAP by") or embed.timestamp is None:
+            continue
+        seconds = (embed.timestamp - message.created_at).total_seconds()
+        if seconds >= 0:
+            waits.append((message.created_at, seconds))
+    _wait_cache = (time.monotonic(), waits)
+    return waits
+
+
+def _typical_wait(waits: list[tuple[datetime, float]], now: datetime) -> float | None:
+    """Median wait for requests made around this time of day, or None with too few of them."""
+    def hours_apart(when: datetime) -> float:
+        diff = abs((when.hour + when.minute / 60) - (now.hour + now.minute / 60))
+        return min(diff, 24 - diff)
+
+    nearby = sorted(seconds for when, seconds in waits if hours_apart(when) <= WAIT_HOUR_WINDOW)
+    if len(nearby) < WAIT_MIN_SAMPLES:
+        return None
+    middle = len(nearby) // 2
+    return nearby[middle] if len(nearby) % 2 else (nearby[middle - 1] + nearby[middle]) / 2
+
+
+def _wait_words(seconds: float) -> str:
+    minutes = seconds / 60
+    if minutes < 5:
+        return "a few minutes"
+    if minutes < 55:
+        return f"about {max(5, round(minutes / 5) * 5)} minutes"
+    hours = round(minutes / 60)
+    return f"about {hours} hour{'' if hours == 1 else 's'}"
+
+
+async def wait_estimate(guild: discord.Guild | None) -> str | None:
+    """"Requests at this time of day are usually approved in about 20 minutes.", or None."""
+    if guild is None:
+        return None
+    try:
+        waits = await asyncio.wait_for(_recent_waits(guild), 5)
+    except (asyncio.TimeoutError, discord.HTTPException):
+        return None
+    typical = _typical_wait(waits, datetime.now(timezone.utc))
+    if typical is None:
+        return None
+    return f"Requests at this time of day are usually approved in {_wait_words(typical)}."
+
+
 def awaiting_approval_embed(
-    guild: discord.Guild | None, queue_message: discord.Message | None = None
+    guild: discord.Guild | None, queue_message: discord.Message | None = None, wait: str | None = None
 ) -> discord.Embed:
     """Sent once steps 1 and 2 are done and the request is in soap-queue."""
     awaiting_emoji = discord.utils.get(guild.emojis, id=AWAITING_EMOTE_ID) if guild else None
@@ -103,6 +177,8 @@ def awaiting_approval_embed(
         "Please wait for our Soapers to review your case. Once approved, your SOAP Transfer will begin "
         "automatically and you will be notified upon its completion."
     )
+    if wait:
+        description += f"\n\n{wait}"
     if queue_message is not None:
         description += f"\n\nBluehax Team: [Click here]({queue_message.jump_url}) to jump to the request."
     embed = discord.Embed(
@@ -133,7 +209,8 @@ async def send_awaiting_approval(
     interaction: discord.Interaction, queue_message: discord.Message | None = None
 ):
     """The awaiting approval message, plus the after hours notice if it's late night."""
-    await interaction.followup.send(embed=awaiting_approval_embed(interaction.guild, queue_message))
+    wait = await wait_estimate(interaction.guild)
+    await interaction.followup.send(embed=awaiting_approval_embed(interaction.guild, queue_message, wait))
     if is_late_night_hours():
         await interaction.followup.send(embed=after_hours_embed())
 
