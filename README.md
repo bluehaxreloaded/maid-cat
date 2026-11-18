@@ -20,6 +20,9 @@ Maidy is a Pycord bot built to work alongside [Soapy the Cat](https://github.com
 6. If console outputs `Logged-in as YOURBOTNAME#1234`, the bot is running. Use .help for a list of commands.
 
 > ⚠️ Please keep in mind that some of this bot's features rely on [Soapy the Cat](https://github.com/bluehaxreloaded/soap-cat), please ensure both are running concurrently.
+
+## Tests
+Run `python3.13 -m pip install -r requirements-dev.txt`, then `python3.13 -m pytest`. The tests run offline and don't use your `constants.py` or the database. They also run on GitHub on every push.
 ---
 ### Why a cat?
 Cats are cute.

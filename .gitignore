@@ -9,3 +9,4 @@ __pycache__
 tracker_counts.json
 case_notes.json
 case_notes.tmp
+.pytest_cache
