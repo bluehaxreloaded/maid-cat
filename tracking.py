@@ -53,10 +53,13 @@ class TrackingCog(commands.Cog):
         self._importing = False
         # Restricted role changes the bot is making itself, so on_member_update doesn't record them twice
         self.own_role_changes: set[int] = set()
+        records.restriction_end_listeners.append(self._restriction_ended)
 
     def cog_unload(self):
         if self._expiry_task:
             self._expiry_task.cancel()
+        if self._restriction_ended in records.restriction_end_listeners:
+            records.restriction_end_listeners.remove(self._restriction_ended)
 
     # ---------- startup ----------
 
@@ -162,6 +165,75 @@ class TrackingCog(commands.Cog):
                     guild=guild, user=user, action="unrestrict", source="Temporary restriction ended",
                     reason=row["reason"],
                 )
+
+    async def _restriction_ended(self, row: dict, ended_by: int | None, end_reason: str):
+        """Log the end in the ban log, and ghost ping the user in the request channel if they tried to get a
+        SOAP or NNID channel while restricted, so they see they can request again. They aren't told anything else.
+        Expiry and .unrestrict already log the end themselves, so those are only logged here when there were attempts."""
+        try:
+            import constants
+
+            attempts = {"SOAP": row.get("soap_attempts") or 0, "NNID": row.get("nnid_attempts") or 0}
+            tried = {kind: n for kind, n in attempts.items() if n}
+            if not tried and end_reason != "role removed":
+                return
+            request_ids = {
+                "SOAP": getattr(constants, "REQUEST_SOAP_CHANNEL_ID", None),
+                "NNID": getattr(constants, "REQUEST_NNID_CHANNEL_ID", None),
+            }
+            for guild in self.bot.guilds:
+                member = guild.get_member(row["user_id"])
+                pinged = []
+                for kind in tried:
+                    channel = guild.get_channel(request_ids[kind]) if request_ids[kind] else None
+                    if member is None or channel is None:
+                        continue
+                    try:
+                        ping = await channel.send(member.mention, allowed_mentions=discord.AllowedMentions(users=True))
+                        await ping.delete()
+                        pinged.append(channel.mention)
+                    except discord.HTTPException as e:
+                        print(f"Could not ping {member} in #{channel.name}: {e}")
+                await self._log_restriction_end(guild, row, ended_by, end_reason, tried, pinged, member)
+        except Exception as e:
+            print(f"Restriction end handling failed: {e!r}")
+
+    async def _log_restriction_end(self, guild, row, ended_by, end_reason, tried, pinged, member):
+        log = guild.get_channel(BAN_LOG_ID) if BAN_LOG_ID else None
+        if log is None:
+            return
+        user = member or await records.resolve(guild, row["user_id"], self.bot)
+        how = {
+            "expired": "Temporary restriction ran out",
+            "unrestricted": "Removed with .unrestrict",
+            "role removed": "Restricted role removed by hand",
+        }.get(end_reason, end_reason)
+        embed = discord.Embed(
+            title="✅ Restriction Ended",
+            description=f"<@{row['user_id']}> {discord.utils.escape_markdown(user.name) if user else ''}".strip(),
+            color=discord.Color.green(),
+            timestamp=datetime.now(timezone.utc),
+        )
+        if user:
+            embed.set_thumbnail(url=user.display_avatar.url)
+        embed.add_field(name="How", value=how, inline=False)
+        if ended_by and ended_by != self.bot.user.id:
+            embed.add_field(name="Ended by", value=f"<@{ended_by}>", inline=True)
+        embed.add_field(name="Restricted", value=_ts(row["created_at"], "f"), inline=True)
+        if tried:
+            counts = ", ".join(f"{n} {kind}" for kind, n in tried.items())
+            embed.add_field(name="Blocked Attempts", value=counts, inline=True)
+            if pinged:
+                embed.add_field(name="Pinged In", value=", ".join(pinged), inline=True)
+            elif member is None:
+                embed.add_field(name="Pinged In", value="Not pinged, they're not in the server", inline=True)
+        if row.get("reason"):
+            embed.add_field(name="Reason", value=row["reason"][:1024], inline=False)
+        embed.set_footer(text=f"ID: {row['user_id']}")
+        try:
+            await log.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+        except discord.HTTPException as e:
+            print(f"Could not log a restriction ending: {e}")
 
     # ---------- keeping things current ----------
 

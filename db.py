@@ -28,7 +28,12 @@ DOWN_SECONDS = 60
 
 # Changes to tables that already exist, applied once each in order (database.sql only creates missing tables).
 # Add new ones to the end, never edit or remove one that has shipped.
-MIGRATIONS: list[str] = []
+MIGRATIONS: list[str] = [
+    # 1: blocked SOAP and NNID attempts while restricted, so they can be pinged when it ends
+    """ALTER TABLE restrictions
+       ADD COLUMN soap_attempts INT UNSIGNED NOT NULL DEFAULT 0 AFTER end_reason,
+       ADD COLUMN nnid_attempts INT UNSIGNED NOT NULL DEFAULT 0 AFTER soap_attempts""",
+]
 
 
 class DatabaseDown(Exception):

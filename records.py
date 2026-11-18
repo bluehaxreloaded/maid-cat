@@ -318,15 +318,33 @@ async def add_restriction(
     return new_id
 
 
+# Called with (restriction row, ended_by, end_reason) when a restriction really ends, see TrackingCog
+restriction_end_listeners: list = []
+LISTENED_END_REASONS = ("expired", "unrestricted", "role removed")  # not "replaced" or "role could not be added"
+
+
 @quiet
 async def end_restriction(user_id: int, *, ended_by: int | None, end_reason: str, ended_at: datetime | None = None) -> bool:
+    active = await active_restriction(user_id)
     changed = await db.execute(
         """UPDATE restrictions SET ended_at = %s, ended_by = %s, end_reason = %s
            WHERE user_id = %s AND ended_at IS NULL""",
         (utc(ended_at) or now(), ended_by, end_reason, user_id),
     )
     await sync_user_restriction(user_id)
+    if changed and active and end_reason in LISTENED_END_REASONS:
+        for listener in restriction_end_listeners:
+            asyncio.create_task(listener(active, ended_by, end_reason))
     return bool(changed)
+
+
+@quiet
+async def count_restricted_attempt(user_id: int, kind: str):
+    """Add one blocked SOAP or NNID attempt to the user's active restriction."""
+    column = "soap_attempts" if kind == "SOAP" else "nnid_attempts"
+    await db.execute(
+        f"UPDATE restrictions SET {column} = {column} + 1 WHERE user_id = %s AND ended_at IS NULL", (user_id,)
+    )
 
 
 @quiet
@@ -540,6 +558,9 @@ def restricted_embed(kind: str, restriction: dict) -> discord.Embed:
 async def log_restricted_attempt(guild: discord.Guild, user, kind: str, how: str, restriction: dict, by=None):
     """Tell Staff a restricted user tried to get a SOAP/NNID channel opened."""
     import constants
+
+    if by is None or by.id == user.id:
+        await count_restricted_attempt(user.id, kind)  # Staff trying .createsoap for them doesn't count
 
     log_id = getattr(constants, "BAN_LOG_ID", None) or getattr(constants, "SOAP_LOG_ID", None)
     log = guild.get_channel(log_id) if log_id else None
