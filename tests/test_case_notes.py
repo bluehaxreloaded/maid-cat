@@ -14,10 +14,11 @@ from helpee import CASE_NOTES_HEADER, add_case_note, case_notes, reset_case_setu
 
 @pytest.fixture(autouse=True)
 def empty_state():
-    for store in (channel_state._helpees, channel_state._notes, channel_state._setup_done):
+    stores = (channel_state._helpees, channel_state._notes, channel_state._setup_done, channel_state._delete_at)
+    for store in stores:
         store.clear()
     yield
-    for store in (channel_state._helpees, channel_state._notes, channel_state._setup_done):
+    for store in stores:
         store.clear()
 
 
@@ -65,7 +66,8 @@ def test_setup_complete_and_reset():
 
 def test_load_merges_with_notes_saved_before_it_finished(monkeypatch):
     async def fake_fetchall(sql, params=None):
-        return [{"channel_id": 10, "user_id": 1, "case_notes": "saved\nalso saved", "case_setup_complete": 1}]
+        return [{"channel_id": 10, "user_id": 1, "status": "open", "case_notes": "saved\nalso saved",
+                 "case_setup_complete": 1, "delete_at": None}]
 
     monkeypatch.setattr(db, "fetchall", fake_fetchall)
     channel_state._notes[10] = ["new", "saved"]

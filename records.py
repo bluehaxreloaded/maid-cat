@@ -36,8 +36,6 @@ def serial_base(serial: str | None) -> str | None:
     match = SERIAL_BASE_RE.match(serial)
     return match.group(1) + match.group(2) if match else serial
 # Same format soap.py writes into archived channel topics
-ARCHIVE_DELETION_RE = re.compile(r"Archived\.\s*Deletion scheduled:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*UTC\.")
-ARCHIVE_DAYS = 3
 CHANNEL_CATEGORIES = (SOAP_CHANNEL_CATEGORY_ID, MANUAL_SOAP_CATEGORY_ID, NNID_CHANNEL_CATEGORY_ID, TEMP_ARCHIVE_CATEGORY_ID)
 
 
@@ -408,17 +406,16 @@ async def sync_channel(channel: discord.TextChannel):
     """Save a SOAP/NNID channel's current state: who it's for, open/manual/archived, and archive times."""
     if not is_tracked_channel(channel):
         return
-    topic = channel.topic or ""
     category_id = channel.category.id
     status = {TEMP_ARCHIVE_CATEGORY_ID: "archived", MANUAL_SOAP_CATEGORY_ID: "manual"}.get(category_id, "open")
-    delete_at = archived_at = None
-    match = ARCHIVE_DELETION_RE.search(topic)
-    if status == "archived" and match:
-        from datetime import timedelta
-
-        delete_at = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S")
-        archived_at = delete_at - timedelta(days=ARCHIVE_DAYS)
     await channel_state.ensure_loaded()
+    delete_at = archived_at = None
+    if status == "archived":
+        deletion = channel_state.deletion_time(channel)
+        channel_state.adopt_deletion_time(channel.id, deletion)  # a timer only in the topic, from before the database had it
+        delete_at, archived_at = utc(deletion), utc(channel_state.archived_at(channel))
+    else:
+        channel_state.cancel_deletion_timer(channel.id)  # moved out of the archive
     user_id = channel_state.helpee_id(channel)
     from helpee import case_notes
 
