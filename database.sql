@@ -114,4 +114,11 @@ CREATE TABLE IF NOT EXISTS user_notes (
     note TEXT NOT NULL,
     created_at DATETIME NOT NULL,
     KEY idx_user (user_id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Each bot writes its row every minute while it's connected to Discord. maid-cat alerts when soap-cat's goes stale
+CREATE TABLE IF NOT EXISTS bot_heartbeats (
+    bot VARCHAR(32) PRIMARY KEY,
+    beat_at DATETIME NOT NULL COMMENT 'UTC',
+    latency_ms INT UNSIGNED NULL COMMENT 'Discord gateway latency'
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci

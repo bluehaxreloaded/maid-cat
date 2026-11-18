@@ -23,6 +23,7 @@ bot.load_extension("soap_helper")
 bot.load_extension("inactivity")
 bot.load_extension("serial")
 bot.load_extension("tracking")
+bot.load_extension("status")
 
 
 @bot.event  # actually show things on error
