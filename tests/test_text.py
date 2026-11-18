@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
+import channel_state
 from helpee import CASE_NOTES_HEADER, TOPIC_LIMIT, append_case_notes, channel_name_for, helpee_id, safe_note_text
 from records import limit_text, restricted_text, serial_base, utc
 from status import _ago
@@ -41,11 +42,23 @@ def test_channel_name_for():
     assert channel_name_for(SimpleNamespace(name="..Some.User."), "-soap") == "some-user-soap"
 
 
-def test_helpee_id():
-    assert helpee_id(SimpleNamespace(topic="SOAP for <@123456>")) == 123456
-    assert helpee_id(SimpleNamespace(topic="SOAP for <@!42>")) == 42
-    assert helpee_id(SimpleNamespace(topic=None)) is None
+def test_helpee_id_falls_back_to_the_topic():
+    assert helpee_id(SimpleNamespace(id=1, topic="SOAP for <@123456>")) == 123456
+    assert helpee_id(SimpleNamespace(id=1, topic="SOAP for <@!42>")) == 42
+    assert helpee_id(SimpleNamespace(id=1, topic=None)) is None
     assert helpee_id(None) is None
+
+
+def test_saved_helpee_wins_over_the_topic():
+    channel = SimpleNamespace(id=555, topic="This is the SOAP channel for <@111>")
+    channel_state.remember(555, 222)
+    try:
+        assert helpee_id(channel) == 222
+        channel.topic = "someone edited the topic"
+        assert helpee_id(channel) == 222
+    finally:
+        channel_state.forget(555)
+    assert helpee_id(channel) is None
 
 
 def test_append_case_notes():

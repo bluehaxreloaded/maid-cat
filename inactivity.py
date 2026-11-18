@@ -1,8 +1,8 @@
 import discord
 import asyncio
-import re
 from datetime import datetime, timezone, timedelta
 from discord.ext import commands
+from channel_state import helpee_id
 from perms import command_with_perms, soap_channels_only
 from log import log_to_soaper_log
 from constants import (
@@ -39,7 +39,6 @@ AFTER_HOURS_TITLE = "🌕 After Hours Notice"  # skipped, so the message before 
 KEEPOPEN_TITLE = "🔓 Inactivity Timer Disabled"  # used to find .keepopen in the channel
 KEEPOPEN_FOOTER = "Inactivity timer disabled"  # older .keepopen messages used this footer instead
 
-MENTION_RE = re.compile(r"<@!?(\d+)>")
 
 
 class InactivityCog(commands.Cog):
@@ -179,8 +178,8 @@ class InactivityCog(commands.Cog):
                 color=discord.Color.red(),
             )
 
-        m = MENTION_RE.search(channel.topic or "")
-        await channel.send(content=f"<@{m.group(1)}>" if m else None, embed=embed)
+        uid = helpee_id(channel)
+        await channel.send(content=f"<@{uid}>" if uid else None, embed=embed)
 
     async def _close(self, channel: discord.TextChannel, is_soap: bool):
         name = channel.name

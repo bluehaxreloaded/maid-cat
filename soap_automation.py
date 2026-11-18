@@ -80,8 +80,8 @@ def store_essential(channel_id: int, user_id: int, data: bytes):
 
 
 async def reject_non_helpee(interaction: discord.Interaction) -> bool:
-    """Only the helpee named in the channel topic can upload their essential.exefs.
-    Tells anyone else so and returns True. In a channel with no helpee in its topic (e.g. testing with .reset), anyone can."""
+    """Only the channel's helpee can upload their essential.exefs.
+    Tells anyone else so and returns True. In a channel with no helpee (e.g. testing with .reset), anyone can."""
     helpee = helpee_id(interaction.channel)
     if helpee is None or interaction.user.id == helpee:
         return False
@@ -690,12 +690,7 @@ class CompletionFollowUpView(discord.ui.View):
                 ):
                     return
 
-                # Extract user ID from channel topic for logging
-                user_id = None
-                if channel.topic:
-                    match = re.search(r"<@!?(\d+)>", channel.topic)
-                    if match:
-                        user_id = int(match.group(1))
+                user_id = helpee_id(channel)  # for logging
 
                 soap_cog = bot.get_cog("SoapCog")
                 if soap_cog:
@@ -801,21 +796,18 @@ class CompletionFollowUpView(discord.ui.View):
         if not channel:
             # For ephemeral interactions, we need to find the SOAP channel differently
             # Since ephemeral interactions don't have the channel context, we'll use the message reference
-            # or find it by user mention in topic
+            # or find it by its helpee
             pass
 
         # If we can't get channel from stored ID, try to find it from user's SOAP channels
         if not channel:
             user_id = interaction.user.id
-            mention_plain = f"<@{user_id}>"
-            mention_nick = f"<@!{user_id}>"
             for ch in interaction.guild.text_channels:
                 if ch.category and ch.category.id in [
                     SOAP_CHANNEL_CATEGORY_ID,
                     MANUAL_SOAP_CATEGORY_ID,
                 ]:
-                    topic = getattr(ch, "topic", None)
-                    if topic and (mention_plain in topic or mention_nick in topic):
+                    if helpee_id(ch) == user_id:
                         channel = ch
                         break
 
@@ -1620,7 +1612,7 @@ class SOAPAutomationCog(commands.Cog):
     )
     async def testqueue(self, ctx):
         """Post the soap-queue embed here, using this channel's data if it's a helpee channel."""
-        member = await member_from_topic(ctx.channel) if getattr(ctx.channel, "topic", None) else None
+        member = await member_from_topic(ctx.channel) if helpee_id(ctx.channel) else None
         if member is not None:
             serial = await entered_serial(ctx.channel)
             embed = soap_queue_embed(
@@ -1666,8 +1658,8 @@ class SOAPAutomationCog(commands.Cog):
         help="Restarts the SOAP channel setup in the current channel (Soaper+ only)",
     )
     async def reset(self, ctx):
-        """Run create_soap_interface in the current channel, for the helpee named in its topic."""
-        member = await member_from_topic(ctx.channel) if getattr(ctx.channel, "topic", None) else None
+        """Run create_soap_interface in the current channel, for its helpee."""
+        member = await member_from_topic(ctx.channel) if helpee_id(ctx.channel) else None
         if member is None:
             # Not a helpee channel (e.g. testing), so run it for whoever used the command
             member = ctx.author if hasattr(ctx, "author") else getattr(ctx, "user", None)
@@ -1744,8 +1736,7 @@ class SOAPAutomationCog(commands.Cog):
         if not any(a.filename.lower().endswith(".exefs") for a in message.attachments):
             return
         # Only the helpee; Soapers can still share files
-        m = re.search(r"<@!?(\d+)>", channel.topic or "")
-        if not m or int(m.group(1)) != message.author.id:
+        if helpee_id(channel) != message.author.id:
             return
 
         try:
@@ -1903,16 +1894,7 @@ class SOAPAutomationCog(commands.Cog):
 
         if status_text == "SUCCESS" and target_channel:
             # Send SUCCESS message immediately
-            # Try to recover the user ID from the channel topic so we can mention them.
-            user_id = None
-            topic = getattr(target_channel, "topic", None)
-            if topic:
-                m = re.search(r"<@!?(\d+)>", topic)
-                if m:
-                    try:
-                        user_id = int(m.group(1))
-                    except ValueError:
-                        user_id = None
+            user_id = helpee_id(target_channel)  # to mention them
 
             boot_instruction = (
                 f"Boot the console with the serial {serial_number} normally (with the SD inserted into the console)"
@@ -1943,16 +1925,7 @@ class SOAPAutomationCog(commands.Cog):
 
         if status_text == "LOTTERY" and target_channel:
             # Send LOTTERY message immediately
-            # Try to recover the user ID from the channel topic so we can mention them.
-            user_id = None
-            topic = getattr(target_channel, "topic", None)
-            if topic:
-                m = re.search(r"<@!?(\d+)>", topic)
-                if m:
-                    try:
-                        user_id = int(m.group(1))
-                    except ValueError:
-                        user_id = None
+            user_id = helpee_id(target_channel)  # to mention them
 
             boot_instruction = (
                 f"Boot the console with the serial {serial_number} normally (with the SD inserted into the console)"
@@ -2003,16 +1976,7 @@ class SOAPAutomationCog(commands.Cog):
             )
 
             if is_serial_error:
-                # Try to recover the user ID from the channel topic so we can mention them.
-                user_id = None
-                topic = getattr(target_channel, "topic", None)
-                if topic:
-                    m = re.search(r"<@!?(\d+)>", topic)
-                    if m:
-                        try:
-                            user_id = int(m.group(1))
-                        except ValueError:
-                            user_id = None
+                user_id = helpee_id(target_channel)  # to mention them
 
                 add_case_note(
                     target_channel, "Serial number didn't match their essential.exefs (found during the SOAP)"

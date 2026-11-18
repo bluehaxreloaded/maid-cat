@@ -107,6 +107,7 @@ class NNIDCog(commands.Cog):  # NNID commands
                 category=category,
                 topic=f"This is the NNID channel for <@{user.id}>, please follow all provided instructions.",
             )
+            await records.set_channel_helpee(new_channel, user.id)
 
             await new_channel.set_permissions(user, read_messages=True)
 
@@ -197,6 +198,7 @@ class NNIDCog(commands.Cog):  # NNID commands
                     category=category,
                     topic=f"This is the NNID channel for <@{user.id}>, please follow all provided instructions.",
                 )
+                await records.set_channel_helpee(new, user.id)
             else:
                 raise CategoryNotFound(NNID_CHANNEL_CATEGORY_ID)
 

@@ -1,9 +1,9 @@
 import discord
 import asyncio
 import json
-import re
 import time
 from pathlib import Path
+import channel_state
 from constants import (
     HELPEE_ROLE_ID,
     SOAP_CHANNEL_CATEGORY_ID,
@@ -19,19 +19,18 @@ def channel_name_for(user: discord.abc.User, suffix: str) -> str:
 
 
 def helpee_id(channel: discord.abc.GuildChannel | None) -> int | None:
-    """ID of the helpee named in a SOAP/NNID channel topic."""
-    m = re.search(r"<@!?(\d+)>", getattr(channel, "topic", None) or "")
-    return int(m.group(1)) if m else None
+    """ID of the helpee a SOAP/NNID channel is for, from the database (the topic only if it isn't there)."""
+    return channel_state.helpee_id(channel)
 
 
 def _topic_mentions(channel: discord.TextChannel, user_id: int) -> bool:
-    return re.search(rf"<@!?{user_id}>", channel.topic or "") is not None
+    return helpee_id(channel) == user_id
 
 
 def find_open_channel(
     guild: discord.Guild, user: discord.abc.User, category_ids: list[int], suffix: str
 ) -> discord.TextChannel | None:
-    """Find a user's open SOAP/NNID channel by the user ID in its topic, falling back to its name."""
+    """Find a user's open SOAP/NNID channel by its helpee, falling back to its name."""
     name = channel_name_for(user, suffix)
     by_name = None
     for channel in guild.text_channels:
@@ -53,7 +52,7 @@ async def restore_helpee_access(
     """Give a helpee access to their open channel again, e.g. after they left and rejoined the server.
     moved: channels just moved to another category (see sync_helpee_role)."""
     if not isinstance(member, discord.Member) or not _topic_mentions(channel, member.id):
-        return  # only the helpee named in the channel topic gets access
+        return  # only the channel's own helpee gets access
     try:
         if not channel.permissions_for(member).read_messages:
             await channel.set_permissions(member, read_messages=True)
@@ -63,11 +62,10 @@ async def restore_helpee_access(
 
 
 async def member_from_topic(channel: discord.TextChannel) -> discord.Member | None:
-    """Get the helpee named in a SOAP/NNID channel topic."""
-    m = re.search(r"<@!?(\d+)>", channel.topic or "")
-    if not m:
+    """Get the helpee of a SOAP/NNID channel (from the database, the topic only as a fallback)."""
+    uid = helpee_id(channel)
+    if not uid:
         return None
-    uid = int(m.group(1))
     member = channel.guild.get_member(uid)
     if member is None:
         try:
@@ -123,7 +121,7 @@ _note_tasks: set[asyncio.Task] = set()  # keeps background writes alive until th
 
 
 def _is_helpee_channel(channel) -> bool:
-    return channel is not None and re.search(r"<@!?\d+>", getattr(channel, "topic", None) or "") is not None
+    return helpee_id(channel) is not None
 
 
 def _notes() -> dict[str, dict]:

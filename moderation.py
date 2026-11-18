@@ -7,6 +7,7 @@ from discord.ext.bridge import BridgeOption
 from perms import command_with_perms
 import db
 import records
+from channel_state import helpee_id
 from constants import (
     JOIN_LEAVE_LOG_ID,
     SPAM_BOT_CHANNEL_ID,
@@ -1008,14 +1009,11 @@ class ModerationCog(commands.Cog):
     async def _maybe_alert_helpee_left(self, member: discord.Member):
         """If the member had a SOAP or NNID channel, send an alert with a close button."""
         guild = member.guild
-        mention_plain = f"<@{member.id}>"
-        mention_nick = f"<@!{member.id}>"
 
         for ch in guild.text_channels:
             if not ch.category or not isinstance(ch, discord.TextChannel):
                 continue
-            topic = getattr(ch, "topic", None) or ""
-            if mention_plain not in topic and mention_nick not in topic:
+            if helpee_id(ch) != member.id:
                 continue
             # Channel belongs to this member - check if it's SOAP or NNID
             is_soap = (

@@ -30,6 +30,7 @@ from helpee import (
     channel_name_for,
     find_open_channel,
     restore_helpee_access,
+    helpee_id,
     member_from_topic,
     sync_helpee_role,
     REOPENED_TITLE,
@@ -96,12 +97,6 @@ async def _respond_ephemeral(ctx, message: str) -> bool:
         return True
     except Exception:
         return False
-
-
-def _get_user_id_from_topic(topic: str) -> int | None:
-    """Extract user ID from topic (looks for <@id> mention). Returns None if not found."""
-    m = re.search(r"<@!?(\d+)>", topic)
-    return int(m.group(1)) if m else None
 
 
 async def _get_channel_topic(channel: discord.TextChannel) -> str:
@@ -447,7 +442,7 @@ class SoapCog(commands.Cog):  # SOAP commands
         suffix = ARCHIVE_CHANNEL_SUFFIX if ARCHIVE_CHANNEL_SUFFIX.startswith("-") else "-" + ARCHIVE_CHANNEL_SUFFIX
         for channel in temp_cat.text_channels:
             topic = channel.topic or ""
-            if _get_user_id_from_topic(ARCHIVE_DELETION_REGEX.sub("", topic, count=1)) != member.id:
+            if helpee_id(channel) != member.id:
                 continue
             if not channel.name.removesuffix(suffix).endswith(channel_suffix):
                 continue
@@ -565,9 +560,9 @@ class SoapCog(commands.Cog):  # SOAP commands
             return
 
         topic = channel.topic or ""
-        user_id = _get_user_id_from_topic(topic)
+        user_id = helpee_id(channel)
         if not user_id:
-            await _notify_and_delete(channel, "Could not find user in channel topic. Deleting channel.")
+            await _notify_and_delete(channel, "Could not find who this channel is for. Deleting channel.")
             return
 
         temp_category = (
@@ -698,6 +693,7 @@ class SoapCog(commands.Cog):  # SOAP commands
                 category=category,
                 topic=f"This is the SOAP channel for <@{user.id}>, please follow all provided instructions.",
             )
+            await records.set_channel_helpee(new_channel, user.id)
 
             await new_channel.set_permissions(user, read_messages=True)
 
@@ -1077,6 +1073,7 @@ class SoapCog(commands.Cog):  # SOAP commands
                     category=category,
                     topic=f"This is the SOAP channel for <@{user.id}>, please follow all provided instructions.",
                 )
+                await records.set_channel_helpee(new, user.id)
             else:
                 raise CategoryNotFound(MANUAL_SOAP_CATEGORY_ID)
 

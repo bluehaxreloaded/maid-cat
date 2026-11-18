@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import discord
 
 import constants
+from channel_state import helpee_id
 from constants import SOAP_CHANNEL_SUFFIX, NNID_CHANNEL_SUFFIX, SOAPER_ROLE_ID, ERROR_LOG_ID
 from helpee import case_notes, REOPENED_TITLE
 from perms import _has_role_or_higher
@@ -62,11 +63,6 @@ def _channel_kind(name: str) -> str:
     return "Channel"
 
 
-def _helpee_id(topic: str) -> int | None:
-    m = re.search(r"<@!?(\d+)>", topic or "")
-    return int(m.group(1)) if m else None
-
-
 def _clip_lines(lines: list[str], limit: int = 1024, empty: str = "None") -> str:
     """Join lines into one embed field value, cutting off with 'and N more' if it's too long."""
     if not lines:
@@ -88,7 +84,7 @@ class _Summary:
         guild = channel.guild
         bot_id = bot.user.id
         by_id = {m.id: m for m in messages}
-        self.helpee_id = _helpee_id(channel.topic or "")
+        self.helpee_id = helpee_id(channel)
         self.kind = _channel_kind(channel.name)
         self.completions = []  # (message, label)
         self.issues: dict[str, list] = {}  # text -> [count, first message id or None]

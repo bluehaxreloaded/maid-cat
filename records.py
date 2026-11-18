@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 import discord
 
+import channel_state
 import db
 from constants import (
     SOAP_CHANNEL_SUFFIX,
@@ -379,15 +380,27 @@ def channel_kind(channel: discord.abc.GuildChannel) -> str | None:
     return None
 
 
+_background: set[asyncio.Task] = set()  # keeps background writes alive until they finish
+
+
 def is_tracked_channel(channel) -> bool:
-    """A helpee's SOAP/NNID channel: in one of the SOAP/NNID/archive categories, with the helpee in its topic."""
+    """A helpee's SOAP/NNID channel: in one of the SOAP/NNID/archive categories, with a known helpee."""
     return (
         isinstance(channel, discord.TextChannel)
         and channel.category is not None
         and channel.category.id in CHANNEL_CATEGORIES
-        and MENTION_RE.search(channel.topic or "") is not None
+        and channel_state.helpee_id(channel) is not None
         and channel_kind(channel) is not None
     )
+
+
+async def set_channel_helpee(channel: discord.TextChannel, user_id: int):
+    """Save who a new SOAP/NNID channel is for, so it never has to be read back from the topic.
+    It's known straight away, and written to the database in the background so opening the channel never waits."""
+    channel_state.remember(channel.id, user_id)
+    task = asyncio.create_task(sync_channel(channel))
+    _background.add(task)
+    task.add_done_callback(_background.discard)
 
 
 @quiet
@@ -405,7 +418,7 @@ async def sync_channel(channel: discord.TextChannel):
 
         delete_at = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S")
         archived_at = delete_at - timedelta(days=ARCHIVE_DAYS)
-    user_id = int(MENTION_RE.search(ARCHIVE_DELETION_RE.sub("", topic)).group(1))
+    user_id = channel_state.helpee_id(channel)
     try:
         from helpee import case_notes
 
@@ -415,7 +428,7 @@ async def sync_channel(channel: discord.TextChannel):
     await db.execute(
         """INSERT INTO channels (channel_id, user_id, kind, name, status, case_notes, created_at, archived_at, delete_at)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-           ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), kind = VALUES(kind), name = VALUES(name),
+           ON DUPLICATE KEY UPDATE user_id = COALESCE(user_id, VALUES(user_id)), kind = VALUES(kind), name = VALUES(name),
                status = VALUES(status), case_notes = COALESCE(VALUES(case_notes), case_notes),
                archived_at = CASE WHEN VALUES(status) = 'archived'
                    THEN COALESCE(VALUES(archived_at), archived_at, UTC_TIMESTAMP()) ELSE NULL END,
@@ -424,6 +437,8 @@ async def sync_channel(channel: discord.TextChannel):
         (channel.id, user_id, channel_kind(channel), channel.name[:100], status, notes,
          utc(channel.created_at), archived_at, delete_at),
     )
+    if not channel_state.known(channel.id):
+        channel_state.remember(channel.id, user_id)  # a channel from before the database knew it
 
 
 @quiet
@@ -441,6 +456,7 @@ async def update_channel(channel: discord.TextChannel, **fields):
 
 @quiet
 async def channel_deleted(channel_id: int):
+    channel_state.forget(channel_id)
     await db.execute(
         "UPDATE channels SET status = 'deleted', deleted_at = UTC_TIMESTAMP() WHERE channel_id = %s AND status <> 'deleted'",
         (channel_id,),
@@ -451,6 +467,7 @@ async def channel_deleted(channel_id: int):
 async def sync_all_channels(guilds: list[discord.Guild]):
     """Bring the channels table in line with Discord: save every SOAP/NNID channel and mark missing ones deleted.
     Takes every server the bot is in, so one server's channels aren't marked deleted while syncing another."""
+    await channel_state.load()
     existing = set()
     for guild in guilds:
         for channel in guild.text_channels:

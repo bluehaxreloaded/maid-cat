@@ -1,12 +1,12 @@
 from pathlib import Path
 import discord
-import re
 from perms import command_with_perms, soap_channels_only, nnid_channels_only
 from discord.ext import commands
 from discord.ext.bridge import BridgeOption
 from functools import wraps
 from random import randint
 import records
+from channel_state import helpee_id
 from constants import (
     SOAP_CHANNEL_SUFFIX,
     NNID_CHANNEL_SUFFIX,
@@ -16,25 +16,25 @@ from constants import (
     SOAP_LOADING_ID,
 )
 
-# Regex pulls the User ID from a mention
-MENTION_RE = re.compile(r"<@!?(\d{15,25})>")
+async def _helpee_member(ctx) -> discord.Member | None:
+    """The helpee of a SOAP/NNID channel, if they're in the server."""
+    uid = helpee_id(ctx.channel) if isinstance(ctx.channel, discord.TextChannel) else None
+    if not uid:
+        return None
+    member = ctx.guild.get_member(uid)
+    if member is None:
+        try:
+            member = await ctx.guild.fetch_member(uid)
+        except discord.NotFound:
+            member = None
+    return member
 
 
 async def _find_helpee(ctx) -> discord.Member | None:
-    """Get the helpee of a SOAP/NNID channel from the channel topic, or the channel name if that fails."""
-    topic = getattr(ctx.channel, "topic", None)
-    if isinstance(ctx.channel, discord.TextChannel) and topic:
-        m = MENTION_RE.search(topic)
-        if m:
-            uid = int(m.group(1))
-            member_obj = ctx.guild.get_member(uid)
-            if member_obj is None:
-                try:
-                    member_obj = await ctx.guild.fetch_member(uid)
-                except discord.NotFound:
-                    member_obj = None
-            if member_obj:
-                return member_obj
+    """Get the helpee of a SOAP/NNID channel, or go by the channel name if that fails."""
+    member_obj = await _helpee_member(ctx)
+    if member_obj:
+        return member_obj
 
     member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
     if member_name == ctx.channel.name:  # SOAP suffix didn't match, try NNID
@@ -46,27 +46,14 @@ def ping_before_mes():  # i didn't feel like writing the same line multiple time
     def decorator(func):
         @wraps(func)
         async def send_ping(self, ctx, *args, **kwargs):
-            # Get the user from the channel topic.
-            member_obj = None
-            topic = getattr(ctx.channel, "topic", None)
-            if isinstance(ctx.channel, discord.TextChannel) and topic:
-                m = MENTION_RE.search(topic)
-                if m:
-                    uid = int(m.group(1))
-                    member_obj = ctx.guild.get_member(uid)
-                    if member_obj is None:
-                        try:
-                            member_obj = await ctx.guild.fetch_member(uid)
-                        except discord.NotFound:
-                            member_obj = None
+            member_obj = await _helpee_member(ctx)
+            if member_obj:
+                await ctx.respond(
+                    f"{member_obj.mention}\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
+                )
+                return
 
-                if member_obj:
-                    await ctx.respond(
-                        f"{member_obj.mention}\n\n{'\n\n'.join(await func(self, ctx, *args, **kwargs))}"
-                    )
-                    return
-
-            # Get the user from the channel name if topic failed.
+            # Get the user from the channel name if that failed.
             # Try SOAP suffix first, then NNID suffix
             member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
             if member_name == ctx.channel.name:  # SOAP suffix didn't match, try NNID
@@ -97,15 +84,15 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         """Record a transfer a Soaper finished with a completion command, in a helpee's channel, and count it on the
         voice channel tracker. Nothing is counted for a test channel or a repeat of one already recorded."""
         channel = ctx.channel
-        match = MENTION_RE.search(getattr(channel, "topic", None) or "")
-        if not match or not records.is_tracked_channel(channel):
+        user_id = helpee_id(channel)
+        if not user_id or not records.is_tracked_channel(channel):
             return  # e.g. used in a test or help channel
         if await records.recently_recorded(channel.id, kind, minutes=60):
             return  # soap-cat already reported this one, or the command was run twice
         ref = getattr(ctx, "message", None) or getattr(ctx, "interaction", None)
         added = await records.record_transfer(
             ctx.guild,
-            user_id=int(match.group(1)),
+            user_id=user_id,
             kind=kind,
             method="manual",
             outcome=outcome,
@@ -188,21 +175,10 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
         help="Explains how to find a serial number in GM9",
     )
     async def findserial(self, ctx):
-        # Get the user from the channel topic or name for mention
-        member_obj = None
-        topic = getattr(ctx.channel, "topic", None)
-        if isinstance(ctx.channel, discord.TextChannel) and topic:
-            m = MENTION_RE.search(topic)
-            if m:
-                uid = int(m.group(1))
-                member_obj = ctx.guild.get_member(uid)
-                if member_obj is None:
-                    try:
-                        member_obj = await ctx.guild.fetch_member(uid)
-                    except discord.NotFound:
-                        member_obj = None
+        # Get the user from the channel's helpee or name for mention
+        member_obj = await _helpee_member(ctx)
 
-        # Get the user from the channel name if topic failed
+        # Get the user from the channel name if that failed
         if not member_obj:
             member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
             if member_name == ctx.channel.name:  # SOAP suffix didn't match, try NNID
@@ -240,18 +216,7 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     )
     @nnid_channels_only()
     async def nnidcomplete(self, ctx):
-        member_obj = None
-        topic = getattr(ctx.channel, "topic", None)
-        if isinstance(ctx.channel, discord.TextChannel) and topic:
-            m = MENTION_RE.search(topic)
-            if m:
-                uid = int(m.group(1))
-                member_obj = ctx.guild.get_member(uid)
-                if member_obj is None:
-                    try:
-                        member_obj = await ctx.guild.fetch_member(uid)
-                    except discord.NotFound:
-                        member_obj = None
+        member_obj = await _helpee_member(ctx)
         if not member_obj:
             member_name = ctx.channel.name.removesuffix(NNID_CHANNEL_SUFFIX)
             member_obj = ctx.guild.get_member_named(member_name)
@@ -454,21 +419,10 @@ class TextCommandsCog(commands.Cog):  # temp until dynamic stuff is ready
     )
     @soap_channels_only()
     async def nodonors(self, ctx):
-        # Get the user from the channel topic or name for mention
-        member_obj = None
-        topic = getattr(ctx.channel, "topic", None)
-        if isinstance(ctx.channel, discord.TextChannel) and topic:
-            m = MENTION_RE.search(topic)
-            if m:
-                uid = int(m.group(1))
-                member_obj = ctx.guild.get_member(uid)
-                if member_obj is None:
-                    try:
-                        member_obj = await ctx.guild.fetch_member(uid)
-                    except discord.NotFound:
-                        member_obj = None
+        # Get the user from the channel's helpee or name for mention
+        member_obj = await _helpee_member(ctx)
 
-        # Get the user from the channel name if topic failed
+        # Get the user from the channel name if that failed
         if not member_obj:
             member_name = ctx.channel.name.removesuffix(SOAP_CHANNEL_SUFFIX)
             if member_name == ctx.channel.name:  # SOAP suffix didn't match, try NNID
