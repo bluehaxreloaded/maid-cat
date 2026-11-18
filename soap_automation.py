@@ -1403,6 +1403,7 @@ class EshopVerificationView(discord.ui.View):
             await interaction.response.edit_message(view=self)
         except Exception:
             await interaction.response.defer()
+        asyncio.create_task(records.record_eshop_answer(interaction.channel_id, True, interaction.user.id))
 
         channel_id = interaction.channel_id
         channel = interaction.channel
@@ -1473,6 +1474,8 @@ class EshopVerificationView(discord.ui.View):
             await interaction.response.edit_message(view=self)
         except Exception:
             await interaction.response.defer()
+        # this SOAP stops counting toward the helpee's SOAP limit
+        asyncio.create_task(records.record_eshop_answer(interaction.channel_id, False, interaction.user.id))
 
         # Show SOAP helper with context for eShop issues
         embed = discord.Embed(

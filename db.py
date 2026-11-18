@@ -34,6 +34,11 @@ MIGRATIONS: list[str] = [
     """ALTER TABLE restrictions
        ADD COLUMN soap_attempts INT UNSIGNED NOT NULL DEFAULT 0 AFTER end_reason,
        ADD COLUMN nnid_attempts INT UNSIGNED NOT NULL DEFAULT 0 AFTER soap_attempts""",
+    # 2: the helpee's answer to "Does the eShop launch successfully?", so SOAPs that didn't work aren't limited
+    """ALTER TABLE transfers
+       ADD COLUMN eshop_works TINYINT(1) NULL COMMENT '1 yes, 0 no, NULL not answered' AFTER message_id,
+       ADD COLUMN eshop_answered_by BIGINT UNSIGNED NULL AFTER eshop_works,
+       ADD COLUMN eshop_answered_at DATETIME NULL AFTER eshop_answered_by""",
 ]
 
 

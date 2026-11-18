@@ -251,6 +251,18 @@ async def record_transfer(
 
 
 @quiet
+async def record_eshop_answer(channel_id: int, works: bool, answered_by: int) -> bool:
+    """Save the answer to "Does the eShop launch successfully?" on the channel's latest SOAP.
+    A SOAP answered no doesn't count toward the SOAP limit."""
+    changed = await db.execute(
+        """UPDATE transfers SET eshop_works = %s, eshop_answered_by = %s, eshop_answered_at = UTC_TIMESTAMP()
+           WHERE channel_id = %s AND kind = 'SOAP' ORDER BY completed_at DESC LIMIT 1""",
+        (int(works), answered_by, channel_id),
+    )
+    return bool(changed)
+
+
+@quiet
 async def recently_recorded(channel_id: int, kind: str, minutes: int = 10) -> bool:
     """Whether this channel already had a transfer recorded in the last few minutes (e.g. .soapnormal right after soap-cat)."""
     row = await db.fetchone(
@@ -635,6 +647,7 @@ async def _soap_limit_hit(user_id: int) -> dict | None:
     rows = await db.fetchall(
         """SELECT completed_at FROM transfers
            WHERE user_id = %s AND kind = 'SOAP' AND completed_at >= %s
+             AND COALESCE(eshop_works, 1) = 1
            ORDER BY completed_at DESC""",
         (user_id, current - timedelta(days=longest)),
     )

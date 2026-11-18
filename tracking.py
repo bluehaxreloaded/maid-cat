@@ -434,6 +434,8 @@ class TrackingCog(commands.Cog):
                     by = guild.get_member(t["soaper_id"]) if guild else None
                     by = by.name if by else (t["soaper_name"] or str(t["soaper_id"]))
                     bits.append(f"by {discord.utils.escape_markdown(by)}")
+                if t.get("eshop_works") == 0:
+                    bits.append("eShop didn't work")
                 lines.append(" · ".join(bits))
             heading = "Transfer History" + (f" (latest {len(transfers)} of {total})" if total > len(transfers) else "")
             embed.add_field(name=heading, value="\n".join(lines)[:1024], inline=False)
@@ -715,7 +717,8 @@ class TrackingCog(commands.Cog):
             description="\n".join(lines) or "No limits set.",
             color=discord.Color.blue(),
         )
-        embed.set_footer(text="Each limit is per person and rolling, e.g. week is any 7 days. NNID transfers aren't limited.")
+        embed.set_footer(text="Each limit is per person and rolling, e.g. week is any 7 days. NNID transfers and SOAPs where "
+            "the helpee said the eShop didn't work aren't counted.")
         await ctx.respond(embed=embed)
 
     @command_with_perms(
