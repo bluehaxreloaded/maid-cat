@@ -23,6 +23,7 @@ SCHEMA_FILE = Path(__file__).parent / "database.sql"
 _lock = threading.Lock()
 _conn = None
 _schema_ready = False
+_schema_lock: asyncio.Lock | None = None  # startup calls arrive together, so only one sets up the schema
 _down_until = 0.0  # after a failed connection, skip the database for a bit instead of waiting on it every time
 DOWN_SECONDS = 60
 
@@ -117,9 +118,18 @@ async def fetchall(sql: str, params=None) -> list[dict]:
 
 async def ensure_schema():
     """Create any missing tables from database.sql. Safe to run on every start."""
-    global _schema_ready
+    global _schema_ready, _schema_lock
     if not enabled() or _schema_ready:
         return
+    if _schema_lock is None:
+        _schema_lock = asyncio.Lock()
+    async with _schema_lock:
+        if not _schema_ready:
+            await _setup_schema()
+
+
+async def _setup_schema():
+    global _schema_ready
     statements = [s.strip() for s in SCHEMA_FILE.read_text(encoding="utf-8").split(";")]
     for statement in statements:
         lines = [l for l in statement.splitlines() if not l.strip().startswith("--")]
